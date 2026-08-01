@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-engineering-bootstrap"
+version = "0.1.0"
+description = "A deterministic CLI for environment audits and project generation."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "rich",
+    "typer",
+]
+
+[project.scripts]
+ai-bootstrap = "ai_engineering_bootstrap.cli:app"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.data-files]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1" = [
+    "templates/ai-app-template-v1/.env.example",
+    "templates/ai-app-template-v1/.gitignore",
+    "templates/ai-app-template-v1/Dockerfile",
+    "templates/ai-app-template-v1/Makefile",
+    "templates/ai-app-template-v1/README.md",
+    "templates/ai-app-template-v1/docker-compose.yml",
+    "templates/ai-app-template-v1/pyproject.toml",
+]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1/.cursor/rules" = [
+    "templates/ai-app-template-v1/.cursor/rules/project.mdc",
+]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1/ADR" = [
+    "templates/ai-app-template-v1/ADR/ADR-000-template.md",
+]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1/configs" = [
+    "templates/ai-app-template-v1/configs/.gitkeep",
+]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1/data" = [
+    "templates/ai-app-template-v1/data/.gitkeep",
+]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1/docs" = [
+    "templates/ai-app-template-v1/docs/architecture.md",
+    "templates/ai-app-template-v1/docs/development.md",
+]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1/models" = [
+    "templates/ai-app-template-v1/models/.gitkeep",
+]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1/notebooks" = [
+    "templates/ai-app-template-v1/notebooks/.gitkeep",
+]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1/src/app" = [
+    "templates/ai-app-template-v1/src/app/__init__.py",
+]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1/tests/integration" = [
+    "templates/ai-app-template-v1/tests/integration/.gitkeep",
+]
+"share/ai-engineering-bootstrap/templates/ai-app-template-v1/tests/unit" = [
+    "templates/ai-app-template-v1/tests/unit/.gitkeep",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"

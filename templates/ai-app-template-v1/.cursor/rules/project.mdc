@@ -1,0 +1,10 @@
+---
+description: Project-wide AI application engineering rules
+alwaysApply: true
+---
+
+- Use Python 3.12, complete type hints, and public docstrings.
+- Keep presentation, application coordination, domain models, and side effects separate.
+- Add unit, error-handling, and validation tests for implemented behavior.
+- Record changes to accepted architecture in a new or superseding ADR.
+- Do not add autonomous or agentic behavior without an approved ADR.
