@@ -28,10 +28,13 @@ class AuditService:
         """Run every configured probe and return a complete ordered report."""
         checks: list[AuditCheck] = []
         for probe in self._probes:
+
             try:
                 checks.append(probe.run())
-            except Exception as error:  # Preserve the aggregate report.
-                checks.append(
+            except BaseException as error: # Preserve the aggregate report while allowing interruption signals.
+                 if isinstance(error, (KeyboardInterrupt, SystemExit)):
+                     raise
+                 checks.append(        
                     AuditCheck(
                         name=type(probe).__name__,
                         status=AuditStatus.ERROR,
