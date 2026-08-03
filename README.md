@@ -47,3 +47,18 @@ GitHub provisioning, CI/CD and Dev Container generation, LLM integration, tool c
 ## Status
 
 Phase 1 currently includes the audit CLI and `ai-app-template-v1` project generation.
+
+## Documentation Index
+
+The following documents define the project architecture and development process.
+
+| Document | Purpose |
+|----------|---------|
+| docs/architecture.md | System architecture |
+| docs/roadmap.md | Project roadmap |
+| docs/development/git-workflow.md | Git workflow |
+| docs/development/github-setup.md | GitHub & SSH setup |
+| docs/development/coding-standards.md | Coding standards |
+| ADR/ | Architecture Decision Records |
+
+These documents are the primary entry points for understanding the project.
