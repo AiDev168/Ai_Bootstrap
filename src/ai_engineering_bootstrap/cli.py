@@ -16,7 +16,17 @@ from ai_engineering_bootstrap.generation import (
     default_project_generator,
     default_template_catalog,
 )
-from ai_engineering_bootstrap.models import AuditReport, GenerationRequest
+from ai_engineering_bootstrap.models import AuditReport, AuditStatus, GenerationRequest
+from ai_engineering_bootstrap.probes.doctor import (
+    DockerExecutableProbe,
+    EditableInstallProbe,
+    GitExecutableProbe,
+    OSProbe,
+    PackageProbe,
+    PlatformProbe,
+    PythonVersionProbe,
+    VirtualEnvProbe,
+)
 
 app = typer.Typer(
     name="ai-bootstrap",
@@ -100,6 +110,82 @@ def create_project(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(code=1) from error
     typer.echo(f"Created project: {result.project_path}")
+
+
+@app.command()
+def doctor() -> None:
+    """Run a read-only environment health check (Environment Doctor)."""
+    # Define all probes to run
+    probes = [
+        PythonVersionProbe(),
+        VirtualEnvProbe(),
+        EditableInstallProbe(),
+        PackageProbe("typer"),
+        PackageProbe("rich"),
+        PackageProbe("pytest"),
+        PackageProbe("ruff"),
+        GitExecutableProbe(),
+        DockerExecutableProbe(),
+        OSProbe(),
+        PlatformProbe(),
+    ]
+    
+    # Run all probes and collect results
+    results = [probe.run() for probe in probes]
+    
+    # Create and render the table
+    table = Table(title="Environment Doctor")
+    table.add_column("Check", style="cyan")
+    table.add_column("Status", style="green")
+    
+    all_ok = True
+    for result in results:
+        status_str = "OK" if result.status == AuditStatus.AVAILABLE else "Missing"
+        if result.status != AuditStatus.AVAILABLE:
+            all_ok = False
+        table.add_row(result.name, status_str)
+    
+    console.print(table)
+    
+    # Print summary
+    console.print()
+    if all_ok:
+        console.print("[green bold]Environment Ready[/green bold]")
+    else:
+        console.print("[red bold]Environment NOT Ready[/red bold]")
+    
+    # Print recommendations for failed checks
+    failed_checks = [r for r in results if r.status != AuditStatus.AVAILABLE]
+    if failed_checks:
+        console.print()
+        console.print("[yellow bold]Recommendations:[/yellow bold]")
+        
+        recommendations = []
+        for check in failed_checks:
+            if "Virtual Environment" in check.name:
+                recommendations.append("python -m venv .venv")
+            elif "Editable Install" in check.name:
+                recommendations.append('python -m pip install -e ".[dev]"')
+            elif check.name in ["Typer", "Rich", "Pytest", "Ruff"]:
+                pkg_name = check.name.lower()
+                recommendations.append(f"pip install {pkg_name}")
+            elif "Git" in check.name:
+                recommendations.append("Install Git from https://git-scm.com/")
+            elif "Docker" in check.name:
+                recommendations.append("Install Docker from https://docker.com/")
+            elif "Python" in check.name:
+                recommendations.append("Upgrade Python to 3.8+")
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_recommendations = []
+        for rec in recommendations:
+            if rec not in seen:
+                seen.add(rec)
+                unique_recommendations.append(rec)
+        
+        for rec in unique_recommendations:
+            console.print(f"  - {rec}")
 
 
 if __name__ == "__main__":
