@@ -1,12 +1,14 @@
 """Bootstrap Planner - generates execution plans based on Doctor results."""
 
-from typing import Any
-
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from ai_engineering_bootstrap.audit import AuditCheck, AuditReport, AuditService
+from ai_engineering_bootstrap.audit import (
+    AuditCheck,
+    AuditReport,
+    default_audit_service,
+)
 
 
 class BootstrapPlanner:
@@ -18,7 +20,8 @@ class BootstrapPlanner:
 
     def run(self) -> None:
         """Run the planner and display the execution plan."""
-        self._audit_report = self._gather_diagnostics()
+        audit_service = default_audit_service()
+        self._audit_report = audit_service.run()
         
         actions = self._generate_actions()
         
@@ -32,11 +35,6 @@ class BootstrapPlanner:
             return
         
         self._display_plan(actions)
-
-    def _gather_diagnostics(self) -> AuditReport:
-        """Gather diagnostics from AuditService without probing directly."""
-        audit_service = AuditService()
-        return audit_service.run()
 
     def _generate_actions(self) -> list[dict[str, str]]:
         """Generate action steps based on audit report results."""
