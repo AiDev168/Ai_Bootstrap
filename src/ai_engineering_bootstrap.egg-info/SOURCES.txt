@@ -7,6 +7,7 @@ src/ai_engineering_bootstrap/config.py
 src/ai_engineering_bootstrap/exceptions.py
 src/ai_engineering_bootstrap/generation.py
 src/ai_engineering_bootstrap/models.py
+src/ai_engineering_bootstrap/planner.py
 src/ai_engineering_bootstrap.egg-info/PKG-INFO
 src/ai_engineering_bootstrap.egg-info/SOURCES.txt
 src/ai_engineering_bootstrap.egg-info/dependency_links.txt
@@ -14,7 +15,7 @@ src/ai_engineering_bootstrap.egg-info/entry_points.txt
 src/ai_engineering_bootstrap.egg-info/requires.txt
 src/ai_engineering_bootstrap.egg-info/top_level.txt
 src/ai_engineering_bootstrap/probes/__init__.py
-src/ai_engineering_bootstrap/probes/environment.py
+src/ai_engineering_bootstrap/probes/doctor.py
 src/ai_engineering_bootstrap/probes/executables.py
 src/ai_engineering_bootstrap/probes/gpu.py
 src/ai_engineering_bootstrap/probes/system.py
