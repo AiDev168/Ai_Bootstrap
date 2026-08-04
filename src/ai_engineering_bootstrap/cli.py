@@ -17,6 +17,7 @@ from ai_engineering_bootstrap.generation import (
     default_template_catalog,
 )
 from ai_engineering_bootstrap.models import AuditReport, AuditStatus, GenerationRequest
+from ai_engineering_bootstrap.planner import BootstrapPlanner
 from ai_engineering_bootstrap.probes.doctor import (
     DockerExecutableProbe,
     EditableInstallProbe,
@@ -235,6 +236,13 @@ def doctor() -> None:
         
         for rec in unique_recommendations:
             console.print(rec)
+
+
+@app.command()
+def plan() -> None:
+    """Generate a read-only execution plan based on environment diagnostics."""
+    planner = BootstrapPlanner(console)
+    planner.run()
 
 
 if __name__ == "__main__":

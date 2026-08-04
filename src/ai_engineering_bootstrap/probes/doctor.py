@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 import sys
-from typing import Protocol
+from dataclasses import dataclass, field
+from typing import Any, Protocol
 
 from ai_engineering_bootstrap.models import AuditCheck, AuditStatus
+
+
+@dataclass
+class DoctorResult:
+    """Container for all doctor probe results."""
+    
+    checks: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 class Probe(Protocol):
