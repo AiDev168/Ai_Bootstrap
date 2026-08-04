@@ -1,0 +1,2 @@
+[console_scripts]
+ai-bootstrap = ai_engineering_bootstrap.cli:app
