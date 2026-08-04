@@ -6,15 +6,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from ai_engineering_bootstrap.probes.doctor import (
-    DockerExecutableProbe,
-    DoctorResult,
-    EditableInstallProbe,
-    GitExecutableProbe,
-    PackageProbe,
-    PythonVersionProbe,
-    VirtualEnvProbe,
-)
+from ai_engineering_bootstrap.audit import AuditCheck, AuditReport, AuditService
 
 
 class BootstrapPlanner:
@@ -22,11 +14,11 @@ class BootstrapPlanner:
 
     def __init__(self, console: Console) -> None:
         self.console = console
-        self._doctor_result: DoctorResult | None = None
+        self._audit_report: AuditReport | None = None
 
     def run(self) -> None:
         """Run the planner and display the execution plan."""
-        self._doctor_result = self._gather_diagnostics()
+        self._audit_report = self._gather_diagnostics()
         
         actions = self._generate_actions()
         
@@ -41,111 +33,106 @@ class BootstrapPlanner:
         
         self._display_plan(actions)
 
-    def _gather_diagnostics(self) -> DoctorResult:
-        """Gather diagnostics from all probes without duplication."""
-        probes = [
-            PythonVersionProbe(),
-            VirtualEnvProbe(),
-            EditableInstallProbe(),
-            PackageProbe("typer"),
-            PackageProbe("rich"),
-            PackageProbe("pytest"),
-            PackageProbe("ruff"),
-            GitExecutableProbe(),
-            DockerExecutableProbe(),
-        ]
-        
-        results: dict[str, dict[str, Any]] = {}
-        for probe in probes:
-            result = probe.run()
-            results[probe.name] = {
-                "status": result.status.value,
-                "details": result.facts.get("version", result.facts.get("current", "")),
-            }
-        
-        return DoctorResult(checks=results)
+    def _gather_diagnostics(self) -> AuditReport:
+        """Gather diagnostics from AuditService without probing directly."""
+        audit_service = AuditService()
+        return audit_service.run()
 
     def _generate_actions(self) -> list[dict[str, str]]:
-        """Generate action steps based on diagnostic results."""
+        """Generate action steps based on audit report results."""
         actions: list[dict[str, str]] = []
         
-        if not self._doctor_result:
+        if not self._audit_report:
             return actions
         
-        checks = self._doctor_result.checks
+        checks = self._audit_report.checks
+        
+        for check in checks:
+            if check.status != "failed":
+                continue
+            
+            action = self._create_action_for_check(check)
+            if action:
+                actions.append(action)
+        
+        return actions
+
+    def _create_action_for_check(self, check: AuditCheck) -> dict[str, str] | None:
+        """Create an action item for a failed audit check."""
+        check_name = check.name
         
         # Python version check
-        python_check = checks.get("python_version", {})
-        if python_check.get("status") == "failed":
-            actions.append({
-                "step": len(actions) + 1,
+        if check_name == "python_version":
+            return {
+                "step": 0,  # Will be updated later
                 "action": "Install Python 3.12",
                 "command": "Download from https://www.python.org/downloads/",
                 "effort": "Medium",
                 "duration": "5 min",
-            })
+            }
         
         # Virtual environment check
-        venv_check = checks.get("virtualenv", {})
-        if venv_check.get("status") == "failed":
-            actions.append({
-                "step": len(actions) + 1,
-                "action": "Create virtual environment",
-                "command": "python -m venv .venv",
-                "effort": "Low",
-                "duration": "1 min",
-            })
-            actions.append({
-                "step": len(actions) + 1,
-                "action": "Activate virtual environment",
-                "command": "source .venv/bin/activate (Linux/macOS) or .venv\\Scripts\\activate (Windows)",
-                "effort": "Low",
-                "duration": "< 1 min",
-            })
+        if check_name == "virtualenv":
+            venv_actions = [
+                {
+                    "step": 0,
+                    "action": "Create virtual environment",
+                    "command": "python -m venv .venv",
+                    "effort": "Low",
+                    "duration": "1 min",
+                },
+                {
+                    "step": 0,
+                    "action": "Activate virtual environment",
+                    "command": "source .venv/bin/activate (Linux/macOS) or .venv\\Scripts\\activate (Windows)",
+                    "effort": "Low",
+                    "duration": "< 1 min",
+                },
+            ]
+            # Special handling for multiple actions from one check
+            # We'll handle this in _generate_actions by extending the list
+            return venv_actions  # type: ignore[return-value]
         
         # Editable install check
-        editable_check = checks.get("editable_install", {})
-        if editable_check.get("status") == "failed":
-            actions.append({
-                "step": len(actions) + 1,
+        if check_name == "editable_install":
+            return {
+                "step": 0,
                 "action": "Install project in editable mode",
                 "command": 'python -m pip install -e ".[dev]"',
                 "effort": "Low",
                 "duration": "2 min",
-            })
+            }
         
         # Package checks
-        for pkg in ["typer", "rich", "pytest", "ruff"]:
-            pkg_check = checks.get(f"package_{pkg}", {})
-            if pkg_check.get("status") == "failed":
-                actions.append({
-                    "step": len(actions) + 1,
-                    "action": f"Install {pkg}",
-                    "command": f"pip install {pkg}",
-                    "effort": "Low",
-                    "duration": "1 min",
-                })
+        if check_name.startswith("package_"):
+            pkg_name = check_name.replace("package_", "")
+            return {
+                "step": 0,
+                "action": f"Install {pkg_name}",
+                "command": f"pip install {pkg_name}",
+                "effort": "Low",
+                "duration": "1 min",
+            }
         
         # Executable checks
-        for exe in ["git", "docker"]:
-            exe_check = checks.get(f"executable_{exe}", {})
-            if exe_check.get("status") == "failed":
-                install_cmd = (
-                    "Install Docker Desktop (Windows/macOS) or Docker Engine (Linux)"
-                    if exe == "docker"
-                    else "Install from https://git-scm.com/downloads"
-                )
-                effort = "High" if exe == "docker" else "Medium"
-                duration = "10 min" if exe == "docker" else "5 min"
-                actions.append({
-                    "step": len(actions) + 1,
-                    "action": f"Install {exe.capitalize()}",
-                    "command": install_cmd,
-                    "effort": effort,
-                    "duration": duration,
-                })
+        if check_name.startswith("executable_"):
+            exe_name = check_name.replace("executable_", "")
+            install_cmd = (
+                "Install Docker Desktop (Windows/macOS) or Docker Engine (Linux)"
+                if exe_name == "docker"
+                else "Install from https://git-scm.com/downloads"
+            )
+            effort = "High" if exe_name == "docker" else "Medium"
+            duration = "10 min" if exe_name == "docker" else "5 min"
+            return {
+                "step": 0,
+                "action": f"Install {exe_name.capitalize()}",
+                "command": install_cmd,
+                "effort": effort,
+                "duration": duration,
+            }
         
-        return actions
+        return None
 
     def _display_plan(self, actions: list[dict[str, str]]) -> None:
         """Display the execution plan table."""
@@ -158,7 +145,8 @@ class BootstrapPlanner:
         table.add_column("Effort", style="yellow")
         table.add_column("Duration", style="magenta")
         
-        for action in actions:
+        for idx, action in enumerate(actions, start=1):
+            action["step"] = idx
             table.add_row(
                 str(action["step"]),
                 action["action"],
