@@ -119,14 +119,14 @@ class TestGitExecutableProbe:
         mock_result = MagicMock()
         mock_result.stdout = "git version 2.40.0"
         
-        with patch("shutil.which", return_value="/usr/bin/git"):
-            with patch("subprocess.run", return_value=mock_result):
-                probe = GitExecutableProbe()
-                result = probe.run()
-                
-                assert result.name == "Git"
-                assert result.status == AuditStatus.AVAILABLE
-                assert "git version" in result.facts["version"]
+        with patch("shutil.which", return_value="/usr/bin/git"), \
+             patch("subprocess.run", return_value=mock_result):
+            probe = GitExecutableProbe()
+            result = probe.run()
+            
+            assert result.name == "Git"
+            assert result.status == AuditStatus.AVAILABLE
+            assert "git version" in result.facts["version"]
 
     def test_git_not_found(self):
         """Test that missing git is detected."""
@@ -136,18 +136,18 @@ class TestGitExecutableProbe:
             
             assert result.name == "Git"
             assert result.status == AuditStatus.NOT_FOUND
-            assert result.facts["path"] == "not found"
+            assert result.facts["version"] == "not found"
 
     def test_git_timeout_error(self):
         """Test that timeout error is handled gracefully."""
-        with patch("shutil.which", return_value="/usr/bin/git"):
-            with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("git", 5)):
-                probe = GitExecutableProbe()
-                result = probe.run()
-                
-                assert result.name == "Git"
-                assert result.status == AuditStatus.AVAILABLE
-                assert result.facts["version"] == "unknown"
+        with patch("shutil.which", return_value="/usr/bin/git"), \
+             patch("subprocess.run", side_effect=subprocess.TimeoutExpired("git", 5)):
+            probe = GitExecutableProbe()
+            result = probe.run()
+            
+            assert result.name == "Git"
+            assert result.status == AuditStatus.AVAILABLE
+            assert result.facts["version"] == "unknown"
 
 
 class TestDockerExecutableProbe:
@@ -158,13 +158,13 @@ class TestDockerExecutableProbe:
         mock_result = MagicMock()
         mock_result.stdout = "Docker version 24.0.0"
         
-        with patch("shutil.which", return_value="/usr/bin/docker"):
-            with patch("subprocess.run", return_value=mock_result):
-                probe = DockerExecutableProbe()
-                result = probe.run()
-                
-                assert result.name == "Docker"
-                assert result.status == AuditStatus.AVAILABLE
+        with patch("shutil.which", return_value="/usr/bin/docker"), \
+             patch("subprocess.run", return_value=mock_result):
+            probe = DockerExecutableProbe()
+            result = probe.run()
+            
+            assert result.name == "Docker"
+            assert result.status == AuditStatus.AVAILABLE
 
     def test_docker_not_found(self):
         """Test that missing docker is detected."""

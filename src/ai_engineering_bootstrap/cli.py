@@ -25,6 +25,7 @@ from ai_engineering_bootstrap.probes.doctor import (
     PackageProbe,
     PlatformProbe,
     PythonVersionProbe,
+    RuntimeTargetProbe,
     VirtualEnvProbe,
 )
 
@@ -128,53 +129,101 @@ def doctor() -> None:
         DockerExecutableProbe(),
         OSProbe(),
         PlatformProbe(),
+        RuntimeTargetProbe(),
     ]
     
     # Run all probes and collect results
     results = [probe.run() for probe in probes]
     
-    # Create and render the table
+    # Create and render the table with three columns
     table = Table(title="Environment Doctor")
     table.add_column("Check", style="cyan")
     table.add_column("Status", style="green")
+    table.add_column("Details", style="white")
     
-    all_ok = True
+    passed = 0
+    failed = 0
+    warnings = 0
+    
     for result in results:
+        # Skip RuntimeTarget from the main table - it's informational
+        if result.name == "Runtime Target":
+            continue
+            
         status_str = "OK" if result.status == AuditStatus.AVAILABLE else "Missing"
-        if result.status != AuditStatus.AVAILABLE:
-            all_ok = False
-        table.add_row(result.name, status_str)
+        if result.status == AuditStatus.AVAILABLE:
+            passed += 1
+        else:
+            failed += 1
+        
+        # Get meaningful details
+        details = result.facts.get("version", result.facts.get("current", result.facts.get("path", "")))
+        if not details or details == "N/A":
+            details = result.facts.get("platform", "")
+            if result.facts.get("architecture"):
+                details = f"{result.facts.get('platform', '')} {result.facts.get('architecture', '')}".strip()
+        
+        # Special handling for specific checks
+        if "Python Version" in result.name:
+            details = result.facts.get("current", "")
+        elif "Virtual Environment" in result.name:
+            details = result.facts.get("path", "N/A")
+        elif "Editable Install" in result.name:
+            details = result.facts.get("package", "ai-engineering-bootstrap")
+        elif result.name in ["Typer", "Rich", "Pytest", "Ruff"]:
+            details = result.facts.get("version", "missing")
+        elif "Git" in result.name or "Docker" in result.name:
+            details = result.facts.get("version", "not found")
+        elif "OS" in result.name:
+            details = result.facts.get("version", "")
+        
+        table.add_row(result.name, status_str, details)
     
     console.print(table)
     
+    # Print runtime target info separately
+    runtime_probe = next((p for p in results if p.name == "Runtime Target"), None)
+    if runtime_probe:
+        console.print()
+        dev_platform = runtime_probe.facts.get("development", "Unknown")
+        target_runtime = runtime_probe.facts.get("target", "Ubuntu 24.04 LTS")
+        
+        console.print(f"[bold]Development Platform:[/bold] {dev_platform}")
+        console.print(f"[bold]Target Runtime:[/bold]      {target_runtime}")
+    
     # Print summary
     console.print()
-    if all_ok:
+    if failed == 0:
         console.print("[green bold]Environment Ready[/green bold]")
     else:
         console.print("[red bold]Environment NOT Ready[/red bold]")
+    
+    console.print(f"Passed: {passed}  Failed: {failed}  Warnings: {warnings}")
     
     # Print recommendations for failed checks
     failed_checks = [r for r in results if r.status != AuditStatus.AVAILABLE]
     if failed_checks:
         console.print()
-        console.print("[yellow bold]Recommendations:[/yellow bold]")
+        console.print("[yellow bold]Recommended actions:[/yellow bold]")
         
         recommendations = []
         for check in failed_checks:
             if "Virtual Environment" in check.name:
-                recommendations.append("python -m venv .venv")
+                recommendations.append("• Create virtual environment")
+                recommendations.append("• Activate virtual environment")
             elif "Editable Install" in check.name:
-                recommendations.append('python -m pip install -e ".[dev]"')
+                recommendations.append("• Install project")
+                recommendations.append('  python -m pip install -e ".[dev]"')
             elif check.name in ["Typer", "Rich", "Pytest", "Ruff"]:
                 pkg_name = check.name.lower()
-                recommendations.append(f"pip install {pkg_name}")
+                recommendations.append(f"• Install {check.name}")
+                recommendations.append(f'  pip install {pkg_name}')
             elif "Git" in check.name:
-                recommendations.append("Install Git from https://git-scm.com/")
+                recommendations.append("• Install Git from https://git-scm.com/")
             elif "Docker" in check.name:
-                recommendations.append("Install Docker from https://docker.com/")
+                recommendations.append("• Install Docker from https://docker.com/")
             elif "Python" in check.name:
-                recommendations.append("Upgrade Python to 3.8+")
+                recommendations.append("• Upgrade Python to 3.8+")
         
         # Remove duplicates while preserving order
         seen = set()
@@ -185,7 +234,7 @@ def doctor() -> None:
                 unique_recommendations.append(rec)
         
         for rec in unique_recommendations:
-            console.print(f"  - {rec}")
+            console.print(rec)
 
 
 if __name__ == "__main__":
