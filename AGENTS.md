@@ -1,5 +1,24 @@
 # AI Engineering Bootstrap
 
+## Mandatory Startup Procedure
+
+Before making any change, read the following documents in this exact order:
+
+1. docs/CONSTITUTION.md
+2. IMPLEMENTATION_WORKFLOW.md
+3. Relevant ADRs
+4. docs/architecture.md (if needed)
+
+These documents have higher priority than feature prompts.
+
+If a feature request conflicts with them:
+
+STOP.
+
+Explain the conflict.
+
+Do not implement conflicting code.
+
 Project Constitution
 
 This document defines the mandatory implementation rules.
