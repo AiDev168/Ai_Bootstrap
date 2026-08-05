@@ -8,6 +8,7 @@ from typing import Literal
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from ai_engineering_bootstrap.audit import default_audit_service
@@ -56,7 +57,6 @@ def _render_table(report: AuditReport) -> None:
         table.add_row(check.name, check.status.value, details)
     console.print(table)
 
-
 @app.command()
 def audit(
     output_format: Literal["table", "json"] = typer.Option(
@@ -66,12 +66,37 @@ def audit(
     ),
 ) -> None:
     """Run a read-only audit of the local engineering environment."""
+
     report = default_audit_service().run()
+
     if output_format == "json":
         typer.echo(json.dumps(_report_data(report), sort_keys=True))
         return
+
     _render_table(report)
 
+    console.print()
+
+    readiness = report.readiness
+
+    if readiness.failed_count == 0:
+        console.print(
+            Panel.fit(
+                "Environment already satisfies the project requirements.",
+                title="No Actions Required",
+                border_style="green",
+            )
+        )
+    else:
+        console.print(
+            Panel.fit(
+                f"Passed: {readiness.passed_count}\n"
+                f"Failed: {readiness.failed_count}\n"
+                f"Warnings: {readiness.warning_count}",
+                title="Actions Required",
+                border_style="yellow",
+            )
+        )
 
 @app.command("list-templates")
 def list_templates() -> None:
