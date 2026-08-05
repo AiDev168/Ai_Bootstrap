@@ -14,6 +14,9 @@ src/ai_engineering_bootstrap.egg-info/dependency_links.txt
 src/ai_engineering_bootstrap.egg-info/entry_points.txt
 src/ai_engineering_bootstrap.egg-info/requires.txt
 src/ai_engineering_bootstrap.egg-info/top_level.txt
+src/ai_engineering_bootstrap/audit/__init__.py
+src/ai_engineering_bootstrap/audit/models.py
+src/ai_engineering_bootstrap/audit/service.py
 src/ai_engineering_bootstrap/probes/__init__.py
 src/ai_engineering_bootstrap/probes/doctor.py
 src/ai_engineering_bootstrap/probes/executables.py
