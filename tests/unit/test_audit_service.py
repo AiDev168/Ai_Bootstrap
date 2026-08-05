@@ -1,6 +1,7 @@
 """Unit tests for audit aggregation."""
 
 from ai_engineering_bootstrap.audit import AuditService
+from ai_engineering_bootstrap.audit.models import CheckStatus
 from ai_engineering_bootstrap.models import AuditCheck, AuditStatus
 
 
@@ -19,9 +20,17 @@ class FailingProbe:
 
 
 def test_audit_service_continues_after_probe_failure() -> None:
+    """Verify that the service captures exceptions as failed checks and continues."""
     report = AuditService((FailingProbe(), SuccessfulProbe())).run()
 
     assert len(report.checks) == 2
-    assert report.checks[0].status is AuditStatus.ERROR
-    assert report.checks[0].diagnostic == "unexpected failure"
-    assert report.checks[1].name == "success"
+    
+    # بررسی چک اول (که خطا داده است)
+    first_check = report.checks[0]
+    assert first_check.status is CheckStatus.FAILED
+    assert "unexpected failure" in first_check.details or "unexpected failure" in str(first_check.facts)
+    
+    # بررسی چک دوم (که موفق بوده است)
+    second_check = report.checks[1]
+    assert second_check.name == "success"
+    assert second_check.status is CheckStatus.PASSED

@@ -71,6 +71,9 @@ The following documents define the project architecture and development process.
 | docs/development/git-workflow.md | Git workflow |
 | docs/development/github-setup.md | GitHub & SSH setup |
 | docs/development/coding-standards.md | Coding standards |
+| docs/development/bootstrap-process.md | Bootstrap workflow |
 | ADR/ | Architecture Decision Records |
 
+
 These documents are the primary entry points for understanding the project.
+
