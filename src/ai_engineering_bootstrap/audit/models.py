@@ -1,4 +1,4 @@
-"""Audit models for Doctor V2."""
+"""Audit models for Doctor V2/V3 - Reporting Layer."""
 
 from dataclasses import dataclass, field
 from enum import Enum
@@ -10,7 +10,6 @@ class CheckStatus(str, Enum):
     PASSED = "passed"
     FAILED = "failed"
     WARNING = "warning"
-    # سایر وضعیت‌ها در صورت نیاز
 
 
 @dataclass(frozen=True)
@@ -39,17 +38,9 @@ class EnvironmentReadiness:
         failed = sum(1 for c in checks if c.status == CheckStatus.FAILED)
         warnings = sum(1 for c in checks if c.status == CheckStatus.WARNING)
 
-        # نگاشت نام‌های نمایشی (از doctor.py) به نام‌های منطقی
-        # توجه: نام‌ها دقیقاً باید با مقدار name در AuditCheck برگشتی از پروب‌ها مطابقت داشته باشند
         dev_critical_names = {
-            "Python Version",
-            "Virtual Environment",
-            "Editable Install",
-            "Typer",
-            "Rich",
-            "Pytest",
-            "Ruff",
-            "Git",
+            "Python Version", "Virtual Environment", "Editable Install",
+            "Typer", "Rich", "Pytest", "Ruff", "Git",
         }
 
         dev_ready = True
@@ -58,23 +49,17 @@ class EnvironmentReadiness:
                 dev_ready = False
                 break
 
-        # Production Ready: Dev Ready + Docker
         docker_check = next((c for c in checks if c.name == "Docker"), None)
-
         prod_ready = dev_ready
         if docker_check and docker_check.status == CheckStatus.FAILED:
             prod_ready = False
 
-        # Calculate Health Score (0-100)
         total_checks = len(checks)
         if total_checks == 0:
             health_score = 100
         else:
-            # Each failed check reduces score by ~10 points
-            # Each warning reduces score by ~5 points
             failure_penalty = 10
             warning_penalty = 5
-            
             raw_score = 100 - (failed * failure_penalty) - (warnings * warning_penalty)
             health_score = max(0, min(100, raw_score))
 
