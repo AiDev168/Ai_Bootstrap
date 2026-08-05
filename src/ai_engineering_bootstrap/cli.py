@@ -29,9 +29,15 @@ app = typer.Typer(
 console = Console()
 
 
-def _report_data(report: AuditReport) -> dict[str, list[dict[str, object]]]:
+def _report_data(report: AuditReport) -> dict[str, object]:
     """Convert an audit report into deterministic JSON-compatible data."""
     return {
+        "health_score": report.readiness.health_score,
+        "development_ready": report.readiness.development_ready,
+        "production_ready": report.readiness.production_ready,
+        "passed_count": report.readiness.passed_count,
+        "failed_count": report.readiness.failed_count,
+        "warning_count": report.readiness.warning_count,
         "checks": [
             {
                 "name": check.name,
@@ -200,6 +206,7 @@ def doctor() -> None:
     console.print(f"[bold]Development Ready :[/bold] {dev_status_str}")
     console.print(f"[bold]Production Ready  :[/bold] {prod_status_str}")
     console.print(f"[bold]Passed :[/bold] {r.passed_count}  [bold]Failed :[/bold] {r.failed_count}  [bold]Warnings :[/bold] {r.warning_count}")
+    console.print(f"[bold]Health Score      :[/bold] {r.health_score}/100")
     
     # Print recommendations for failed checks
     if not r.development_ready:
