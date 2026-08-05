@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from unittest.mock import MagicMock, patch
 
-from ai_engineering_bootstrap.models import AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditStatus
 from ai_engineering_bootstrap.probes.doctor import (
     DockerExecutableProbe,
     EditableInstallProbe,

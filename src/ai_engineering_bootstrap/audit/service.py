@@ -10,10 +10,10 @@ from ai_engineering_bootstrap.audit.models import (
 )
 from ai_engineering_bootstrap.audit.models import (
     AuditReport,
+    AuditStatus,
     CheckStatus,
     EnvironmentReadiness,
 )
-from ai_engineering_bootstrap.models import AuditCheck, AuditStatus
 
 
 class AuditService:
@@ -40,25 +40,25 @@ class AuditService:
                 status = status_map.get(result.status, CheckStatus.FAILED)
 
                 # استخراج جزئیات
-                details = ""
+                details = result.details if hasattr(result, 'details') else ""
                 facts = result.facts or {}
                 
-                if result.diagnostic:
+                if not details and result.diagnostic:
                     details = result.diagnostic
-                elif "version" in facts:
+                elif not details and "version" in facts:
                     details = facts["version"]
-                elif "current" in facts:
+                elif not details and "current" in facts:
                     details = facts["current"]
-                elif "path" in facts:
+                elif not details and "path" in facts:
                     details = facts["path"]
-                elif "system" in facts:
+                elif not details and "system" in facts:
                     details = facts.get("version", facts["system"])
-                elif "platform" in facts:
+                elif not details and "platform" in facts:
                     arch = facts.get("architecture", "")
                     details = f"{facts['platform']} {arch}".strip()
-                elif "editable" in facts:
+                elif not details and "editable" in facts:
                     details = facts.get("package", "ai-engineering-bootstrap")
-                elif facts:
+                elif not details and facts:
                     # اگر هیچکدام نبود، اولین مقدار فکت را بگیر (رفع خطای Ruff PERF102)
                     details = str(next(iter(facts.values())))
                 

@@ -6,7 +6,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from ai_engineering_bootstrap.models import AuditCheck, AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditCheck, AuditStatus
 
 
 @dataclass

@@ -2,7 +2,7 @@
 
 import subprocess
 
-from ai_engineering_bootstrap.models import AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditStatus
 from ai_engineering_bootstrap.probes.executables import ExecutableProbe
 
 

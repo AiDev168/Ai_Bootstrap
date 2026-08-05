@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 
-from ai_engineering_bootstrap.models import AuditCheck, AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditCheck, AuditStatus
 from ai_engineering_bootstrap.probes.executables import CommandRunner
 
 

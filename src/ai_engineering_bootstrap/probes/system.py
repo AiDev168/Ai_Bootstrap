@@ -6,7 +6,7 @@ import platform
 import sys
 from collections.abc import Callable
 
-from ai_engineering_bootstrap.models import AuditCheck, AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditCheck, AuditStatus
 
 
 class OperatingSystemProbe:

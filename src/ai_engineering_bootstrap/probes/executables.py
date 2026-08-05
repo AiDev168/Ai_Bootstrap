@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Callable, Sequence
 
-from ai_engineering_bootstrap.models import AuditCheck, AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditCheck, AuditStatus
 
 CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
 

@@ -1,46 +1,14 @@
-"""Typed domain models for audit and project generation."""
+"""Typed domain models for project generation."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
-from enum import StrEnum
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-
-class AuditStatus(StrEnum):
-    """Outcome reported by an individual audit probe."""
-
-    AVAILABLE = "available"
-    NOT_FOUND = "not_found"
-    UNSUPPORTED = "unsupported"
-    ERROR = "error"
-
-
-@dataclass(frozen=True, slots=True)
-class AuditCheck:
-    """Normalized result produced by one environment probe."""
-
-    name: str
-    status: AuditStatus
-    facts: dict[str, str] = field(default_factory=dict)
-    diagnostic: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class AuditReport:
-    """Complete ordered collection of environment audit checks."""
-
-    checks: tuple[AuditCheck, ...]
-
-
-class AuditProbe(Protocol):
-    """Contract implemented by read-only environment probes."""
-
-    def run(self) -> AuditCheck:
-        """Inspect one environment capability and return its result."""
-        ...
+# Audit models have been moved to ai_engineering_bootstrap.audit.models
+# Import them from there if needed.
 
 
 @dataclass(frozen=True, slots=True)
