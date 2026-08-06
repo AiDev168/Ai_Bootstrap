@@ -2,7 +2,7 @@
 
 import subprocess
 
-from ai_engineering_bootstrap.models import AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditStatus
 from ai_engineering_bootstrap.probes.executables import ExecutableProbe
 
 
@@ -37,7 +37,7 @@ def test_executable_probe_reports_timeout() -> None:
     check = ExecutableProbe("tool", ("tool", "--version"), runner=runner).run()
 
     assert check.status is AuditStatus.ERROR
-    assert check.diagnostic == "version check timed out"
+    assert check.details == "version check timed out"
 
 
 def test_executable_probe_reports_nonzero_exit() -> None:
@@ -47,7 +47,7 @@ def test_executable_probe_reports_nonzero_exit() -> None:
     check = ExecutableProbe("tool", ("tool", "--version"), runner=runner).run()
 
     assert check.status is AuditStatus.ERROR
-    assert check.diagnostic == "not ready"
+    assert check.details == "not ready"
 
 
 def test_executable_probe_rejects_empty_version_output() -> None:
@@ -57,4 +57,4 @@ def test_executable_probe_rejects_empty_version_output() -> None:
     check = ExecutableProbe("tool", ("tool", "--version"), runner=runner).run()
 
     assert check.status is AuditStatus.ERROR
-    assert check.diagnostic == "version command returned no output"
+    assert check.details == "version command returned no output"

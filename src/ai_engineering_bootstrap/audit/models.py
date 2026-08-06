@@ -5,8 +5,16 @@ from enum import Enum
 from typing import Any
 
 
+class AuditStatus(str, Enum):
+    """Outcome reported by an individual audit probe (Source of Truth)."""
+    AVAILABLE = "available"
+    NOT_FOUND = "not_found"
+    UNSUPPORTED = "unsupported"
+    ERROR = "error"
+
+
 class CheckStatus(str, Enum):
-    """Status of an audit check mapped from AuditStatus."""
+    """Status of an audit check mapped from AuditStatus for reporting."""
     PASSED = "passed"
     FAILED = "failed"
     WARNING = "warning"

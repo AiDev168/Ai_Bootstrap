@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 
-from ai_engineering_bootstrap.models import AuditCheck, AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditCheck, AuditStatus
 from ai_engineering_bootstrap.probes.executables import CommandRunner
 
 
@@ -40,28 +40,28 @@ class GpuProbe:
             return AuditCheck(
                 name="gpu",
                 status=AuditStatus.UNSUPPORTED,
-                diagnostic="GPU vendor utility not available",
+                details="GPU vendor utility not available",
             )
         except subprocess.TimeoutExpired:
             return AuditCheck(
                 name="gpu",
                 status=AuditStatus.ERROR,
-                diagnostic="GPU check timed out",
+                details="GPU check timed out",
             )
         except (OSError, subprocess.SubprocessError) as error:
             return AuditCheck(
                 name="gpu",
                 status=AuditStatus.ERROR,
-                diagnostic=str(error),
+                details=str(error),
             )
 
         output = result.stdout.strip()
         if result.returncode != 0 or not output:
-            diagnostic = result.stderr.strip() or "GPU information is not available"
+            details = result.stderr.strip() or "GPU information is not available"
             return AuditCheck(
                 name="gpu",
                 status=AuditStatus.UNSUPPORTED,
-                diagnostic=diagnostic,
+                details=details,
             )
 
         devices = [line.strip() for line in output.splitlines() if line.strip()]

@@ -1,6 +1,6 @@
 """Unit tests for standard-library system probes."""
 
-from ai_engineering_bootstrap.models import AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditStatus
 from ai_engineering_bootstrap.probes.system import (
     OperatingSystemProbe,
     PythonVersionProbe,
@@ -31,7 +31,7 @@ def test_operating_system_probe_normalizes_platform_error() -> None:
     check = OperatingSystemProbe(system=fail).run()
 
     assert check.status is AuditStatus.ERROR
-    assert check.diagnostic == "platform unavailable"
+    assert check.details == "platform unavailable"
 
 
 def test_python_probe_reports_running_interpreter() -> None:

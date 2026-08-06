@@ -1,15 +1,14 @@
 """Unit tests for audit aggregation."""
 
 from ai_engineering_bootstrap.audit import AuditService
-from ai_engineering_bootstrap.audit.models import CheckStatus
-from ai_engineering_bootstrap.models import AuditCheck, AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditCheck, AuditStatus, CheckStatus
 
 
 class SuccessfulProbe:
     """Probe test double returning a fixed successful check."""
 
     def run(self) -> AuditCheck:
-        return AuditCheck("success", AuditStatus.AVAILABLE)
+        return AuditCheck("success", AuditStatus.AVAILABLE, facts={})
 
 
 class FailingProbe:

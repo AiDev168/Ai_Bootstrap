@@ -2,7 +2,7 @@
 
 import subprocess
 
-from ai_engineering_bootstrap.models import AuditStatus
+from ai_engineering_bootstrap.audit.models import AuditStatus
 from ai_engineering_bootstrap.probes.gpu import GpuProbe
 
 
@@ -23,7 +23,7 @@ def test_gpu_probe_is_nonfatal_when_vendor_utility_is_missing() -> None:
     check = GpuProbe(runner=runner).run()
 
     assert check.status is AuditStatus.UNSUPPORTED
-    assert check.diagnostic == "GPU vendor utility not available"
+    assert check.details == "GPU vendor utility not available"
 
 
 def test_gpu_probe_reports_vendor_error_as_unsupported() -> None:
@@ -33,4 +33,4 @@ def test_gpu_probe_reports_vendor_error_as_unsupported() -> None:
     check = GpuProbe(runner=runner).run()
 
     assert check.status is AuditStatus.UNSUPPORTED
-    assert check.diagnostic == "no devices found"
+    assert check.details == "no devices found"
