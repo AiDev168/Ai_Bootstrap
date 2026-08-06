@@ -42,7 +42,7 @@ class OperatingSystemProbe:
             return AuditCheck(
                 name="operating_system",
                 status=AuditStatus.ERROR,
-                diagnostic=str(error),
+                details=str(error),
             )
 
 

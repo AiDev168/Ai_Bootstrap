@@ -37,7 +37,7 @@ class PythonVersionProbe:
             name="Python Version",
             status=AuditStatus.AVAILABLE if is_ok else AuditStatus.UNSUPPORTED,
             facts={"current": f"{current[0]}.{current[1]}.{current[2]}", "required": f">={self.min_version[0]}.{self.min_version[1]}"},
-            diagnostic=None if is_ok else f"Python {current[0]}.{current[1]} is too old. Upgrade to {self.min_version[0]}.{self.min_version[1]}+",
+            details="" if is_ok else f"Python {current[0]}.{current[1]} is too old. Upgrade to {self.min_version[0]}.{self.min_version[1]}+",
         )
 
 
@@ -52,7 +52,7 @@ class VirtualEnvProbe:
             name="Virtual Environment",
             status=AuditStatus.AVAILABLE if in_venv else AuditStatus.NOT_FOUND,
             facts={"in_venv": str(in_venv), "path": venv_name},
-            diagnostic=None if in_venv else "Not running in a virtual environment",
+            details="" if in_venv else "Not running in a virtual environment",
         )
 
 
@@ -83,14 +83,14 @@ class EditableInstallProbe:
                 name="Editable Install",
                 status=AuditStatus.AVAILABLE if is_editable else AuditStatus.NOT_FOUND,
                 facts={"editable": str(is_editable), "package": "ai-engineering-bootstrap"},
-                diagnostic=None if is_editable else "Package is not installed in editable mode",
+                details="" if is_editable else "Package is not installed in editable mode",
             )
         except metadata.PackageNotFoundError:
             return AuditCheck(
                 name="Editable Install",
                 status=AuditStatus.NOT_FOUND,
                 facts={"editable": "false", "package": "ai-engineering-bootstrap"},
-                diagnostic="Package not found. Install with: pip install -e '.'",
+                details="Package not found. Install with: pip install -e '.'",
             )
 
 
@@ -109,14 +109,14 @@ class PackageProbe:
                 name=self.package_name.capitalize(),
                 status=AuditStatus.AVAILABLE,
                 facts={"version": version},
-                diagnostic=None,
+                details="",
             )
         except metadata.PackageNotFoundError:
             return AuditCheck(
                 name=self.package_name.capitalize(),
                 status=AuditStatus.NOT_FOUND,
                 facts={"version": "missing"},
-                diagnostic=f"Package '{self.package_name}' is not installed",
+                details=f"Package '{self.package_name}' is not installed",
             )
 
 
@@ -149,7 +149,7 @@ class GitExecutableProbe:
             name="Git",
             status=AuditStatus.AVAILABLE if is_ok else AuditStatus.NOT_FOUND,
             facts={"version": version},
-            diagnostic=None if is_ok else "Git is not installed or not in PATH",
+            details="" if is_ok else "Git is not installed or not in PATH",
         )
 
 
@@ -182,7 +182,7 @@ class DockerExecutableProbe:
             name="Docker",
             status=AuditStatus.AVAILABLE if is_ok else AuditStatus.NOT_FOUND,
             facts={"version": version},
-            diagnostic=None if is_ok else "Docker is not installed or not in PATH",
+            details="" if is_ok else "Docker is not installed or not in PATH",
         )
 
 
@@ -213,7 +213,7 @@ class OSProbe:
             name="OS",
             status=AuditStatus.AVAILABLE,
             facts={"system": os_name, "version": os_display},
-            diagnostic=None,
+            details="",
         )
 
 
@@ -234,7 +234,7 @@ class PlatformProbe:
             name="Platform",
             status=AuditStatus.AVAILABLE,
             facts={"platform": platform_name, "architecture": arch},
-            diagnostic=None,
+            details="",
         )
 
 
@@ -268,5 +268,5 @@ class RuntimeTargetProbe:
             name="Runtime Target",
             status=AuditStatus.AVAILABLE,
             facts={"development": dev_platform, "target": target_runtime, "is_windows_dev": str(is_windows)},
-            diagnostic=None,
+            details="",
         )

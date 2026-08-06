@@ -38,7 +38,7 @@ class TestPythonVersionProbe:
         
         assert result.name == "Python Version"
         assert result.status == AuditStatus.UNSUPPORTED
-        assert result.diagnostic is not None
+        assert result.details is not None
 
 
 class TestVirtualEnvProbe:
@@ -82,7 +82,7 @@ class TestEditableInstallProbe:
             
             assert result.name == "Editable Install"
             assert result.status == AuditStatus.NOT_FOUND
-            assert result.diagnostic is not None
+            assert result.details is not None
 
 
 class TestPackageProbe:

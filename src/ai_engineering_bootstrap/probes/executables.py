@@ -42,13 +42,13 @@ class ExecutableProbe:
             return AuditCheck(
                 name=self._name,
                 status=AuditStatus.ERROR,
-                diagnostic="version check timed out",
+                details="version check timed out",
             )
         except (OSError, subprocess.SubprocessError) as error:
             return AuditCheck(
                 name=self._name,
                 status=AuditStatus.ERROR,
-                diagnostic=str(error),
+                details=str(error),
             )
 
         output = (result.stdout or result.stderr).strip()
@@ -56,13 +56,13 @@ class ExecutableProbe:
             return AuditCheck(
                 name=self._name,
                 status=AuditStatus.ERROR,
-                diagnostic=output or f"command exited with status {result.returncode}",
+                details=output or f"command exited with status {result.returncode}",
             )
         if not output:
             return AuditCheck(
                 name=self._name,
                 status=AuditStatus.ERROR,
-                diagnostic="version command returned no output",
+                details="version command returned no output",
             )
         return AuditCheck(
             name=self._name,

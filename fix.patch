@@ -1,0 +1,313 @@
+diff --git a/src/ai_engineering_bootstrap/probes/doctor.py b/src/ai_engineering_bootstrap/probes/doctor.py
+index 1234567..abcdefg 100644
+--- a/src/ai_engineering_bootstrap/probes/doctor.py
++++ b/src/ai_engineering_bootstrap/probes/doctor.py
+@@ -36,7 +36,7 @@ class PythonVersionProbe:
+         return AuditCheck(
+             name="Python Version",
+             status=AuditStatus.AVAILABLE if is_ok else AuditStatus.UNSUPPORTED,
+-            facts={"current": f"{current[0]}.{current[1]}.{current[2]}", "required": f">={self.min_version[0]}.{self.min_version[1]}"},
+-            diagnostic=None if is_ok else f"Python {current[0]}.{current[1]} is too old. Upgrade to {self.min_version[0]}.{self.min_version[1]}+",
++            details="" if is_ok else f"Python {current[0]}.{current[1]} is too old. Upgrade to {self.min_version[0]}.{self.min_version[1]}+",
+         )
+ 
+@@ -51,7 +51,7 @@ class VirtualEnvProbe:
+         return AuditCheck(
+             name="Virtual Environment",
+             status=AuditStatus.AVAILABLE if in_venv else AuditStatus.NOT_FOUND,
+-            facts={"in_venv": str(in_venv), "path": venv_name},
+-            diagnostic=None if in_venv else "Not running in a virtual environment",
++            details="" if in_venv else "Not running in a virtual environment",
+         )
+ 
+@@ -89,7 +89,7 @@ class EditableInstallProbe:
+             return AuditCheck(
+                 name="Editable Install",
+                 status=AuditStatus.NOT_FOUND,
+-                facts={"editable": "false", "package": "ai-engineering-bootstrap"},
+-                diagnostic="Package not found. Install with: pip install -e '.'",
++                details="Package not found. Install with: pip install -e '.'",
+             )
+ 
+@@ -108,7 +108,7 @@ class PackageProbe:
+             return AuditCheck(
+                 name=self.package_name.capitalize(),
+                 status=AuditStatus.AVAILABLE,
+-                facts={"version": version},
+-                diagnostic=None,
++                details="",
+             )
+         except metadata.PackageNotFoundError:
+             return AuditCheck(
+                 name=self.package_name.capitalize(),
+                 status=AuditStatus.NOT_FOUND,
+-                facts={"version": "missing"},
+-                diagnostic=f"Package '{self.package_name}' is not installed",
++                details=f"Package '{self.package_name}' is not installed",
+             )
+ 
+@@ -148,7 +148,7 @@ class GitExecutableProbe:
+         return AuditCheck(
+             name="Git",
+             status=AuditStatus.AVAILABLE if is_ok else AuditStatus.NOT_FOUND,
+-            facts={"version": version},
+-            diagnostic=None if is_ok else "Git is not installed or not in PATH",
++            details="" if is_ok else "Git is not installed or not in PATH",
+         )
+ 
+@@ -181,7 +181,7 @@ class DockerExecutableProbe:
+         return AuditCheck(
+             name="Docker",
+             status=AuditStatus.AVAILABLE if is_ok else AuditStatus.NOT_FOUND,
+-            facts={"version": version},
+-            diagnostic=None if is_ok else "Docker is not installed or not in PATH",
++            details="" if is_ok else "Docker is not installed or not in PATH",
+         )
+ 
+@@ -212,7 +212,7 @@ class OSProbe:
+         return AuditCheck(
+             name="OS",
+             status=AuditStatus.AVAILABLE,
+-            facts={"system": os_name, "version": os_display},
+-            diagnostic=None,
++            details="",
+         )
+ 
+@@ -233,7 +233,7 @@ class PlatformProbe:
+         return AuditCheck(
+             name="Platform",
+             status=AuditStatus.AVAILABLE,
+-            facts={"platform": platform_name, "architecture": arch},
+-            diagnostic=None,
++            details="",
+         )
+diff --git a/src/ai_engineering_bootstrap/probes/executables.py b/src/ai_engineering_bootstrap/probes/executables.py
+index 2345678..bcdefgh 100644
+--- a/src/ai_engineering_bootstrap/probes/executables.py
++++ b/src/ai_engineering_bootstrap/probes/executables.py
+@@ -42,7 +42,7 @@ class ExecutableProbe:
+             return AuditCheck(
+                 name=self._name,
+                 status=AuditStatus.ERROR,
+-                diagnostic="version check timed out",
++                details="version check timed out",
+             )
+         except (OSError, subprocess.SubprocessError) as error:
+             return AuditCheck(
+                 name=self._name,
+                 status=AuditStatus.ERROR,
+-                diagnostic=str(error),
++                details=str(error),
+             )
+ 
+@@ -56,7 +56,7 @@ class ExecutableProbe:
+             return AuditCheck(
+                 name=self._name,
+                 status=AuditStatus.ERROR,
+-                diagnostic=output or f"command exited with status {result.returncode}",
++                details=output or f"command exited with status {result.returncode}",
+             )
+         if not output:
+             return AuditCheck(
+                 name=self._name,
+                 status=AuditStatus.ERROR,
+-                diagnostic="version command returned no output",
++                details="version command returned no output",
+             )
+diff --git a/src/ai_engineering_bootstrap/probes/gpu.py b/src/ai_engineering_bootstrap/probes/gpu.py
+index 3456789..cdefghi 100644
+--- a/src/ai_engineering_bootstrap/probes/gpu.py
++++ b/src/ai_engineering_bootstrap/probes/gpu.py
+@@ -28,7 +28,7 @@ class GpuProbe:
+             return AuditCheck(
+                 name="gpu",
+                 status=AuditStatus.UNSUPPORTED,
+-                diagnostic="GPU vendor utility not available",
++                details="GPU vendor utility not available",
+             )
+         except subprocess.TimeoutExpired:
+             return AuditCheck(
+                 name="gpu",
+                 status=AuditStatus.ERROR,
+-                diagnostic="GPU check timed out",
++                details="GPU check timed out",
+             )
+         except (OSError, subprocess.SubprocessError) as error:
+             return AuditCheck(
+                 name="gpu",
+                 status=AuditStatus.ERROR,
+-                diagnostic=str(error),
++                details=str(error),
+             )
+ 
+@@ -45,7 +45,7 @@ class GpuProbe:
+             return AuditCheck(
+                 name="gpu",
+                 status=AuditStatus.UNSUPPORTED,
+-                diagnostic=diagnostic,
++                details=diagnostic,
+             )
+ 
+         devices = [line.strip() for line in output.splitlines() if line.strip()]
+diff --git a/tests/unit/test_audit_service.py b/tests/unit/test_audit_service.py
+index 4567890..defghij 100644
+--- a/tests/unit/test_audit_service.py
++++ b/tests/unit/test_audit_service.py
+@@ -25,7 +25,7 @@ def test_audit_service_continues_after_probe_failure() -> None:
+     # بررسی چک اول (که خطا داده است)
+     first_check = report.checks[0]
+     assert first_check.status is CheckStatus.FAILED
+-    assert "unexpected failure" in first_check.details or "unexpected failure" in str(first_check.facts)
++    assert "unexpected failure" in first_check.details
+ 
+     # بررسی چک دوم (که موفق بوده است)
+     second_check = report.checks[1]
+diff --git a/tests/unit/test_cli.py b/tests/unit/test_cli.py
+index 5678901..efghijk 100644
+--- a/tests/unit/test_cli.py
++++ b/tests/unit/test_cli.py
+@@ -15,7 +15,11 @@ class StubAuditService:
+     def run(self) -> AuditReport:
+         checks = [
+             AuditCheck(
+-                name="python",
+-                status=AuditStatus.AVAILABLE,
+-                facts={"version": "3.12.0"},
++                name="python", status=AuditStatus.AVAILABLE,
++                facts={"version": "3.12.0"}, details=""
+             ),
+         ]
+-        # ایجاد یک نمونه EnvironmentReadiness برای رفع خطای تست
+         readiness = EnvironmentReadiness(
+             development_ready=True,
+             production_ready=True,
+diff --git a/tests/unit/test_doctor_command.py b/tests/unit/test_doctor_command.py
+index 6789012..fghijkl 100644
+--- a/tests/unit/test_doctor_command.py
++++ b/tests/unit/test_doctor_command.py
+@@ -27,7 +27,7 @@ class TestPythonVersionProbe:
+         probe = PythonVersionProbe(min_version=(3, 8))
+         result = probe.run()
+         assert result.status == AuditStatus.AVAILABLE
+-        assert result.diagnostic is None
++        assert result.details == ""
+ 
+     def test_python_version_unsupported_old_version(self):
+         """Test that old Python version is reported as unsupported."""
+@@ -37,7 +37,7 @@ class TestPythonVersionProbe:
+         probe = PythonVersionProbe(min_version=(99, 0))
+         result = probe.run()
+         assert result.status == AuditStatus.UNSUPPORTED
+-        assert "too old" in result.diagnostic
++        assert "too old" in result.details
+ 
+     @patch("sys.prefix", "/path/to/venv")
+     @patch("sys.base_prefix", "/usr")
+@@ -52,7 +52,7 @@ class TestVirtualEnvProbe:
+         probe = VirtualEnvProbe()
+         result = probe.run()
+         assert result.status == AuditStatus.AVAILABLE
+-        assert result.diagnostic is None
++        assert result.details == ""
+ 
+     @patch("sys.prefix", "/usr")
+     @patch("sys.base_prefix", "/usr")
+@@ -66,7 +66,7 @@ class TestVirtualEnvProbe:
+             probe = VirtualEnvProbe()
+             result = probe.run()
+             assert result.status == AuditStatus.NOT_FOUND
+-            assert "Not running" in result.diagnostic
++            assert "Not running" in result.details
+ 
+     def test_editable_install_not_found_when_package_missing(self):
+         """Test that missing package is reported."""
+@@ -81,7 +81,7 @@ class TestEditableInstallProbe:
+             probe = EditableInstallProbe()
+             result = probe.run()
+             assert result.status == AuditStatus.NOT_FOUND
+-            assert "Package not found" in result.diagnostic
++            assert "Package not found" in result.details
+ 
+     def test_package_available(self):
+         """Test that installed package is detected."""
+@@ -95,7 +95,7 @@ class TestPackageProbe:
+             probe = PackageProbe("testpkg")
+             result = probe.run()
+             assert result.status == AuditStatus.AVAILABLE
+-            assert result.diagnostic is None
++            assert result.details == ""
+ 
+     def test_package_not_found(self):
+         """Test that missing package is detected."""
+@@ -107,7 +107,7 @@ class TestPackageProbe:
+             probe = PackageProbe("missing_pkg")
+             result = probe.run()
+             assert result.status == AuditStatus.NOT_FOUND
+-            assert "not installed" in result.diagnostic
++            assert "not installed" in result.details
+ 
+     def test_git_available(self):
+         """Test that git is detected when available."""
+@@ -125,7 +125,7 @@ class TestGitExecutableProbe:
+             probe = GitExecutableProbe()
+             result = probe.run()
+             assert result.status == AuditStatus.AVAILABLE
+-            assert result.diagnostic is None
++            assert result.details == ""
+ 
+     def test_git_not_found(self):
+         """Test that missing git is detected."""
+@@ -135,7 +135,7 @@ class TestGitExecutableProbe:
+             probe = GitExecutableProbe()
+             result = probe.run()
+             assert result.status == AuditStatus.NOT_FOUND
+-            assert "not installed" in result.diagnostic
++            assert "not installed" in result.details
+ 
+     def test_git_timeout_error(self):
+         """Test that timeout error is handled gracefully."""
+@@ -146,7 +146,7 @@ class TestGitExecutableProbe:
+             probe = GitExecutableProbe()
+             result = probe.run()
+             assert result.status == AuditStatus.NOT_FOUND
+-            assert "unknown" in result.facts.get("version", "")
++            assert "unknown" in result.facts.get("version", "")
+ 
+     def test_docker_available(self):
+         """Test that docker is detected when available."""
+@@ -164,7 +164,7 @@ class TestDockerExecutableProbe:
+             probe = DockerExecutableProbe()
+             result = probe.run()
+             assert result.status == AuditStatus.AVAILABLE
+-            assert result.diagnostic is None
++            assert result.details == ""
+ 
+     def test_docker_not_found(self):
+         """Test that missing docker is detected."""
+@@ -173,7 +173,7 @@ class TestDockerExecutableProbe:
+             probe = DockerExecutableProbe()
+             result = probe.run()
+             assert result.status == AuditStatus.NOT_FOUND
+-            assert "not installed" in result.diagnostic
++            assert "not installed" in result.details
+ 
+     def test_os_probe_always_available(self):
+         """Test that OS probe always returns available."""
+@@ -185,7 +185,7 @@ class TestOSProbe:
+         probe = OSProbe()
+         result = probe.run()
+         assert result.status == AuditStatus.AVAILABLE
+-        assert result.diagnostic is None
++        assert result.details == ""
+ 
+     def test_platform_probe_always_available(self):
+         """Test that platform probe always returns available."""
+@@ -198,7 +198,7 @@ class TestPlatformProbe:
+         probe = PlatformProbe()
+         result = probe.run()
+         assert result.status == AuditStatus.AVAILABLE
+-        assert result.diagnostic is None
++        assert result.details == ""
+ 
+     @patch("platform.system", return_value="Windows")
+     def test_platform_windows(self, mock_system):

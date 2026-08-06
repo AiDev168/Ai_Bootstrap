@@ -31,7 +31,7 @@ def test_operating_system_probe_normalizes_platform_error() -> None:
     check = OperatingSystemProbe(system=fail).run()
 
     assert check.status is AuditStatus.ERROR
-    assert check.diagnostic == "platform unavailable"
+    assert check.details == "platform unavailable"
 
 
 def test_python_probe_reports_running_interpreter() -> None:
