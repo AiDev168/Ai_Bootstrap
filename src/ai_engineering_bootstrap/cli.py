@@ -35,7 +35,7 @@ def _report_data(report: AuditReport) -> dict[str, Any]:
             {
                 "name": check.name,
                 "status": check.status.value,
-                "category": check.category.value,  # افزوده شده برای V3
+                "category": check.category.value,
                 "facts": check.facts,
                 "details": check.details,
             }
@@ -59,7 +59,7 @@ def _render_table(report: AuditReport) -> None:
     table.add_column("Check")
     table.add_column("Status")
     table.add_column("Details")
-    
+
     for check in report.checks:
         status_str = "OK" if check.status == CheckStatus.PASSED else "FAILED"
         if check.status == CheckStatus.WARNING:
@@ -85,6 +85,9 @@ def audit(
     report = default_audit_service().run()
     if output_format == "json":
         typer.echo(json.dumps(_report_data(report), sort_keys=True, indent=2))
+        # Exit code logic: 0 if development_ready, else 1
+        if not report.readiness.development_ready:
+            raise typer.Exit(code=1)
         return
     _render_table(report)
 
@@ -125,48 +128,48 @@ def doctor() -> None:
     """Run a read-only environment health check (Environment Doctor V3)."""
     audit_service = default_audit_service()
     report = audit_service.run()
-    
-    # گروه‌بندی چک‌ها بر اساس دسته‌بندی (ویژگی اصلی V3)
+
+    # Group checks by category
     grouped_checks: dict[str, list] = {}
     for check in report.checks:
         cat = check.category.value
         if cat not in grouped_checks:
             grouped_checks[cat] = []
         grouped_checks[cat].append(check)
-    
-    # نمایش جداول گروه‌بندی شده
+
+    # Display grouped tables
     for category, checks in grouped_checks.items():
         table = Table(title=f"[bold cyan]{category}[/bold cyan]")
         table.add_column("Check", style="cyan")
         table.add_column("Status", style="green")
         table.add_column("Details", style="white")
-        
+
         for check in checks:
             status_str = "OK" if check.status == CheckStatus.PASSED else "FAILED"
             if check.status == CheckStatus.WARNING:
                 status_str = "WARNING"
-            
+
             details = check.details
             if not details:
                 details = check.facts.get("version", check.facts.get("current", ""))
-            
+
             table.add_row(check.name, status_str, details)
-        
+
         console.print(table)
-        console.print() # خط خالی بین گروه‌ها
-    
-    # خلاصه وضعیت
+        console.print()  # Empty line between groups
+
+    # Print Summary
     r = report.readiness
     dev_status_str = "[green]YES[/green]" if r.development_ready else "[red]NO[/red]"
     prod_status_str = "[green]YES[/green]" if r.production_ready else "[red]NO[/red]"
-    
+
     console.rule("[bold]Summary[/bold]")
     console.print(f"[bold]Development Ready :[/bold] {dev_status_str}")
     console.print(f"[bold]Production Ready  :[/bold] {prod_status_str}")
     console.print(f"[bold]Health Score      :[/bold] {r.health_score}/100")
     console.print(f"[bold]Passed :[/bold] {r.passed_count}  [bold]Failed :[/bold] {r.failed_count}  [bold]Warnings :[/bold] {r.warning_count}")
-    
-    # پیشنهادات
+
+    # Recommendations
     if not r.development_ready:
         console.print()
         console.print("[yellow bold]Recommended actions:[/yellow bold]")
@@ -187,7 +190,7 @@ def doctor() -> None:
                     recommendations.append("• Upgrade Python")
                 else:
                     recommendations.append(f"• Fix {check.name}")
-        
+
         seen = set()
         for rec in recommendations:
             if rec not in seen:
