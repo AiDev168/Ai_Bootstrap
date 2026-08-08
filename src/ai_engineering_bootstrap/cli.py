@@ -38,6 +38,7 @@ def _report_data(report: AuditReport) -> dict[str, Any]:
                 "category": check.category.value,
                 "facts": check.facts,
                 "details": check.details,
+                "recommendations": check.recommendations,
             }
             for check in report.checks
         ],
@@ -84,11 +85,10 @@ def audit(
     """Run a read-only audit of the local engineering environment."""
     report = default_audit_service().run()
     if output_format == "json":
+        # تعیین کد خروجی بر اساس development_ready
+        exit_code = 0 if report.readiness.development_ready else 1
         typer.echo(json.dumps(_report_data(report), sort_keys=True, indent=2))
-        # Exit code logic: 0 if development_ready, else 1
-        if not report.readiness.development_ready:
-            raise typer.Exit(code=1)
-        return
+        raise typer.Exit(code=exit_code)
     _render_table(report)
 
 
@@ -129,7 +129,7 @@ def doctor() -> None:
     audit_service = default_audit_service()
     report = audit_service.run()
 
-    # Group checks by category
+    # گروه‌بندی چک‌ها بر اساس دسته‌بندی
     grouped_checks: dict[str, list] = {}
     for check in report.checks:
         cat = check.category.value
@@ -137,7 +137,7 @@ def doctor() -> None:
             grouped_checks[cat] = []
         grouped_checks[cat].append(check)
 
-    # Display grouped tables
+    # نمایش جداول گروه‌بندی شده
     for category, checks in grouped_checks.items():
         table = Table(title=f"[bold cyan]{category}[/bold cyan]")
         table.add_column("Check", style="cyan")
@@ -156,46 +156,33 @@ def doctor() -> None:
             table.add_row(check.name, status_str, details)
 
         console.print(table)
-        console.print()  # Empty line between groups
+        console.print()
 
-    # Print Summary
+    # خلاصه وضعیت
     r = report.readiness
     dev_status_str = "[green]YES[/green]" if r.development_ready else "[red]NO[/red]"
     prod_status_str = "[green]YES[/green]" if r.production_ready else "[red]NO[/red]"
 
     console.rule("[bold]Summary[/bold]")
     console.print(f"[bold]Development Ready :[/bold] {dev_status_str}")
-    console.print(f"[bold]Production Ready  :[/bold] {prod_status_str}")
+    console.print(f"[bold]Production Ready :[/bold] {prod_status_str}")
     console.print(f"[bold]Health Score      :[/bold] {r.health_score}/100")
     console.print(f"[bold]Passed :[/bold] {r.passed_count}  [bold]Failed :[/bold] {r.failed_count}  [bold]Warnings :[/bold] {r.warning_count}")
 
-    # Recommendations
-    if not r.development_ready:
-        console.print()
-        console.print("[yellow bold]Recommended actions:[/yellow bold]")
-        recommendations = []
-        for check in report.checks:
-            if check.status == CheckStatus.FAILED:
-                if "Virtual Environment" in check.name:
-                    recommendations.append("• Create and activate virtual environment")
-                elif "Editable Install" in check.name:
-                    recommendations.append('• Run: pip install -e ".[dev]"')
-                elif check.name.lower() in ["typer", "rich", "pytest", "ruff"]:
-                    recommendations.append(f"• Run: pip install {check.name.lower()}")
-                elif "Git" in check.name:
-                    recommendations.append("• Install Git")
-                elif "Docker" in check.name:
-                    recommendations.append("• Install Docker")
-                elif "Python" in check.name:
-                    recommendations.append("• Upgrade Python")
-                else:
-                    recommendations.append(f"• Fix {check.name}")
+    # نمایش توصیه‌ها (Recommendations)
+    all_recommendations = set()
+    for check in report.checks:
+        for rec in check.recommendations:
+            all_recommendations.add(rec)
 
-        seen = set()
-        for rec in recommendations:
-            if rec not in seen:
-                seen.add(rec)
-                console.print(rec)
+    console.print()
+    if all_recommendations:
+        console.print("[yellow bold]Recommended actions:[/yellow bold]")
+        for rec in sorted(all_recommendations):
+            console.print(f"• {rec}")
+    else:
+        console.print("[green bold]No Actions Required[/green bold]")
+        console.print("Environment already satisfies the project requirements.")
 
 
 @app.command()

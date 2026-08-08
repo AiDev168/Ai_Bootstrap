@@ -36,9 +36,10 @@ class AuditCheck:
     """Represents a single audit check result normalized for reporting."""
     name: str
     status: CheckStatus
-    category: CheckCategory = CheckCategory.SYSTEM  # مقدار پیش‌فرض برای سازگاری
+    category: CheckCategory = CheckCategory.SYSTEM
     details: str = ""
     facts: dict[str, Any] = field(default_factory=dict)
+    recommendations: list[str] = field(default_factory=list)  # NEW FIELD
 
 
 @dataclass(frozen=True)
