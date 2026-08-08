@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Typer command-line interface for AI Engineering Bootstrap."""
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from rich.table import Table
 from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.audit.models import AuditReport, CheckStatus
 from ai_engineering_bootstrap.exceptions import BootstrapError
+from ai_engineering_bootstrap.executor import ExecutorEngine
 from ai_engineering_bootstrap.generation import (
     default_project_generator,
     default_template_catalog,
@@ -196,6 +198,53 @@ def plan() -> None:
         console.print(f"{i}. [cyan]{action.description}[/cyan]")
         console.print(f"   [dim]ID: {action.action_id} | Priority: {action.priority}[/dim]")
         console.print()
+
+
+@app.command()
+def execute() -> None:
+    """
+    Execute the generated plan (SAFE MODE / DRY RUN).
+
+    WARNING: This is a foundation feature.
+    NO real system changes will be made.
+    Actions are simulated to verify the execution pipeline.
+    """
+    audit_service = default_audit_service()
+    report = audit_service.run()
+
+    # Generate plan
+    planner = PlannerEngine()
+    plan = planner.generate_plan(report)
+
+    if not plan.is_actionable:
+        console.print("[green]✓ Environment is healthy. No actions to execute.[/green]")
+        return
+
+    console.print("[yellow bold]⚠️ SAFE MODE ACTIVE[/yellow bold]")
+    console.print("The following actions would be taken, but are currently simulated:")
+    console.print()
+
+    # Execute plan
+    executor = ExecutorEngine()
+    result = executor.execute(plan)
+
+    # Display results
+    for res in result.results:
+        status_color = (
+            "green"
+            if res.status.value == "success"
+            else ("red" if res.status.value == "failed" else "yellow")
+        )
+        status_str = res.status.value.upper()
+        console.print(f"[{status_color}]• [{status_str}] {res.action_id}[/{status_color}]")
+        console.print(f"  [dim]{res.message}[/dim]")
+
+    console.print()
+    final_color = "green" if result.is_success else "red"
+    console.print(f"[{final_color} bold]{result.summary}[/{final_color} bold]")
+    console.print(
+        "\n[dim]Note: Real system modification handlers are not yet implemented.[/dim]"
+    )
 
 
 @app.command()
