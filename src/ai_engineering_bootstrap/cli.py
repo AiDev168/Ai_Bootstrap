@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import typer
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
 from ai_engineering_bootstrap.audit import default_audit_service
@@ -29,39 +28,50 @@ app = typer.Typer(
 console = Console()
 
 
-def _report_data(report: AuditReport) -> dict[str, object]:
+def _report_data(report: AuditReport) -> dict[str, Any]:
     """Convert an audit report into deterministic JSON-compatible data."""
     return {
-        "health_score": report.readiness.health_score,
-        "development_ready": report.readiness.development_ready,
-        "production_ready": report.readiness.production_ready,
-        "passed_count": report.readiness.passed_count,
-        "failed_count": report.readiness.failed_count,
-        "warning_count": report.readiness.warning_count,
         "checks": [
             {
                 "name": check.name,
                 "status": check.status.value,
+                "category": check.category.value,  # افزوده شده برای V3
                 "facts": check.facts,
-                "diagnostic": getattr(check, 'diagnostic', ''),
+                "details": check.details,
             }
             for check in report.checks
-        ]
+        ],
+        "readiness": {
+            "development_ready": report.readiness.development_ready,
+            "production_ready": report.readiness.production_ready,
+            "health_score": report.readiness.health_score,
+            "passed": report.readiness.passed_count,
+            "failed": report.readiness.failed_count,
+            "warnings": report.readiness.warning_count,
+        }
     }
 
 
 def _render_table(report: AuditReport) -> None:
-    """Render an audit report for interactive use."""
+    """Render an audit report for interactive use (Legacy flat view)."""
     table = Table(title="Environment Audit")
+    table.add_column("Category")
     table.add_column("Check")
     table.add_column("Status")
     table.add_column("Details")
+    
     for check in report.checks:
-        details = ", ".join(f"{key}: {value}" for key, value in check.facts.items())
-        if getattr(check, 'diagnostic', None):
-            details = check.diagnostic
-        table.add_row(check.name, check.status.value, details)
+        status_str = "OK" if check.status == CheckStatus.PASSED else "FAILED"
+        if check.status == CheckStatus.WARNING:
+            status_str = "WARNING"
+        table.add_row(
+            check.category.value,
+            check.name,
+            status_str,
+            check.details
+        )
     console.print(table)
+
 
 @app.command()
 def audit(
@@ -72,37 +82,12 @@ def audit(
     ),
 ) -> None:
     """Run a read-only audit of the local engineering environment."""
-
     report = default_audit_service().run()
-
     if output_format == "json":
-        typer.echo(json.dumps(_report_data(report), sort_keys=True))
+        typer.echo(json.dumps(_report_data(report), sort_keys=True, indent=2))
         return
-
     _render_table(report)
 
-    console.print()
-
-    readiness = report.readiness
-
-    if readiness.failed_count == 0:
-        console.print(
-            Panel.fit(
-                "Environment already satisfies the project requirements.",
-                title="No Actions Required",
-                border_style="green",
-            )
-        )
-    else:
-        console.print(
-            Panel.fit(
-                f"Passed: {readiness.passed_count}\n"
-                f"Failed: {readiness.failed_count}\n"
-                f"Warnings: {readiness.warning_count}",
-                title="Actions Required",
-                border_style="yellow",
-            )
-        )
 
 @app.command("list-templates")
 def list_templates() -> None:
@@ -137,114 +122,77 @@ def create_project(
 
 @app.command()
 def doctor() -> None:
-    """Run a read-only environment health check (Environment Doctor V2)."""
-    # Execute the audit service which runs all probes and calculates readiness
+    """Run a read-only environment health check (Environment Doctor V3)."""
     audit_service = default_audit_service()
     report = audit_service.run()
     
-    # Create and render the table with three columns
-    table = Table(title="Environment Doctor")
-    table.add_column("Check", style="cyan")
-    table.add_column("Status", style="green")
-    table.add_column("Details", style="white")
-    
+    # گروه‌بندی چک‌ها بر اساس دسته‌بندی (ویژگی اصلی V3)
+    grouped_checks: dict[str, list] = {}
     for check in report.checks:
-        # Skip informational checks like Runtime Target from the main grid if desired
-        # But usually we show them. Let's show all except purely internal ones.
-        if check.name == "Runtime Target":
-            continue
+        cat = check.category.value
+        if cat not in grouped_checks:
+            grouped_checks[cat] = []
+        grouped_checks[cat].append(check)
+    
+    # نمایش جداول گروه‌بندی شده
+    for category, checks in grouped_checks.items():
+        table = Table(title=f"[bold cyan]{category}[/bold cyan]")
+        table.add_column("Check", style="cyan")
+        table.add_column("Status", style="green")
+        table.add_column("Details", style="white")
+        
+        for check in checks:
+            status_str = "OK" if check.status == CheckStatus.PASSED else "FAILED"
+            if check.status == CheckStatus.WARNING:
+                status_str = "WARNING"
             
-        status_str = "OK" if check.status == CheckStatus.PASSED else "FAILED"
-        if check.status == CheckStatus.WARNING:
-            status_str = "WARNING"
+            details = check.details
+            if not details:
+                details = check.facts.get("version", check.facts.get("current", ""))
+            
+            table.add_row(check.name, status_str, details)
         
-        # Get meaningful details
-        details = check.details
-        if not details:
-            details = check.facts.get("version", check.facts.get("current", check.facts.get("path", "")))
-            if not details or details == "N/A":
-                details = check.facts.get("platform", "")
-                if check.facts.get("architecture"):
-                    details = f"{check.facts.get('platform', '')} {check.facts.get('architecture', '')}".strip()
-        
-        # Special handling for specific checks to ensure clean output
-        if "Python Version" in check.name:
-            details = check.facts.get("current", "")
-        elif "Virtual Environment" in check.name:
-            details = check.facts.get("path", "N/A")
-        elif "Editable Install" in check.name:
-            details = check.facts.get("package", "ai-engineering-bootstrap")
-        elif check.name.lower() in ["typer", "rich", "pytest", "ruff"]:
-            details = check.facts.get("version", "missing")
-        elif "Git" in check.name or "Docker" in check.name:
-            details = check.facts.get("version", "not found")
-        elif "OS" in check.name:
-            details = check.facts.get("version", "")
-        
-        table.add_row(check.name, status_str, details)
+        console.print(table)
+        console.print() # خط خالی بین گروه‌ها
     
-    console.print(table)
-    
-    # Print runtime target info separately (if available in facts)
-    # We look for it in the checks list
-    runtime_check = next((c for c in report.checks if c.name == "Runtime Target"), None)
-    if runtime_check:
-        console.print()
-        dev_platform = runtime_check.facts.get("development", "Unknown")
-        target_runtime = runtime_check.facts.get("target", "Ubuntu 24.04 LTS")
-        
-        console.print(f"[bold]Development Platform:[/bold] {dev_platform}")
-        console.print(f"[bold]Target Runtime:[/bold]      {target_runtime}")
-    
-    # Print Summary with Development/Production Readiness
-    console.print()
+    # خلاصه وضعیت
     r = report.readiness
-    
     dev_status_str = "[green]YES[/green]" if r.development_ready else "[red]NO[/red]"
     prod_status_str = "[green]YES[/green]" if r.production_ready else "[red]NO[/red]"
     
+    console.rule("[bold]Summary[/bold]")
     console.print(f"[bold]Development Ready :[/bold] {dev_status_str}")
     console.print(f"[bold]Production Ready  :[/bold] {prod_status_str}")
-    console.print(f"[bold]Passed :[/bold] {r.passed_count}  [bold]Failed :[/bold] {r.failed_count}  [bold]Warnings :[/bold] {r.warning_count}")
     console.print(f"[bold]Health Score      :[/bold] {r.health_score}/100")
+    console.print(f"[bold]Passed :[/bold] {r.passed_count}  [bold]Failed :[/bold] {r.failed_count}  [bold]Warnings :[/bold] {r.warning_count}")
     
-    # Print recommendations for failed checks
+    # پیشنهادات
     if not r.development_ready:
         console.print()
         console.print("[yellow bold]Recommended actions:[/yellow bold]")
-        
         recommendations = []
         for check in report.checks:
             if check.status == CheckStatus.FAILED:
                 if "Virtual Environment" in check.name:
-                    recommendations.append("• Create virtual environment")
-                    recommendations.append("• Activate virtual environment")
+                    recommendations.append("• Create and activate virtual environment")
                 elif "Editable Install" in check.name:
-                    recommendations.append("• Install project")
-                    recommendations.append('  python -m pip install -e ".[dev]"')
+                    recommendations.append('• Run: pip install -e ".[dev]"')
                 elif check.name.lower() in ["typer", "rich", "pytest", "ruff"]:
-                    pkg_name = check.name.lower()
-                    recommendations.append(f"• Install {check.name}")
-                    recommendations.append(f'  pip install {pkg_name}')
+                    recommendations.append(f"• Run: pip install {check.name.lower()}")
                 elif "Git" in check.name:
-                    recommendations.append("• Install Git from https://git-scm.com/")
+                    recommendations.append("• Install Git")
                 elif "Docker" in check.name:
-                    recommendations.append("• Install Docker from https://docker.com/")
+                    recommendations.append("• Install Docker")
                 elif "Python" in check.name:
-                    recommendations.append("• Upgrade Python to 3.8+")
+                    recommendations.append("• Upgrade Python")
                 else:
                     recommendations.append(f"• Fix {check.name}")
         
-        # Remove duplicates while preserving order
         seen = set()
-        unique_recommendations = []
         for rec in recommendations:
             if rec not in seen:
                 seen.add(rec)
-                unique_recommendations.append(rec)
-        
-        for rec in unique_recommendations:
-            console.print(rec)
+                console.print(rec)
 
 
 @app.command()
