@@ -20,11 +20,23 @@ class CheckStatus(str, Enum):
     WARNING = "warning"
 
 
+class CheckCategory(str, Enum):
+    """Categories for grouping audit checks in reports."""
+    PYTHON = "Python"
+    ENVIRONMENT = "Environment"
+    DEPENDENCIES = "Dependencies"
+    TOOLS = "Tools"
+    PLATFORM = "Platform"
+    CONTAINER = "Container"
+    SYSTEM = "System"
+
+
 @dataclass(frozen=True)
 class AuditCheck:
     """Represents a single audit check result normalized for reporting."""
     name: str
     status: CheckStatus
+    category: CheckCategory = CheckCategory.SYSTEM  # مقدار پیش‌فرض برای سازگاری
     details: str = ""
     facts: dict[str, Any] = field(default_factory=dict)
 

@@ -5,11 +5,10 @@ import json
 from typer.testing import CliRunner
 
 from ai_engineering_bootstrap import cli
-
-# تغییر مهم: ایمپورت از ماژول audit به جای models عمومی
 from ai_engineering_bootstrap.audit.models import (
     AuditCheck,
     AuditReport,
+    CheckCategory,  # ایمپورت جدید
     CheckStatus,
     EnvironmentReadiness,
 )
@@ -24,7 +23,8 @@ class StubAuditService:
         checks = [
             AuditCheck(
                 name="python",
-                status=CheckStatus.PASSED, # استفاده از CheckStatus به جای AuditStatus
+                status=CheckStatus.PASSED,
+                category=CheckCategory.PYTHON, # افزودن دسته‌بندی الزامی
                 details="3.12.0",
                 facts={"version": "3.12.0"},
             ),
@@ -50,16 +50,21 @@ def test_audit_command_emits_deterministic_json(monkeypatch: object) -> None:
     output_data = json.loads(result.stdout)
     
     # بررسی ساختار جدید خروجی JSON
-    assert "health_score" in output_data
-    assert output_data["health_score"] == 100
-    assert "development_ready" in output_data
-    assert "production_ready" in output_data
-    assert "checks" in output_data
+    # health_score اکنون داخل آبجکت readiness قرار دارد
+    assert "readiness" in output_data
+    readiness = output_data["readiness"]
     
+    assert readiness["health_score"] == 100
+    assert readiness["development_ready"] is True
+    assert readiness["production_ready"] is True
+    
+    assert "checks" in output_data
     assert len(output_data["checks"]) == 1
+    
     check = output_data["checks"][0]
     assert check["name"] == "python"
     assert check["status"] == "passed"
+    assert check["category"] == "Python" # بررسی فیلد جدید category
     assert check["facts"]["version"] == "3.12.0"
 
 
