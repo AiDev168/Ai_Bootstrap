@@ -6,15 +6,14 @@ from collections.abc import Iterable
 from typing import Any
 
 from ai_engineering_bootstrap.audit.models import (
-    AuditCheck as NewAuditCheck,
-)
-from ai_engineering_bootstrap.audit.models import (
+    AuditCheck,
     AuditReport,
     AuditStatus,
     CheckCategory,
     CheckStatus,
     EnvironmentReadiness,
 )
+from ai_engineering_bootstrap.audit.recommendations import RecommendationEngine
 
 
 class AuditService:
@@ -22,12 +21,13 @@ class AuditService:
 
     def __init__(self, probes: Iterable[Any]) -> None:
         self._probes = list(probes)
+        self._recommendation_engine = RecommendationEngine()
 
     @staticmethod
     def _map_category(name: str) -> CheckCategory:
         """Map a check name to its category."""
         name_lower = name.lower()
-        
+
         if "python" in name_lower:
             return CheckCategory.PYTHON
         if "virtual" in name_lower or "editable" in name_lower:
@@ -40,17 +40,17 @@ class AuditService:
             return CheckCategory.CONTAINER
         if "os" in name_lower or "platform" in name_lower:
             return CheckCategory.PLATFORM
-        
+
         return CheckCategory.SYSTEM
 
     def run(self) -> AuditReport:
         """Run all probes and generate the audit report."""
-        checks: list[NewAuditCheck] = []
+        checks: list[AuditCheck] = []
 
         for probe in self._probes:
             try:
                 result: Any = probe.run()
-                
+
                 # نگاشت وضعیت
                 status_map = {
                     AuditStatus.AVAILABLE: CheckStatus.PASSED,
@@ -66,7 +66,7 @@ class AuditService:
                 # استخراج جزئیات
                 details = getattr(result, 'details', "")
                 facts = getattr(result, 'facts', {}) or {}
-                
+
                 if not details and hasattr(result, 'diagnostic') and result.diagnostic:
                     details = result.diagnostic
                 elif not details and "version" in facts:
@@ -84,25 +84,46 @@ class AuditService:
                     details = facts.get("package", "ai-engineering-bootstrap")
                 elif not details and facts:
                     details = str(next(iter(facts.values())))
-                
-                check = NewAuditCheck(
+
+                # تولید توصیه‌ها
+                temp_check = AuditCheck(
                     name=getattr(result, 'name', 'Unknown'),
                     status=status,
                     category=category,
                     details=details,
                     facts=facts,
                 )
+                recommendations = self._recommendation_engine.generate(temp_check)
+
+                check = AuditCheck(
+                    name=temp_check.name,
+                    status=status,
+                    category=category,
+                    details=details,
+                    facts=facts,
+                    recommendations=recommendations,
+                )
                 checks.append(check)
 
             except Exception as error:  # noqa: BLE001
                 probe_name = getattr(probe, 'name', 'Unknown Probe')
                 category = self._map_category(probe_name)
-                checks.append(NewAuditCheck(
+                temp_check = AuditCheck(
                     name=probe_name,
                     status=CheckStatus.FAILED,
                     category=category,
                     details="Probe execution failed",
-                    facts={"error": str(error)}
+                    facts={"error": str(error)},
+                )
+                recommendations = self._recommendation_engine.generate(temp_check)
+
+                checks.append(AuditCheck(
+                    name=probe_name,
+                    status=CheckStatus.FAILED,
+                    category=category,
+                    details="Probe execution failed",
+                    facts={"error": str(error)},
+                    recommendations=recommendations,
                 ))
 
         readiness = EnvironmentReadiness.calculate(checks)
