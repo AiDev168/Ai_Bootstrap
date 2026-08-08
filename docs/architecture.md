@@ -1,41 +1,230 @@
 # Architecture
 
-## Scope
+## 1. Scope
 
-Phase 1 is a deterministic Python 3.12 CLI with two use cases: read-only environment auditing and project generation from three predefined templates. The capabilities share presentation and domain conventions but remain independently coordinated.
+The project is a layered, deterministic AI Engineering Bootstrap platform.
 
-## Dependency direction
+The current implementation has evolved beyond the original Phase 1 audit/generation
+CLI. The active core pipeline is:
 
 ```text
-CLI / Rich presentation
-    -> application services
-        -> typed protocols and domain models
-            <- infrastructure adapters
+Probes
+   ↓
+Doctor / AuditService
+   ↓
+AuditReport
+   ↓
+Planner
+   ↓
+ExecutionPlan
+   ↓
+Executor
+   ↓
+Application / CLI / GUI
 ```
 
-- `cli.py` parses commands, invokes services, formats results, and maps expected failures to stable exit codes.
-- `audit.py` and `generation.py` coordinate use cases without presentation logic.
-- `models.py` defines typed requests and results without printing or filesystem access.
-- `probes/` isolates platform and subprocess inspection.
-- Template resource access and filesystem writes belong to generation infrastructure.
+The final product is intended to provide a professional GUI, while the CLI remains
+important for development, diagnostics, automation, and CI/CD.
 
-Dependencies are explicit. Phase 1 does not use global state, a dependency-injection container, repository pattern, plug-in system, or agent framework.
+## 2. Dependency Direction
 
-## Side-effect boundaries
+```text
+Probe
+  ↓
+Doctor / AuditService
+  ↓
+AuditReport
+  ↓
+Planner
+  ↓
+ExecutionPlan
+  ↓
+Executor
+  ↓
+Application/UI
+```
 
-Audit probes may inspect standard-library platform facts and run non-mutating executable checks using argument arrays, captured output, timeouts, and no shell. Individual failures become typed results and do not stop unrelated probes.
+Presentation must not bypass these layers.
 
-Generation validates identifiers, project names, paths, and destination non-existence before writing. It stages output within the destination parent, substitutes only declared variables in declared UTF-8 text files, preserves binary bytes, cleans up failures, and performs an atomic final rename where feasible.
+Forbidden:
 
-## Stable Phase 1 contracts
+```text
+CLI → Probe
+GUI → Probe
+Planner → Probe
+Executor → Probe
+GUI → shell/remediation logic
+CLI → remediation business logic
+```
 
-- Audit statuses: `available`, `not_found`, `unsupported`, and `error`.
-- Template identifiers: `ai-app-template-v1`, `ml-template-v1`, and `ai-research-template-v1`.
-- Destination policy: fail when the target exists; no merge or overwrite mode.
-- CLI commands: `ai-bootstrap audit`, `ai-bootstrap list-templates`, and `ai-bootstrap create-project PROJECT_NAME --template TEMPLATE_NAME`.
+## 3. Probes
 
-Changes to accepted interfaces, models, commands, output behavior, or collision semantics require a new or superseding ADR.
+Probes are read-only environment observers.
 
-## Exclusions
+They inspect facts such as:
 
-Phase 1 excludes GitHub provisioning, CI/CD generation, Dev Container generation, LLM integration, tool calling, autonomous workflows, and multi-agent architecture.
+- Python version;
+- virtual environment;
+- editable installation;
+- required Python packages;
+- Git;
+- Docker;
+- operating system;
+- platform architecture;
+- runtime target;
+- best-effort GPU information.
+
+A probe returns a typed result. It does not render output and does not perform
+remediation.
+
+## 4. Doctor / AuditService
+
+Doctor is the single source of environment diagnostics.
+
+Responsibilities:
+
+- execute probes;
+- normalize probe results;
+- create `AuditCheck` objects;
+- assign check categories;
+- calculate readiness;
+- calculate Health Score;
+- produce deterministic `AuditReport` data;
+- attach context-aware recommendations.
+
+Doctor remains read-only.
+
+Doctor must not execute remediation actions.
+
+## 5. Audit Models
+
+Doctor-specific models live in:
+
+```text
+src/ai_engineering_bootstrap/audit/models.py
+```
+
+This is the source of truth for:
+
+- `AuditCheck`;
+- `AuditReport`;
+- `AuditStatus`;
+- `CheckStatus`;
+- `CheckCategory`;
+- `EnvironmentReadiness`.
+
+There must not be competing definitions of Doctor's `AuditCheck` or `AuditReport`.
+
+Generic application models may remain in the root `models.py` only when they are
+not Doctor-specific.
+
+## 6. Planner
+
+Planner consumes the public `AuditReport`.
+
+Current Planner Foundation contains:
+
+```text
+src/ai_engineering_bootstrap/planner/models.py
+src/ai_engineering_bootstrap/planner/engine.py
+```
+
+Public concepts:
+
+- `ExecutionPlan`;
+- `ExecutionPlanAction`.
+
+Planner currently:
+
+- maps known failed checks to stable action IDs;
+- creates deterministic actions;
+- assigns priorities;
+- removes duplicate actions;
+- safely ignores unknown failures;
+- produces a summary;
+- remains read-only.
+
+Planner must consume public audit models and must not inspect probes.
+
+## 7. Executor Boundary
+
+Executor is the only layer allowed to modify the host environment.
+
+The Executor Foundation is the next architectural milestone.
+
+It must consume `ExecutionPlan` and execute only explicitly approved actions.
+
+Executor must not become a second diagnostic system.
+
+The intended boundary is:
+
+```text
+READ-ONLY
+Probe
+Doctor
+Planner
+        │
+        ▼
+WRITE
+Executor
+```
+
+No remediation should be added to Doctor, Planner, CLI, or GUI.
+
+## 8. Application / Presentation
+
+CLI and GUI are application/presentation entry points.
+
+They may:
+
+- invoke application services;
+- display public models;
+- collect user input/approval;
+- report expected failures.
+
+They must not contain independent business rules.
+
+The future GUI is the primary product interface. CLI presentation should remain
+stable, deterministic, scriptable, and useful without becoming a second product.
+
+## 9. Determinism
+
+For identical inputs/environment state, the system should produce stable:
+
+- check ordering;
+- categories;
+- readiness;
+- Health Score;
+- recommendations;
+- action IDs;
+- action ordering;
+- JSON structure.
+
+Determinism is required for testing, CI/CD, debugging, and future GUI behavior.
+
+## 10. Read/Write Safety
+
+Audit and planning commands are read-only.
+
+The current `bootstrap` command is also non-mutating: it demonstrates audit and
+planning but does not execute fixes.
+
+Only the future Executor may perform system changes.
+
+## 11. Existing Generation Boundary
+
+Project generation remains a separate application capability.
+
+It validates project/template input, prevents destination collisions, and performs
+controlled file generation according to the accepted generation ADR.
+
+It must not be mixed with Doctor/Planner business logic.
+
+## 12. Architecture Change Rule
+
+Accepted interfaces, model contracts, dependency direction, collision semantics,
+or read/write boundaries must not be changed casually.
+
+Use a new or superseding ADR for architectural changes.
+
+Do not redesign unrelated subsystems while implementing a feature.

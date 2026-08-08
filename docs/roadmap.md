@@ -1,52 +1,191 @@
 # AI Engineering Bootstrap Roadmap
 
-## Phase 0
-Bootstrap Prototype
+## Product Direction
 
-Status: Completed
+The project is evolving from a deterministic bootstrap/audit CLI into a controlled
+AI engineering environment platform.
 
----
+The target product workflow is:
 
-## Phase 1
-Validation
+```text
+Inspect
+  ↓
+Doctor
+  ↓
+Plan
+  ↓
+Review / Approve
+  ↓
+Execute
+  ↓
+Verify
+```
 
-Status: Completed
+The final primary interface is a professional GUI.
 
----
+CLI remains important for developer workflows, automation, diagnostics, and CI/CD,
+but excessive CLI cosmetic work is not a priority.
 
-## Phase 2
-Developer Environment Standardization
+## Completed Foundation
 
-Status: In Progress
+### Phase 0 — Bootstrap Prototype
 
-Deliverables
+**Status: Completed**
 
-- Bootstrap automation
-- GitHub setup automation
-- SSH automation
-- Python environment
-- Docker environment
-- Cursor configuration
-- Development documentation
-- Pre-commit hooks
+Initial project/bootstrap prototype.
 
----
+### Phase 1 — Core Bootstrap and Validation
 
-## Phase 3
-AI Project Generator
+**Status: Completed**
 
-Status: Planned
+Includes:
 
----
+- environment inspection;
+- audit CLI;
+- project/template generation;
+- typed models;
+- deterministic tests;
+- safe destination/collision handling.
 
-## Phase 4
-AI Team Bootstrap Agent
+### Doctor V2
 
-Status: Planned
+**Status: Completed**
 
----
+Includes:
 
-## Phase 5
-AI Engineering Operating System
+- Environment Doctor;
+- readiness reporting;
+- human-readable diagnostics;
+- recommendations.
 
-Status: Planned
+### Doctor V3 Foundation
+
+**Status: Completed**
+
+Implemented milestones:
+
+1. Model Unification
+2. Health Score
+3. Check Categorization
+4. CI/CD Audit JSON
+5. Context-Aware Recommendations
+
+### Planner Foundation
+
+**Status: Completed**
+
+Implemented:
+
+- `ExecutionPlan`;
+- `ExecutionPlanAction`;
+- stable action IDs;
+- deterministic ordering;
+- priorities;
+- duplicate-action elimination;
+- safe handling of unknown checks;
+- audit → plan conversion.
+
+## Current Phase — Controlled Execution Pipeline
+
+### Milestone 1 — Executor Foundation
+
+**Status: Next**
+
+Goal: establish the write boundary without building a large remediation framework.
+
+Scope:
+
+- Executor public contract;
+- execution result model(s);
+- consume `ExecutionPlan`;
+- explicit action execution boundary;
+- deterministic behavior;
+- safety/dry-run semantics where required;
+- unit tests;
+- integration path for future application/GUI.
+
+Do not add broad autonomous remediation.
+
+### Milestone 2 — Application Workflow
+
+Connect the core services into one workflow:
+
+```text
+Doctor
+  ↓
+Planner
+  ↓
+Executor
+  ↓
+Verification / Doctor
+```
+
+The resulting application workflow becomes the shared backend for CLI and GUI.
+
+### Milestone 3 — GUI Foundation
+
+Build the professional GUI on top of the application workflow.
+
+Priority:
+
+- environment dashboard;
+- Health Score;
+- categorized checks;
+- recommendations;
+- execution plan;
+- approval;
+- execution progress;
+- results/logs;
+- re-verification.
+
+Do not duplicate business logic in the GUI.
+
+### Milestone 4 — Safe Remediation Library
+
+Add approved Executor actions incrementally.
+
+Every action requires:
+
+- stable action ID;
+- explicit preconditions;
+- clear scope;
+- deterministic behavior;
+- result reporting;
+- tests;
+- no unrelated side effects.
+
+### Milestone 5 — Bootstrap Workflow
+
+Target experience:
+
+```text
+ai-bootstrap bootstrap
+```
+
+Conceptually:
+
+```text
+Inspect
+  ↓
+Diagnose
+  ↓
+Plan
+  ↓
+Review
+  ↓
+Approve
+  ↓
+Execute
+  ↓
+Verify
+```
+
+The GUI should provide the richer interactive version of the same workflow.
+
+## Long-Term Direction
+
+After the deterministic bootstrap/execution core and GUI are stable, the platform
+can evolve toward AI-assisted engineering workflows, knowledge integration,
+controlled agent capabilities, and other higher-level automation.
+
+Those capabilities are downstream of the stable core and must not destabilize it.

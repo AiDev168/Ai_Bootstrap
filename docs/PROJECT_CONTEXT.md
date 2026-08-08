@@ -1,0 +1,248 @@
+# Project Context — Master Development Reference
+
+## Project Identity
+
+**Repository:** `aamm188/ai-engineering-bootstrap`
+
+GitHub is the source of truth.
+
+The reference development runtime is Ubuntu 24.04 LTS.
+
+## Product Goal
+
+Build a production-grade AI Engineering Bootstrap platform that can:
+
+1. inspect an engineering environment;
+2. diagnose its state;
+3. calculate readiness and health;
+4. generate a deterministic remediation plan;
+5. let the user review/approve that plan;
+6. execute approved changes safely;
+7. verify the resulting environment;
+8. provide the complete workflow through a professional GUI.
+
+Target workflow:
+
+```text
+Environment
+   ↓
+Inspect / Probes
+   ↓
+Doctor
+   ↓
+AuditReport
+   ↓
+Planner
+   ↓
+ExecutionPlan
+   ↓
+User Review / Approval
+   ↓
+Executor
+   ↓
+Verification
+   ↓
+Doctor again
+```
+
+## Current Implementation Status
+
+### Completed
+
+- Bootstrap foundation
+- Environment probes
+- AuditService / Doctor
+- unified Doctor audit models
+- development readiness
+- production readiness
+- Health Score
+- check categorization
+- deterministic audit JSON / CI output
+- context-aware recommendations
+- Planner Foundation
+- `ExecutionPlan`
+- `ExecutionPlanAction`
+- stable action IDs
+- priority ordering
+- duplicate-action elimination
+- safe handling of unknown failed checks
+- template discovery and safe project generation
+
+### Current Baseline
+
+`main` is the stable integration branch.
+
+Planner Foundation has been merged into `main`.
+
+### Next
+
+```text
+Executor Foundation
+```
+
+## Architecture
+
+```text
+Probe
+  ↓
+Doctor / AuditService
+  ↓
+AuditReport
+  ↓
+Planner
+  ↓
+ExecutionPlan
+  ↓
+Executor
+  ↓
+Application Workflow
+  ↓
+CLI / Professional GUI
+```
+
+### Responsibilities
+
+**Probe**
+
+Read-only environment observation.
+
+**Doctor**
+
+Single source of diagnostics. Produces readiness, Health Score, categories,
+recommendations, and `AuditReport`.
+
+**Planner**
+
+Consumes `AuditReport` and produces deterministic `ExecutionPlan`.
+
+**Executor**
+
+Only write-capable layer. Consumes `ExecutionPlan`.
+
+**Application Workflow**
+
+Coordinates Doctor → Planner → Executor and verification.
+
+**CLI**
+
+Developer, diagnostic, automation, and CI/CD interface.
+
+**GUI**
+
+Long-term primary product interface. Must use the same core/application services.
+
+## Frozen Rules
+
+- Never duplicate business logic.
+- Never duplicate Doctor models.
+- Doctor is the source of truth for diagnostics.
+- Planner consumes Doctor public models.
+- Executor consumes Planner public models.
+- Probe/Doctor/Planner are read-only.
+- Executor alone can modify the environment.
+- CLI/GUI cannot bypass the pipeline.
+- Backward compatibility is mandatory.
+- No unnecessary runtime dependencies.
+- No speculative abstractions.
+- No unrelated refactors during feature implementation.
+- Every feature is tested.
+- Never commit directly to `main`.
+
+## Development Workflow
+
+Every feature:
+
+```text
+updated main
+    ↓
+feature branch
+    ↓
+read project rules + inspect current code
+    ↓
+implement smallest coherent change
+    ↓
+tests
+    ↓
+ruff
+    ↓
+git diff --check
+    ↓
+CLI smoke tests
+    ↓
+commit
+    ↓
+push
+    ↓
+merge
+    ↓
+verify main
+```
+
+## Mandatory AI Startup
+
+A coding AI must read:
+
+```text
+AGENTS.md
+docs/CONSTITUTION.md
+relevant ADRs
+IMPLEMENTATION_WORKFLOW.md
+docs/PROJECT_CONTEXT.md
+docs/architecture.md
+relevant source/tests
+```
+
+Then inspect:
+
+```bash
+git status
+git log --oneline --decorate -5
+```
+
+The current repository and Git history override stale roadmap statements.
+
+## Next Feature — Executor Foundation
+
+The immediate feature is:
+
+```text
+feature/executor-foundation
+```
+
+The goal is to establish the execution contract and safety boundary, not to build a
+large remediation framework.
+
+Expected scope:
+
+- Executor public protocol/contract;
+- execution result model(s);
+- consume `ExecutionPlan`;
+- explicit action execution boundary;
+- deterministic behavior;
+- safe/dry-run semantics where required;
+- unit/integration tests;
+- integration path for the future application workflow.
+
+Do not add:
+
+- autonomous agent behavior;
+- LLM integration;
+- broad remediation catalog;
+- GUI business logic;
+- unrelated refactors.
+
+## Product Priority
+
+Priority order:
+
+```text
+1. Correct core architecture
+2. Doctor → Planner → Executor workflow
+3. Safety and deterministic execution
+4. Application workflow
+5. Professional GUI
+6. CLI cosmetic improvements
+```
+
+The CLI must remain stable and automation-friendly, but professional GUI capability
+is a major product objective.

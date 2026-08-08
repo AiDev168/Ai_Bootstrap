@@ -1,64 +1,127 @@
 # Bootstrap Process
 
-## Goal
+## Product Workflow
 
-Prepare every developer workstation to the organization standard.
+The bootstrap process is a controlled environment workflow, not merely a checklist.
 
----
+The target workflow is:
 
-## Phase 1
+```text
+Inspect
+  ↓
+Doctor
+  ↓
+Plan
+  ↓
+Review / Approve
+  ↓
+Execute
+  ↓
+Verify
+```
 
-Environment Inspection
+## Stage 1 — Inspect
 
-- Operating System
-- Python
-- Git
-- Docker
-- GPU
-- Virtual Environment
+Read-only probes inspect:
+
+- operating system;
+- Python;
+- virtual environment;
+- installed dependencies;
+- Git;
+- Docker;
+- platform;
+- runtime target;
+- best-effort GPU state.
 
 No changes are performed.
 
----
+## Stage 2 — Doctor
 
-## Phase 2
+Doctor aggregates the inspection results into an `AuditReport`.
 
-Environment Preparation
+It provides:
 
-Future implementation
+- check status;
+- categories;
+- readiness;
+- Health Score;
+- context-aware recommendations;
+- deterministic JSON for automation.
 
-- Python installation
-- Docker installation
-- Git configuration
-- SSH configuration
-- GitHub authentication
-- Cursor configuration
+Doctor does not fix anything.
 
-Every installation requiring administrator privileges must request explicit user approval.
+## Stage 3 — Plan
 
----
+Planner converts the `AuditReport` into an `ExecutionPlan`.
 
-## Phase 3
+Planner:
 
-Project Bootstrap
+- maps known failures to actions;
+- assigns stable action IDs;
+- assigns priorities;
+- removes duplicate actions;
+- preserves deterministic ordering;
+- safely ignores unknown failures.
 
-Generate
+Planner remains read-only.
 
-- Repository
-- Documentation
-- ADR
-- Template
-- Tests
-- Development Environment
+## Stage 4 — Review / Approval
 
----
+The execution plan must be visible before system-changing operations.
 
-## Long-term Goal
+The professional GUI is the preferred long-term interface for review and approval.
 
-One command:
+CLI remains useful for diagnostics and automation.
+
+## Stage 5 — Execute
+
+Executor is the only component allowed to modify the environment.
+
+Execution must be:
+
+- explicit;
+- controlled;
+- observable;
+- testable;
+- limited to approved actions.
+
+The current `bootstrap` command does not yet execute changes.
+
+## Stage 6 — Verify
+
+After execution, run Doctor again.
+
+The intended remediation loop is:
+
+```text
+Doctor(before)
+    ↓
+Planner
+    ↓
+User approval
+    ↓
+Executor
+    ↓
+Doctor(after)
+```
+
+This verifies that the requested environment state was actually achieved.
+
+## Long-Term Command
+
+The target CLI workflow is:
 
 ```bash
 ai-bootstrap bootstrap
 ```
 
-will prepare a complete AI development environment following the team's standards.
+The target GUI workflow should provide the same core process with a richer interactive
+experience.
+
+## Safety Rule
+
+No installation, configuration, or other host modification belongs in Probe,
+Doctor, Planner, CLI, or GUI business logic.
+
+Only Executor may perform system changes.

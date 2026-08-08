@@ -1,65 +1,130 @@
-# AI Engineering Bootstrap
+# AI Engineering Bootstrap — AI Coding Rules
 
 ## Mandatory Startup Procedure
 
-Before making any change, read the following documents in this exact order:
+Before making any change, read these documents in order:
 
-1. docs/CONSTITUTION.md
-2. IMPLEMENTATION_WORKFLOW.md
-3. Relevant ADRs
-4. docs/architecture.md (if needed)
+1. `AGENTS.md`
+2. `docs/CONSTITUTION.md`
+3. relevant accepted ADRs
+4. `IMPLEMENTATION_WORKFLOW.md`
+5. `docs/PROJECT_CONTEXT.md`
+6. `docs/architecture.md`
+7. relevant source code and tests
 
-These documents have higher priority than feature prompts.
+These rules have higher priority than a feature prompt.
 
-If a feature request conflicts with them:
+If a feature request conflicts with the Constitution or an accepted ADR:
 
-STOP.
+**STOP. Explain the conflict. Do not implement conflicting code.**
 
-Explain the conflict.
+## Current Product Direction
 
-Do not implement conflicting code.
+The project is evolving toward:
 
-Project Constitution
+```text
+Probe
+  ↓
+Doctor
+  ↓
+Planner
+  ↓
+Executor
+  ↓
+Professional GUI
+```
 
-This document defines the mandatory implementation rules.
+Current implementation includes Doctor V3 foundations and Planner Foundation.
 
-These rules override feature prompts.
+The next planned core milestone is Executor Foundation.
 
-If a feature conflicts with this document,
+The final product is intended to have a professional GUI. CLI work should prioritize
+correctness, automation, diagnostics, and CI/CD rather than cosmetic polish.
 
-STOP and explain the conflict.
+## Non-Negotiable Architecture
 
-Never implement conflicting code.
+- Doctor is the single source of environment diagnostics.
+- Planner consumes Doctor's public `AuditReport`.
+- Executor consumes Planner's public `ExecutionPlan`.
+- Probe, Doctor, and Planner are read-only.
+- Executor is the only write-capable layer.
+- CLI and GUI must not bypass the core pipeline.
+- CLI and GUI must not duplicate business logic.
+- Do not duplicate public models or business rules.
+- Consume public models/contracts rather than lower-layer implementation details.
 
-------------------------------------------------
+Canonical flow:
 
-Priority
+```text
+Probe → Doctor → Planner → Executor
+```
 
-1. Constitution
-
-2. Accepted ADRs
-
-3. Architecture
-
-4. Feature Prompt
-
-------------------------------------------------
-
-Implementation Rules
+## Implementation Rules
 
 - Never duplicate logic.
-- Never bypass ADRs.
-- Never redesign architecture.
+- Never bypass accepted ADRs.
+- Never redesign architecture without approval.
 - Never use quick fixes.
-- Never inspect internal implementation.
-- Consume public models only.
-- Doctor is the single source of diagnostics.
-- Planner consumes Doctor.
-- Executor consumes Planner.
-- Read-only components never modify the system.
-- Every feature updates tests.
-- Every feature passes Ruff and Pytest.
-- Backward compatibility is mandatory.
-- Prefer refactoring over rewriting.
-- Small commits only.
+- Never hide architecture problems with broad exception handling.
+- Prefer small, explicit, testable changes.
+- Preserve backward compatibility.
+- Do not introduce runtime dependencies without approval.
+- Every feature must include tests.
+- Every feature must pass Ruff and Pytest.
+- Run relevant CLI smoke tests.
+- Keep commits small.
+- Never commit directly to `main`.
+- One feature = one dedicated branch.
 - Stop when architecture is unclear.
+
+## Feature Branch Rule
+
+Start from updated `main`:
+
+```bash
+git switch main
+git pull
+git switch -c feature/<feature-name>
+```
+
+After implementation and validation:
+
+```bash
+git add <actual-files>
+git commit -m "<Conventional Commit>"
+git push -u origin feature/<feature-name>
+```
+
+Merge only after all required checks pass.
+
+## Validation
+
+Minimum gate:
+
+```bash
+git diff --check
+ruff check .
+pytest
+ai-bootstrap audit
+ai-bootstrap doctor
+ai-bootstrap plan
+```
+
+## Current Next Feature
+
+Unless a newer accepted decision changes the roadmap:
+
+```text
+feature/executor-foundation
+```
+
+Scope:
+
+- Executor public contract;
+- execution result model(s);
+- consume `ExecutionPlan`;
+- explicit safety/write boundary;
+- deterministic execution behavior;
+- tests.
+
+Do not turn Executor Foundation into a broad autonomous remediation framework.
