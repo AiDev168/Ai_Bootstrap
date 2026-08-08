@@ -18,7 +18,7 @@ from ai_engineering_bootstrap.generation import (
     default_template_catalog,
 )
 from ai_engineering_bootstrap.models import GenerationRequest
-from ai_engineering_bootstrap.planner import BootstrapPlanner
+from ai_engineering_bootstrap.planner import PlannerEngine
 
 app = typer.Typer(
     name="ai-bootstrap",
@@ -85,7 +85,6 @@ def audit(
     """Run a read-only audit of the local engineering environment."""
     report = default_audit_service().run()
     if output_format == "json":
-        # تعیین کد خروجی بر اساس development_ready
         exit_code = 0 if report.readiness.development_ready else 1
         typer.echo(json.dumps(_report_data(report), sort_keys=True, indent=2))
         raise typer.Exit(code=exit_code)
@@ -129,7 +128,6 @@ def doctor() -> None:
     audit_service = default_audit_service()
     report = audit_service.run()
 
-    # گروه‌بندی چک‌ها بر اساس دسته‌بندی
     grouped_checks: dict[str, list] = {}
     for check in report.checks:
         cat = check.category.value
@@ -137,7 +135,6 @@ def doctor() -> None:
             grouped_checks[cat] = []
         grouped_checks[cat].append(check)
 
-    # نمایش جداول گروه‌بندی شده
     for category, checks in grouped_checks.items():
         table = Table(title=f"[bold cyan]{category}[/bold cyan]")
         table.add_column("Check", style="cyan")
@@ -158,7 +155,6 @@ def doctor() -> None:
         console.print(table)
         console.print()
 
-    # خلاصه وضعیت
     r = report.readiness
     dev_status_str = "[green]YES[/green]" if r.development_ready else "[red]NO[/red]"
     prod_status_str = "[green]YES[/green]" if r.production_ready else "[red]NO[/red]"
@@ -169,7 +165,6 @@ def doctor() -> None:
     console.print(f"[bold]Health Score      :[/bold] {r.health_score}/100")
     console.print(f"[bold]Passed :[/bold] {r.passed_count}  [bold]Failed :[/bold] {r.failed_count}  [bold]Warnings :[/bold] {r.warning_count}")
 
-    # نمایش توصیه‌ها (Recommendations)
     all_recommendations = set()
     for check in report.checks:
         for rec in check.recommendations:
@@ -187,9 +182,40 @@ def doctor() -> None:
 
 @app.command()
 def plan() -> None:
-    """Generate a read-only execution plan based on environment diagnostics."""
-    planner = BootstrapPlanner(console)
-    planner.run()
+    """Generate an execution plan based on the latest audit."""
+    audit_service = default_audit_service()
+    report = audit_service.run()
+    engine = PlannerEngine()
+    plan = engine.generate_plan(report)
+    if not plan.is_actionable:
+        console.print("[green]✓ Environment is healthy. No actions required.[/green]")
+        return
+
+    console.print("[bold]Execution Plan:[/bold]\n")
+    for i, action in enumerate(plan.actions, 1):
+        console.print(f"{i}. [cyan]{action.description}[/cyan]")
+        console.print(f"   [dim]ID: {action.action_id} | Priority: {action.priority}[/dim]")
+        console.print()
+
+
+@app.command()
+def bootstrap() -> None:
+    """Run audit, display plan, and (in future) execute fixes."""
+    # فعلاً فقط audit و plan را نمایش می‌دهد
+    audit_service = default_audit_service()
+    report = audit_service.run()
+    # نمایش خلاصه دکتر
+    r = report.readiness
+    if r.development_ready:
+        console.print("[green]Environment is ready.[/green]")
+    else:
+        console.print("[red]Environment needs attention. Generating plan...[/red]")
+        engine = PlannerEngine()
+        plan = engine.generate_plan(report)
+        if plan.is_actionable:
+            console.print("\n[bold]Required Actions:[/bold]")
+            for action in plan.actions:
+                console.print(f"• {action.description}")
 
 
 if __name__ == "__main__":
