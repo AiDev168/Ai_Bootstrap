@@ -20,6 +20,7 @@ from ai_engineering_bootstrap.generation import (
     default_template_catalog,
 )
 from ai_engineering_bootstrap.models import GenerationRequest
+from ai_engineering_bootstrap.pipeline import PipelineEngine
 from ai_engineering_bootstrap.planner import PlannerEngine
 
 app = typer.Typer(
@@ -245,6 +246,41 @@ def execute() -> None:
     console.print(
         "\n[dim]Note: Real system modification handlers are not yet implemented.[/dim]"
     )
+
+
+@app.command()
+def run_pipeline() -> None:
+    """
+    Run the full integrated pipeline: Audit → Plan → Execute.
+    Demonstrates the end-to-end flow while keeping layers separate.
+    Output includes summary of all three stages.
+    """
+    console.print("[bold cyan]Running Full Pipeline (Audit → Plan → Execute)...[/bold cyan]\n")
+    engine = PipelineEngine()
+    result = engine.run()
+    # Stage 1 Summary
+    r = result.audit_report.readiness
+    console.print(f"[bold]1. Audit Complete:[/bold] Health Score {r.health_score}/100")
+    console.print(f"   Development Ready: {'Yes' if r.development_ready else 'No'}")
+    console.print()
+    # Stage 2 Summary
+    if result.plan.is_actionable:
+        console.print(f"[bold]2. Plan Generated:[/bold] {len(result.plan.actions)} action(s) identified.")
+    else:
+        console.print("[bold]2. Plan Generated:[/bold] No actions required.")
+    console.print()
+    # Stage 3 Summary
+    console.print(f"[bold]3. Execution Result:[/bold] {result.execution_result.summary}")
+    if result.execution_result.results:
+        console.print("   Details:")
+        for res in result.execution_result.results:
+            status_str = res.status.value.upper()
+            console.print(f"   • [{status_str}] {res.action_id}: {res.message}")
+    console.print()
+    if result.is_success:
+        console.print("[green bold]✓ Pipeline Completed Successfully.[/green bold]")
+    else:
+        console.print("[red bold]⚠ Pipeline Completed with Execution Failures.[/red bold]")
 
 
 @app.command()
