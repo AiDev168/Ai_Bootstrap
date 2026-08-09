@@ -249,51 +249,60 @@ def execute() -> None:
 
 
 @app.command()
-def run_pipeline() -> None:
+def run_pipeline(
+    real_execution: bool = typer.Option(
+        False,
+        "--real-execution",
+        help="Enable REAL execution mode for approved non-destructive actions. Default is SAFE/Mock."
+    )
+) -> None:
     """
     Run the full integrated pipeline: Audit → Plan → Validate → Execute.
+    By default, runs in SAFE mode (simulation).
+    Use --real-execution to enable controlled real capabilities.
     """
-    console.print("[bold cyan]Running Full Pipeline...[/bold cyan]\n")
+    from ai_engineering_bootstrap.executor.mode import ExecutionMode
+    mode = ExecutionMode.REAL if real_execution else ExecutionMode.SAFE
+    console.print(f"[bold cyan]Running Full Pipeline ({mode.value.upper()} MODE)...[/bold cyan]\n")
+    if mode == ExecutionMode.REAL:
+        console.print("[yellow bold]⚠️ REAL EXECUTION MODE ACTIVE[/yellow bold]")
+        console.print("Only pre-approved, non-destructive actions will run.\n")
+
     engine = PipelineEngine()
-    result = engine.run()
+    result = engine.run(mode=mode)
     # Stage 1 Summary
     r = result.audit_report.readiness
-    console.print(f"[bold]1. Audit:[/bold] Health Score {r.health_score}/100")
+    console.print(f"[bold]1. Audit Complete:[/bold] Health Score {r.health_score}/100")
     console.print()
     # Stage 2 Summary
     if result.plan.is_actionable:
-        console.print(f"[bold]2. Plan:[/bold] {len(result.plan.actions)} action(s).")
+        console.print(f"[bold]2. Plan Generated:[/bold] {len(result.plan.actions)} action(s).")
     else:
-        console.print("[bold]2. Plan:[/bold] No actions required.")
+        console.print("[bold]2. Plan Generated:[/bold] No actions required.")
     console.print()
-
-    # Stage 3: Validation (NEW)
+    # Stage 3 Summary (Validation)
     if result.validation_result.is_valid:
         console.print("[bold]3. Validation:[/bold] [green]PASSED[/green]")
-        if result.validation_result.warnings:
-            for w in result.validation_result.warnings:
-                console.print(f"   [yellow]Warning: {w}[/yellow]")
     else:
         console.print("[bold]3. Validation:[/bold] [red]FAILED[/red]")
         for err in result.validation_result.errors:
-            console.print(f"   [red]Error: {err}[/red]")
-        console.print("\n[bold red]⛔ Execution Blocked by Safety Gate.[/bold red]")
-        return # Stop here
-
-    # Stage 4: Execution
+            console.print(f"   - {err}")
+        console.print("\n[red bold]Pipeline halted due to validation failure.[/red bold]")
+        return
+    # Stage 4 Summary (Execution)
     if result.execution_result:
-        console.print(f"\n[bold]4. Execution:[/bold] {result.execution_result.summary}")
+        console.print(f"[bold]4. Execution:[/bold] {result.execution_result.summary}")
         if result.execution_result.results:
             for res in result.execution_result.results:
                 status_str = res.status.value.upper()
                 color = "green" if res.status.value == "success" else ("red" if res.status.value == "failed" else "yellow")
                 console.print(f"   [{color}]• [{status_str}] {res.action_id}[/{color}]")
+                console.print(f"      [dim]{res.message}[/dim]")
     console.print()
     if result.is_success:
         console.print("[green bold]✓ Pipeline Completed Successfully.[/green bold]")
     else:
         console.print("[red bold]⚠ Pipeline Completed with Issues.[/red bold]")
-
 
 @app.command()
 def bootstrap() -> None:
