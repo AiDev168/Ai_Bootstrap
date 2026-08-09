@@ -47,7 +47,7 @@ def test_execute_unknown_action_fails_gracefully() -> None:
     assert len(result.results) == 1
     res = result.results[0]
     assert res.status == ExecutionStatus.FAILED
-    assert "not implemented" in res.message
+    assert "not supported" in res.message
     # کل پلن نباید موفق باشد چون یک اکشن شکست خورده
     assert result.is_success is False
 
