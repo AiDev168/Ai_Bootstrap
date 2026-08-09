@@ -17,6 +17,7 @@ from ai_engineering_bootstrap.probes.doctor import (
     RuntimeTargetProbe,
     VirtualEnvProbe,
 )
+from ai_engineering_bootstrap.probes.gpu import GpuProbe
 
 
 def default_audit_service() -> AuditService:
@@ -34,6 +35,7 @@ def default_audit_service() -> AuditService:
         OSProbe(),
         PlatformProbe(),
         RuntimeTargetProbe(),
+        GpuProbe(),
     ]
     return AuditService(probes=probes)
 

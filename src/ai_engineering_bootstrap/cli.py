@@ -251,36 +251,48 @@ def execute() -> None:
 @app.command()
 def run_pipeline() -> None:
     """
-    Run the full integrated pipeline: Audit → Plan → Execute.
-    Demonstrates the end-to-end flow while keeping layers separate.
-    Output includes summary of all three stages.
+    Run the full integrated pipeline: Audit → Plan → Validate → Execute.
     """
-    console.print("[bold cyan]Running Full Pipeline (Audit → Plan → Execute)...[/bold cyan]\n")
+    console.print("[bold cyan]Running Full Pipeline...[/bold cyan]\n")
     engine = PipelineEngine()
     result = engine.run()
     # Stage 1 Summary
     r = result.audit_report.readiness
-    console.print(f"[bold]1. Audit Complete:[/bold] Health Score {r.health_score}/100")
-    console.print(f"   Development Ready: {'Yes' if r.development_ready else 'No'}")
+    console.print(f"[bold]1. Audit:[/bold] Health Score {r.health_score}/100")
     console.print()
     # Stage 2 Summary
     if result.plan.is_actionable:
-        console.print(f"[bold]2. Plan Generated:[/bold] {len(result.plan.actions)} action(s) identified.")
+        console.print(f"[bold]2. Plan:[/bold] {len(result.plan.actions)} action(s).")
     else:
-        console.print("[bold]2. Plan Generated:[/bold] No actions required.")
+        console.print("[bold]2. Plan:[/bold] No actions required.")
     console.print()
-    # Stage 3 Summary
-    console.print(f"[bold]3. Execution Result:[/bold] {result.execution_result.summary}")
-    if result.execution_result.results:
-        console.print("   Details:")
-        for res in result.execution_result.results:
-            status_str = res.status.value.upper()
-            console.print(f"   • [{status_str}] {res.action_id}: {res.message}")
+
+    # Stage 3: Validation (NEW)
+    if result.validation_result.is_valid:
+        console.print("[bold]3. Validation:[/bold] [green]PASSED[/green]")
+        if result.validation_result.warnings:
+            for w in result.validation_result.warnings:
+                console.print(f"   [yellow]Warning: {w}[/yellow]")
+    else:
+        console.print("[bold]3. Validation:[/bold] [red]FAILED[/red]")
+        for err in result.validation_result.errors:
+            console.print(f"   [red]Error: {err}[/red]")
+        console.print("\n[bold red]⛔ Execution Blocked by Safety Gate.[/bold red]")
+        return # Stop here
+
+    # Stage 4: Execution
+    if result.execution_result:
+        console.print(f"\n[bold]4. Execution:[/bold] {result.execution_result.summary}")
+        if result.execution_result.results:
+            for res in result.execution_result.results:
+                status_str = res.status.value.upper()
+                color = "green" if res.status.value == "success" else ("red" if res.status.value == "failed" else "yellow")
+                console.print(f"   [{color}]• [{status_str}] {res.action_id}[/{color}]")
     console.print()
     if result.is_success:
         console.print("[green bold]✓ Pipeline Completed Successfully.[/green bold]")
     else:
-        console.print("[red bold]⚠ Pipeline Completed with Execution Failures.[/red bold]")
+        console.print("[red bold]⚠ Pipeline Completed with Issues.[/red bold]")
 
 
 @app.command()

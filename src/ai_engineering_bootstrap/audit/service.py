@@ -1,4 +1,6 @@
+#!/usr/bin/env python3
 """Audit Service - Orchestrates probes and generates reports."""
+#src/ai_engineering_bootstrap/audit/service.py: #!/usr/bin/env python3
 
 from __future__ import annotations
 
@@ -27,7 +29,8 @@ class AuditService:
     def _map_category(name: str) -> CheckCategory:
         """Map a check name to its category."""
         name_lower = name.lower()
-
+        if "gpu" in name_lower or "cuda" in name_lower:
+            return CheckCategory.SYSTEM
         if "python" in name_lower:
             return CheckCategory.PYTHON
         if "virtual" in name_lower or "editable" in name_lower:
@@ -40,7 +43,6 @@ class AuditService:
             return CheckCategory.CONTAINER
         if "os" in name_lower or "platform" in name_lower:
             return CheckCategory.PLATFORM
-
         return CheckCategory.SYSTEM
 
     def run(self) -> AuditReport:
@@ -50,7 +52,6 @@ class AuditService:
         for probe in self._probes:
             try:
                 result: Any = probe.run()
-
                 # نگاشت وضعیت
                 status_map = {
                     AuditStatus.AVAILABLE: CheckStatus.PASSED,
