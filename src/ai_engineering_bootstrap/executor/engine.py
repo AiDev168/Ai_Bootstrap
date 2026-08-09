@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Executor Engine - Dispatches actions via the Registry with Mode control."""
+"""Executor Engine - Dispatches via Registry and Abstraction."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai_engineering_bootstrap.executor.handlers import BaseContext
+from ai_engineering_bootstrap.executor.handlers.base import ExecutionContext
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 from ai_engineering_bootstrap.executor.models import (
     ActionResult,
@@ -21,9 +21,8 @@ if TYPE_CHECKING:
 
 class ExecutorEngine:
     """
-    Executes actions from a validated ExecutionPlan using the Action Registry.
-    Supports both SAFE (mock) and REAL (controlled) execution modes.
-    Enforces Safety Gate policies before any handler invocation.
+    Executes actions using handler abstraction.
+    Does not depend on concrete handler implementations.
     """
 
     def __init__(self, mode: ExecutionMode = ExecutionMode.SAFE, is_approved: bool = False) -> None:
@@ -33,23 +32,22 @@ class ExecutorEngine:
         self._safety_gate = SafetyGate()
 
     def execute(self, plan: ExecutionPlan) -> ExecutionResult:
-        """Process all actions in the plan deterministically."""
+        """Process all actions deterministically."""
         results: list[ActionResult] = []
-        context = BaseContext(
+        context = ExecutionContext(
+            mode=self._mode,
             dry_run=(self._mode == ExecutionMode.SAFE),
-            platform="unknown",
-            metadata={"mode": self._mode.value}
+            is_approved=self._is_approved
         )
 
         for action in plan.actions:
-            # بررسی Safety Gate قبل از هر کاری
+            # 1. Safety Gate Check
             allowed, reason = self._safety_gate.evaluate(
                 action.action_id,
                 self._mode,
-                self._is_approved
+                is_approved=self._is_approved
             )
             if not allowed:
-                # اکشن رد شده توسط گیت امنیتی -> هرگز به هندلر نمی‌رسد
                 results.append(ActionResult(
                     action_id=action.action_id,
                     status=ExecutionStatus.FAILED,
@@ -58,9 +56,10 @@ class ExecutorEngine:
                 ))
                 continue
 
+            # 2. Handler Lookup & Execution
             try:
                 handler = self._registry.get_handler(action.action_id, self._mode)
-                result = handler.handle(action, context)
+                result = handler.execute(action, context)
                 results.append(result)
             except KeyError as ke:
                 results.append(ActionResult(
