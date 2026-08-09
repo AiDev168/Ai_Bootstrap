@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Central Action Registry for mapping action IDs to handlers."""
 
 from __future__ import annotations

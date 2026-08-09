@@ -253,57 +253,67 @@ def run_pipeline(
     real_execution: bool = typer.Option(
         False,
         "--real-execution",
-        help="Enable REAL execution mode for approved non-destructive actions. Default is SAFE/Mock."
+        help="Enable REAL execution mode."
     )
 ) -> None:
-    """
-    Run the full integrated pipeline: Audit → Plan → Validate → Execute.
-    By default, runs in SAFE mode (simulation).
-    Use --real-execution to enable controlled real capabilities.
-    """
     from ai_engineering_bootstrap.executor.mode import ExecutionMode
     mode = ExecutionMode.REAL if real_execution else ExecutionMode.SAFE
     console.print(f"[bold cyan]Running Full Pipeline ({mode.value.upper()} MODE)...[/bold cyan]\n")
     if mode == ExecutionMode.REAL:
         console.print("[yellow bold]⚠️ REAL EXECUTION MODE ACTIVE[/yellow bold]")
         console.print("Only pre-approved, non-destructive actions will run.\n")
-
     engine = PipelineEngine()
     result = engine.run(mode=mode)
-    # Stage 1 Summary
+    # 1. Audit
     r = result.audit_report.readiness
     console.print(f"[bold]1. Audit Complete:[/bold] Health Score {r.health_score}/100")
-    console.print()
-    # Stage 2 Summary
+    # 2. Plan
     if result.plan.is_actionable:
         console.print(f"[bold]2. Plan Generated:[/bold] {len(result.plan.actions)} action(s).")
     else:
         console.print("[bold]2. Plan Generated:[/bold] No actions required.")
-    console.print()
-    # Stage 3 Summary (Validation)
+    # 3. Validation
     if result.validation_result.is_valid:
         console.print("[bold]3. Validation:[/bold] [green]PASSED[/green]")
     else:
         console.print("[bold]3. Validation:[/bold] [red]FAILED[/red]")
         for err in result.validation_result.errors:
             console.print(f"   - {err}")
-        console.print("\n[red bold]Pipeline halted due to validation failure.[/red bold]")
+        console.print("\n[red bold]Pipeline halted.[/red bold]")
         return
-    # Stage 4 Summary (Execution)
+    # 4. Execution
     if result.execution_result:
-        console.print(f"[bold]4. Execution:[/bold] {result.execution_result.summary}")
-        if result.execution_result.results:
-            for res in result.execution_result.results:
-                status_str = res.status.value.upper()
-                color = "green" if res.status.value == "success" else ("red" if res.status.value == "failed" else "yellow")
-                console.print(f"   [{color}]• [{status_str}] {res.action_id}[/{color}]")
-                console.print(f"      [dim]{res.message}[/dim]")
+        if result.execution_result.is_success:
+             console.print("[bold]4. Execution:[/bold] [green]SUCCESS[/green]")
+        else:
+             console.print("[bold]4. Execution:[/bold] [red]FAILED[/red]")
+        for res in result.execution_result.results:
+            color = "green" if res.status.value == "success" else ("red" if res.status.value == "failed" else "yellow")
+            console.print(f"   [{color}]• [{res.status.value.upper()}] {res.action_id}[/{color}]")
+            console.print(f"      [dim]{res.message}[/dim]")
+    else:
+        console.print("[bold]4. Execution:[/bold] [dim]Skipped (Validation Failed)[/dim]")
+    # 5. Verification
+    console.print()
+    if result.verification_results:
+        all_verified = all(v.status.value != "failed" for v in result.verification_results)
+        if all_verified:
+            console.print("[bold]5. Verification:[/bold] [green]COMPLETED[/green]")
+        else:
+            console.print("[bold]5. Verification:[/bold] [red]ISSUES DETECTED[/red]")
+        for v in result.verification_results:
+            color = "green" if v.status.value == "verified" else ("red" if v.status.value == "failed" else "yellow")
+            console.print(f"   [{color}]• [{v.status.value.upper()}] {v.action_id}[/{color}]")
+            console.print(f"      [dim]{v.message}[/dim]")
+            if v.observed:
+                console.print(f"      [dim]Observed: {v.observed}[/dim]")
+    else:
+        console.print("[bold]5. Verification:[/bold] [dim]No actions to verify[/dim]")
     console.print()
     if result.is_success:
         console.print("[green bold]✓ Pipeline Completed Successfully.[/green bold]")
     else:
         console.print("[red bold]⚠ Pipeline Completed with Issues.[/red bold]")
-
 @app.command()
 def bootstrap() -> None:
     """Run audit, display plan, and (in future) execute fixes."""
