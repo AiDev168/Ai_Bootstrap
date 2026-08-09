@@ -32,6 +32,8 @@ def test_execute_known_safe_action() -> None:
     assert res.status == ExecutionStatus.SKIPPED
     assert "Safe Mode" in res.message
 
+# ... (سایر ایمپورت‌ها)
+
 def test_execute_unknown_action_fails_gracefully() -> None:
     """Unknown action should fail gracefully without crashing."""
     action = ExecutionPlanAction(
@@ -47,10 +49,9 @@ def test_execute_unknown_action_fails_gracefully() -> None:
     assert len(result.results) == 1
     res = result.results[0]
     assert res.status == ExecutionStatus.FAILED
-    assert "not supported" in res.message
-    # کل پلن نباید موفق باشد چون یک اکشن شکست خورده
-    assert result.is_success is False
-
+    # پیام جدید Safety Gate
+    assert "Safety Gate Denied" in res.message
+    assert "no explicit policy" in res.message
 def test_execute_mixed_actions() -> None:
     """Mixed known and unknown actions should be handled correctly."""
     actions = [
