@@ -268,8 +268,8 @@ def run_pipeline(
     r = result.audit_report.readiness
     console.print(f"[bold]1. Audit Complete:[/bold] Health Score {r.health_score}/100")
     # 2. Plan
-    if result.plan.is_actionable:
-        console.print(f"[bold]2. Plan Generated:[/bold] {len(result.plan.actions)} action(s).")
+    if result.original_plan.is_actionable:
+        console.print(f"[bold]2. Plan Generated:[/bold] {len(result.original_plan.actions)} action(s).")
     else:
         console.print("[bold]2. Plan Generated:[/bold] No actions required.")
     # 3. Validation
