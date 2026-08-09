@@ -38,19 +38,19 @@ class GpuProbe:
             )
         except FileNotFoundError:
             return AuditCheck(
-                name="gpu",
+                name="GPU",
                 status=AuditStatus.UNSUPPORTED,
                 details="GPU vendor utility not available",
             )
         except subprocess.TimeoutExpired:
             return AuditCheck(
-                name="gpu",
+                name="GPU",
                 status=AuditStatus.ERROR,
                 details="GPU check timed out",
             )
         except (OSError, subprocess.SubprocessError) as error:
             return AuditCheck(
-                name="gpu",
+                name="GPU",
                 status=AuditStatus.ERROR,
                 details=str(error),
             )
@@ -59,14 +59,14 @@ class GpuProbe:
         if result.returncode != 0 or not output:
             details = result.stderr.strip() or "GPU information is not available"
             return AuditCheck(
-                name="gpu",
+                name="GPU",
                 status=AuditStatus.UNSUPPORTED,
                 details=details,
             )
 
         devices = [line.strip() for line in output.splitlines() if line.strip()]
         return AuditCheck(
-            name="gpu",
+            name="GPU",
             status=AuditStatus.AVAILABLE,
             facts={"devices": " | ".join(devices), "count": str(len(devices))},
         )

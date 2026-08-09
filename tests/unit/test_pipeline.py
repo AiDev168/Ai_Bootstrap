@@ -1,4 +1,7 @@
+#!/usr/bin/env python3
 """Integration tests for the Execution Pipeline."""
+
+from unittest.mock import MagicMock, patch
 
 from ai_engineering_bootstrap.audit.models import (
     AuditCheck,
@@ -8,7 +11,7 @@ from ai_engineering_bootstrap.audit.models import (
     EnvironmentReadiness,
 )
 from ai_engineering_bootstrap.pipeline import PipelineEngine
-from ai_engineering_bootstrap.planner.models import ExecutionPlan
+from ai_engineering_bootstrap.planner.models import ExecutionPlan, ExecutionPlanAction
 
 
 def _make_failed_report() -> AuditReport:
@@ -29,62 +32,68 @@ def _make_healthy_report() -> AuditReport:
     readiness = EnvironmentReadiness.calculate(checks)
     return AuditReport(checks=checks, readiness=readiness)
 
-def test_pipeline_healthy_environment() -> None:
-    """Pipeline should complete successfully for a healthy environment."""
-    # Note: Since we can't easily mock the default_audit_service globally here without complex fixtures,
-    # we test the logic flow assuming the real service works as tested in other units.
-    # For strict unit testing of the pipeline logic itself, we would inject dependencies.
-    # Here we verify the structure of the result when run against the actual current environment.
-    
-    engine = PipelineEngine()
-    result = engine.run()
-    
-    assert result.audit_report is not None
-    assert result.plan is not None
-    assert result.execution_result is not None
-    
-    # If the real env is healthy, plan should be empty and exec success
-    if not result.plan.is_actionable:
-        assert len(result.execution_result.results) == 0
-        assert result.execution_result.is_success is True
+def test_pipeline_blocks_invalid_plan() -> None:
+    """If Validator fails, Executor must NOT be called."""
+    # ساخت یک طرح نامعتبر (action_id خالی)
+    bad_action = ExecutionPlanAction(action_id="", description="Bad", priority=1)
+    bad_plan = ExecutionPlan(is_actionable=True, actions=[bad_action], summary="Bad Plan")
 
-def test_pipeline_with_failures_integration() -> None:
-    """Verify that if Audit has failures, Planner creates plan and Executor processes it."""
-    # This test relies on the real environment having some failure or mocking the service.
-    # Given the constraints, we verify the deterministic behavior of the engine structure.
-    engine = PipelineEngine()
-    result = engine.run()
-    
-    # Ensure all stages produced output
-    assert isinstance(result.audit_report, AuditReport)
-    assert isinstance(result.plan, ExecutionPlan)
-    assert result.execution_result.is_success == (len([r for r in result.execution_result.results if r.status.value != 'success']) == 0)
+    # ماک کردن سرویس‌های داخلی پایپ‌لاین
+    with patch('ai_engineering_bootstrap.pipeline.engine.default_audit_service') as mock_audit_svc:
+        mock_audit_instance = MagicMock()
+        mock_audit_instance.run.return_value = _make_healthy_report()
+        mock_audit_svc.return_value = mock_audit_instance
+        with patch('ai_engineering_bootstrap.pipeline.engine.PlannerEngine') as MockPlanner:
+            mock_planner_instance = MagicMock()
+            mock_planner_instance.generate_plan.return_value = bad_plan
+            MockPlanner.return_value = mock_planner_instance
+            # Executor نباید صدا زده شود
+            with patch('ai_engineering_bootstrap.pipeline.engine.ExecutorEngine') as MockExecutor:
+                mock_executor_instance = MagicMock()
+                MockExecutor.return_value = mock_executor_instance
+                engine = PipelineEngine()
+                result = engine.run()
+                # بررسی‌ها
+                assert result.validation_result is not None
+                assert result.validation_result.is_valid is False
+                # Executor هرگز نباید execute را صدا زده باشد
+                mock_executor_instance.execute.assert_not_called()
+                # نتیجه اجرا باید وجود داشته باشد اما نشان‌دهنده توقف باشد
+                assert result.execution_result is not None
+                assert result.execution_result.is_success is False
+                assert "blocked by Safety Gate" in result.execution_result.summary
+                assert len(result.execution_result.results) == 0
 
-def test_pipeline_deterministic_ordering() -> None:
-    """Running the pipeline twice should yield same action order (if any)."""
-    engine = PipelineEngine()
-    res1 = engine.run()
-    res2 = engine.run()
-    
-    # Action IDs should be in same order
-    ids1 = [r.action_id for r in res1.execution_result.results]
-    ids2 = [r.action_id for r in res2.execution_result.results]
-    assert ids1 == ids2
-
-def test_pipeline_preserves_intermediate_results() -> None:
-    """PipelineResult must expose all three stages independently."""
-    engine = PipelineEngine()
-    result = engine.run()
-    
-    assert hasattr(result, 'audit_report')
-    assert hasattr(result, 'plan')
-    assert hasattr(result, 'execution_result')
-    
-    # Verify types
-    from ai_engineering_bootstrap.audit.models import AuditReport
-    from ai_engineering_bootstrap.executor.models import ExecutionResult
-    from ai_engineering_bootstrap.planner.models import ExecutionPlan
-    
-    assert isinstance(result.audit_report, AuditReport)
-    assert isinstance(result.plan, ExecutionPlan)
-    assert isinstance(result.execution_result, ExecutionResult)
+def test_pipeline_allows_valid_plan() -> None:
+    """If Validator passes, Executor MUST be called."""
+    good_action = ExecutionPlanAction(action_id="install_git", description="Git", priority=1)
+    good_plan = ExecutionPlan(is_actionable=True, actions=[good_action], summary="Good Plan")
+    with patch('ai_engineering_bootstrap.pipeline.engine.default_audit_service') as mock_audit_svc:
+        mock_audit_instance = MagicMock()
+        mock_audit_instance.run.return_value = _make_healthy_report()
+        mock_audit_svc.return_value = mock_audit_instance
+        with patch('ai_engineering_bootstrap.pipeline.engine.PlannerEngine') as MockPlanner:
+            mock_planner_instance = MagicMock()
+            mock_planner_instance.generate_plan.return_value = good_plan
+            MockPlanner.return_value = mock_planner_instance
+            with patch('ai_engineering_bootstrap.pipeline.engine.ExecutorEngine') as MockExecutor:
+                mock_executor_instance = MagicMock()
+                # شبیه‌سازی نتیجه موفقیت‌آمیز اجرا
+                from ai_engineering_bootstrap.executor.models import (
+                    ActionResult,
+                    ExecutionResult,
+                    ExecutionStatus,
+                )
+                mock_result = ExecutionResult(
+                    is_success=True,
+                    results=[ActionResult(action_id="install_git", status=ExecutionStatus.SKIPPED, message="Mock")],
+                    summary="Success"
+                )
+                mock_executor_instance.execute.return_value = mock_result
+                MockExecutor.return_value = mock_executor_instance
+                engine = PipelineEngine()
+                result = engine.run()
+                # بررسی‌ها
+                assert result.validation_result.is_valid is True
+                mock_executor_instance.execute.assert_called_once()
+                assert result.execution_result.is_success is True
