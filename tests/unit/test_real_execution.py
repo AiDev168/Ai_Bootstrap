@@ -43,7 +43,7 @@ def test_real_mode_rejects_unapproved_action() -> None:
     assert len(result.results) == 1
     res = result.results[0]
     assert res.status == ExecutionStatus.FAILED
-    assert "not approved for REAL execution" in res.message
+    assert "not allowed in real mode" in res.message
 
 def test_real_mode_rejects_unknown_action() -> None:
     """REAL mode must reject unknown malicious actions."""
@@ -55,8 +55,8 @@ def test_real_mode_rejects_unknown_action() -> None:
     
     assert len(result.results) == 1
     assert result.results[0].status == ExecutionStatus.FAILED
-    assert "not supported" in result.results[0].message
-
+    assert "Safety Gate Denied" in result.results[0].message
+    assert "Default Deny" in result.results[0].message
 def test_registry_separation() -> None:
     """Registry must distinguish between safe and real handlers."""
     reg = ActionRegistry()
