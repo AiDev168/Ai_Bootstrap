@@ -2,8 +2,8 @@
 
 ## Product Direction
 
-The project is evolving from a deterministic bootstrap/audit CLI into a controlled
-AI engineering environment platform.
+The project is evolving from a deterministic bootstrap/audit CLI into a
+controlled AI engineering environment platform.
 
 The target product workflow is:
 
@@ -14,11 +14,15 @@ Doctor
   ↓
 Plan
   ↓
-Review / Approve
+Validate / Safety Policy
+  ↓
+Human Approval (when required)
   ↓
 Execute
   ↓
 Verify
+  ↓
+Recover / Re-plan
 ```
 
 The final primary interface is a professional GUI.
@@ -47,22 +51,11 @@ Includes:
 - deterministic tests;
 - safe destination/collision handling.
 
-### Doctor V2
-
-**Status: Completed**
-
-Includes:
-
-- Environment Doctor;
-- readiness reporting;
-- human-readable diagnostics;
-- recommendations.
-
 ### Doctor V3 Foundation
 
 **Status: Completed**
 
-Implemented milestones:
+Includes:
 
 1. Model Unification
 2. Health Score
@@ -74,7 +67,7 @@ Implemented milestones:
 
 **Status: Completed**
 
-Implemented:
+Includes:
 
 - `ExecutionPlan`;
 - `ExecutionPlanAction`;
@@ -85,107 +78,97 @@ Implemented:
 - safe handling of unknown checks;
 - audit → plan conversion.
 
-## Current Phase — Controlled Execution Pipeline
+### Controlled Execution Core
 
-### Milestone 1 — Executor Foundation
+**Status: Completed**
 
-**Status: Next**
+Includes:
 
-Goal: establish the write boundary without building a large remediation framework.
+- Executor Foundation;
+- Safe/Mock execution;
+- execution-plan validation;
+- Action Policy / Safety Gate;
+- Safe vs Real execution modes;
+- Real Action Handler architecture;
+- controlled read-only real action;
+- post-execution verification;
+- bounded failure/retry/re-plan signalling;
+- capability/tool registry.
 
-Scope:
+### Agent / LLM Decision Layer
 
-- Executor public contract;
-- execution result model(s);
-- consume `ExecutionPlan`;
-- explicit action execution boundary;
-- deterministic behavior;
-- safety/dry-run semantics where required;
-- unit tests;
-- integration path for future application/GUI.
+**Status: Foundation Completed**
 
-Do not add broad autonomous remediation.
+Includes:
 
-### Milestone 2 — Application Workflow
+- structured `AgentDecision`;
+- `LLMProvider` contract;
+- Mock provider;
+- local HTTP provider for LM Studio/Ollama style servers;
+- remote API-key provider;
+- in-process Python provider;
+- capability validation;
+- no direct Agent → Executor path.
 
-Connect the core services into one workflow:
+### Human Approval / Safety Controls
 
-```text
-Doctor
-  ↓
-Planner
-  ↓
-Executor
-  ↓
-Verification / Doctor
-```
+**Status: Foundation Completed**
 
-The resulting application workflow becomes the shared backend for CLI and GUI.
+Includes:
 
-### Milestone 3 — GUI Foundation
+- approval request/result contracts;
+- explicit approval provider boundary;
+- action/plan/run binding;
+- pending/rejected/approved handling;
+- fail-closed behavior.
 
-Build the professional GUI on top of the application workflow.
+### End-to-End Hardening
 
-Priority:
+**Status: Test Foundation Completed**
 
-- environment dashboard;
-- Health Score;
-- categorized checks;
-- recommendations;
-- execution plan;
-- approval;
-- execution progress;
-- results/logs;
-- re-verification.
+The current repository contains hardening tests covering the critical
+Doctor → Planner → validation → approval → execution boundaries.
 
-Do not duplicate business logic in the GUI.
+The implementation must continue to preserve these invariants.
 
-### Milestone 4 — Safe Remediation Library
+## Current Remaining Direction
 
-Add approved Executor actions incrementally.
+The controlled core is substantially implemented. Before GUI work, remaining
+work must be limited to concrete gaps demonstrated by the current source/tests.
 
-Every action requires:
+Potential downstream areas, to be taken only when justified by the repository:
 
-- stable action ID;
-- explicit preconditions;
-- clear scope;
-- deterministic behavior;
-- result reporting;
-- tests;
-- no unrelated side effects.
+1. strengthen end-to-end integration where a current test exposes a real gap;
+2. add approved real actions incrementally, each with explicit policy and
+   independent verification;
+3. complete any required production hardening identified by tests;
+4. build the professional GUI only after the controlled backend contracts are
+   stable.
 
-### Milestone 5 — Bootstrap Workflow
+Do not introduce a new framework, orchestration model, or autonomous behavior
+merely because it is available.
 
-Target experience:
+## GUI Foundation
 
-```text
-ai-bootstrap bootstrap
-```
+**Status: Deferred**
 
-Conceptually:
+The GUI is the future primary product interface.
 
-```text
-Inspect
-  ↓
-Diagnose
-  ↓
-Plan
-  ↓
-Review
-  ↓
-Approve
-  ↓
-Execute
-  ↓
-Verify
-```
+It must consume the existing application/core services and must not duplicate:
 
-The GUI should provide the richer interactive version of the same workflow.
+- Doctor logic;
+- Planner logic;
+- Safety Policy;
+- Approval logic;
+- Executor logic;
+- Verification logic.
+
+GUI work begins only after the controlled core is considered stable.
 
 ## Long-Term Direction
 
 After the deterministic bootstrap/execution core and GUI are stable, the platform
-can evolve toward AI-assisted engineering workflows, knowledge integration,
-controlled agent capabilities, and other higher-level automation.
+can evolve toward richer AI-assisted engineering workflows, knowledge integration,
+and controlled agent capabilities.
 
 Those capabilities are downstream of the stable core and must not destabilize it.

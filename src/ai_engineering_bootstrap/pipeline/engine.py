@@ -21,6 +21,10 @@ from ai_engineering_bootstrap.executor.validator import (
     ExecutionPlanValidator,
     ValidationResult,
 )
+from ai_engineering_bootstrap.executor.verifier import (
+    VerificationResult,
+    VerificationStatus,
+)
 from ai_engineering_bootstrap.planner import PlannerEngine
 from ai_engineering_bootstrap.planner.models import ExecutionPlan
 
@@ -32,7 +36,7 @@ class PipelineResult:
     original_plan: ExecutionPlan
     validation_result: ValidationResult
     execution_result: ExecutionResult | None
-    verification_result: Any | None  # فعلاً ساده‌سازی شده
+    verification_results: list[VerificationResult] = field(default_factory=list)
     replan_requested: bool = False
     replanned_plan: ExecutionPlan | None = None
     failure_records: list[Any] = field(default_factory=list)
@@ -50,7 +54,12 @@ class PipelineResult:
             return False
         if self.is_pending_approval or self.is_rejected_approval:
             return False
-        return self.execution_result.is_success
+        if not self.execution_result.is_success:
+            return False
+        return all(
+            result.status != VerificationStatus.FAILED
+            for result in self.verification_results
+        )
 
 
 class PipelineEngine:
@@ -94,7 +103,7 @@ class PipelineEngine:
                 original_plan=original_plan,
                 validation_result=validation_result,
                 execution_result=None,
-                verification_result=None,
+                verification_results=[],
                 replan_requested=False
             )
 
@@ -163,7 +172,7 @@ class PipelineEngine:
                     original_plan=original_plan,
                     validation_result=validation_result,
                     execution_result=None,
-                    verification_result=None,
+                    verification_results=[],
                     replan_requested=False,
                     approval_requests=pending_requests,
                     is_pending_approval=True
@@ -176,7 +185,7 @@ class PipelineEngine:
                     original_plan=original_plan,
                     validation_result=validation_result,
                     execution_result=None,
-                    verification_result=None,
+                    verification_results=[],
                     replan_requested=False,
                     approval_requests=rejected_requests,
                     is_rejected_approval=True
@@ -187,8 +196,8 @@ class PipelineEngine:
         executor = ExecutorEngine(mode=mode)
         exec_result = executor.execute(original_plan, max_attempts=max_retry_attempts)
 
-        # Stage 5: Verification (ساده‌سازی شده برای این فیچر)
-        verification_result = None
+        # Stage 5: Independent post-execution verification.
+        verification_results = executor.verify(original_plan, exec_result)
         replan_requested = False
         failure_records = []
 
@@ -209,7 +218,7 @@ class PipelineEngine:
             original_plan=original_plan,
             validation_result=validation_result,
             execution_result=exec_result,
-            verification_result=verification_result,
+            verification_results=verification_results,
             replan_requested=replan_requested,
             replanned_plan=replanned_plan,
             failure_records=failure_records

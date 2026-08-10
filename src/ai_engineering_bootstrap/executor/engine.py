@@ -15,6 +15,11 @@ from ai_engineering_bootstrap.executor.models import (
 from ai_engineering_bootstrap.executor.policy import SafetyGate
 from ai_engineering_bootstrap.executor.recovery import RetryPolicy
 from ai_engineering_bootstrap.executor.registry import ActionRegistry
+from ai_engineering_bootstrap.executor.verifier import (
+    VerificationResult,
+    VerificationStatus,
+    VerifierRegistry,
+)
 
 if TYPE_CHECKING:
     from ai_engineering_bootstrap.planner.models import ExecutionPlan
@@ -32,6 +37,46 @@ class ExecutorEngine:
         self._is_approved = is_approved
         self._registry = ActionRegistry()
         self._safety_gate = SafetyGate()
+        self._verifier_registry = VerifierRegistry()
+
+
+    def verify(self, plan: ExecutionPlan, execution_result: ExecutionResult) -> list[VerificationResult]:
+        """Verify successful executions using independent, read-only verifiers."""
+        results: list[VerificationResult] = []
+        context = ExecutionContext(
+            mode=self._mode,
+            dry_run=(self._mode == ExecutionMode.SAFE),
+            is_approved=self._is_approved,
+        )
+        action_by_id = {action.action_id: action for action in plan.actions}
+
+        for action_result in execution_result.results:
+            action = action_by_id.get(action_result.action_id)
+            if action is None:
+                results.append(
+                    VerificationResult(
+                        action_id=action_result.action_id,
+                        status=VerificationStatus.FAILED,
+                        message="Execution result has no matching plan action.",
+                        details={"error": "plan_action_not_found"},
+                    )
+                )
+                continue
+
+            verifier = self._verifier_registry.get_verifier(action.action_id)
+            if verifier is None:
+                results.append(
+                    VerificationResult(
+                        action_id=action.action_id,
+                        status=VerificationStatus.SKIPPED,
+                        message="No verifier registered for this action.",
+                    )
+                )
+                continue
+
+            results.append(verifier.verify(action, action_result, context))
+
+        return results
 
     def execute(
         self,
