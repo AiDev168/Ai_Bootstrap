@@ -53,6 +53,23 @@ class SafetyGate:
             approval_required=ApprovalRequirement.NONE
         )
         
+        self._policies["create_virtualenv"] = ActionPolicy(
+            "create_virtualenv", True, ActionRisk.MEDIUM,
+            [ExecutionMode.SAFE, ExecutionMode.REAL], ApprovalRequirement.HUMAN
+        )
+        self._policies["install_python_package"] = ActionPolicy(
+            "install_python_package", True, ActionRisk.MEDIUM,
+            [ExecutionMode.SAFE, ExecutionMode.REAL], ApprovalRequirement.HUMAN
+        )
+        self._policies["install_project_dependencies"] = ActionPolicy(
+            "install_project_dependencies", True, ActionRisk.MEDIUM,
+            [ExecutionMode.SAFE, ExecutionMode.REAL], ApprovalRequirement.HUMAN
+        )
+        self._policies["fix_editable"] = ActionPolicy(
+            "fix_editable", True, ActionRisk.MEDIUM,
+            [ExecutionMode.SAFE], ApprovalRequirement.HUMAN
+        )
+
         # اکشن‌های MOCK (فقط در حالت SAFE مجازند)
         mock_actions = ["install_git", "install_docker", "fix_venv", "fix_editable", "upgrade_python"]
         for action_id in mock_actions:
@@ -67,6 +84,15 @@ class SafetyGate:
     def register_policy(self, policy: ActionPolicy) -> None:
         """Register or update a policy."""
         self._policies[policy.action_id] = policy
+
+    def get_policy(self, action_id: str) -> ActionPolicy | None:
+        """Return the explicit policy for an action, if one exists."""
+        return self._policies.get(action_id)
+
+    def requires_human_approval(self, action_id: str) -> bool:
+        """Return whether an explicitly known action requires human approval."""
+        policy = self.get_policy(action_id)
+        return policy is not None and policy.approval_required == ApprovalRequirement.HUMAN
 
     def evaluate(self, action_id: str, mode: ExecutionMode, is_approved: bool = False) -> tuple[bool, str]:
         """
@@ -85,7 +111,11 @@ class SafetyGate:
         if mode not in policy.allowed_modes:
             return False, f"Safety Gate Denied: Action '{action_id}' is not allowed in {mode.value} mode."
         
-        if policy.approval_required == ApprovalRequirement.HUMAN and not is_approved:
+        if (
+            mode == ExecutionMode.REAL
+            and policy.approval_required == ApprovalRequirement.HUMAN
+            and not is_approved
+        ):
             return False, f"Safety Gate Denied: Action '{action_id}' requires human approval."
         
         return True, "Allowed"

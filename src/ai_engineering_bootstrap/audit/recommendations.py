@@ -35,6 +35,11 @@ class RecommendationEngine:
         elif "editable" in name_lower:
             recommendations.append('Install the project in editable mode: python -m pip install -e ".[dev]"')
 
+        # Project/runtime dependencies
+        elif facts.get("remediation_action") == "install_python_package":
+            requirement = facts.get("requirement", facts.get("package", check.name))
+            recommendations.append(f"Install Python dependency: {requirement}")
+
         # Dependencies (Typer, Rich, Pytest, Ruff)
         elif name_lower == "typer":
             recommendations.append("Install Typer: python -m pip install typer")

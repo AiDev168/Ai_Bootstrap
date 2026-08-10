@@ -5,6 +5,11 @@ from ai_engineering_bootstrap.executor.capability import (
     CapabilityRegistry,
     CapabilityRisk,
     DuplicateCapabilityError,
+    default_capability_registry,
+)
+from ai_engineering_bootstrap.executor.capability_binding import (
+    CapabilityActionBinder,
+    CapabilityBindingResult,
 )
 from ai_engineering_bootstrap.executor.engine import ExecutorEngine
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
@@ -17,6 +22,8 @@ from ai_engineering_bootstrap.executor.models import (
 __all__ = [
     "ActionResult",
     "Capability",
+    "CapabilityActionBinder",
+    "CapabilityBindingResult",
     "CapabilityRegistry",
     "CapabilityRisk",
     "DuplicateCapabilityError",
@@ -24,4 +31,5 @@ __all__ = [
     "ExecutionResult",
     "ExecutionStatus",
     "ExecutorEngine",
+    "default_capability_registry",
 ]

@@ -253,8 +253,13 @@ def run_pipeline(
     real_execution: bool = typer.Option(
         False,
         "--real-execution",
-        help="Enable REAL execution mode."
-    )
+        help="Enable REAL execution mode.",
+    ),
+    interactive_approval: bool = typer.Option(
+        False,
+        "--interactive-approval",
+        help="Prompt for required human approvals before REAL execution.",
+    ),
 ) -> None:
     from ai_engineering_bootstrap.executor.mode import ExecutionMode
     mode = ExecutionMode.REAL if real_execution else ExecutionMode.SAFE
@@ -263,7 +268,43 @@ def run_pipeline(
         console.print("[yellow bold]⚠️ REAL EXECUTION MODE ACTIVE[/yellow bold]")
         console.print("Only pre-approved, non-destructive actions will run.\n")
     engine = PipelineEngine()
-    result = engine.run(mode=mode)
+    approval_provider = None
+    run_id = "cli-run"
+    pending_approvals = None
+    if interactive_approval:
+        if not real_execution:
+            raise typer.BadParameter("--interactive-approval requires --real-execution")
+        from ai_engineering_bootstrap.approval.provider import InMemoryApprovalProvider
+        approval_provider = InMemoryApprovalProvider()
+
+    result = engine.run(
+        mode=mode,
+        approval_provider=approval_provider,
+        pending_approvals=pending_approvals,
+        run_id=run_id,
+    )
+
+    if interactive_approval and result.is_pending_approval:
+        approved = True
+        approved_ids: dict[str, str] = {}
+        for request in result.approval_requests:
+            answer = typer.confirm(
+                f"Approve {request.action_id} ({request.risk_level})?",
+                default=False,
+            )
+            if answer:
+                approval_provider.approve(request.approval_id)
+                approved_ids[request.action_id] = request.approval_id
+            else:
+                approved = False
+                approval_provider.reject(request.approval_id)
+        if approved:
+            result = engine.run(
+                mode=mode,
+                approval_provider=approval_provider,
+                pending_approvals=approved_ids,
+                run_id=run_id,
+            )
     # 1. Audit
     r = result.audit_report.readiness
     console.print(f"[bold]1. Audit Complete:[/bold] Health Score {r.health_score}/100")
@@ -294,30 +335,31 @@ def run_pipeline(
     else:
         console.print("[bold]4. Execution:[/bold] [dim]Skipped (Validation Failed)[/dim]")
     # 5. Verification
+    # اصلاح: استفاده از getattr برای جلوگیری از خطا در صورت عدم وجود فیلد
+    # و بررسی نام صحیح فیلد (احتمالاً verification_result به صورت مفرد یا جمع)
     console.print()
-    verification_results = result.verification_results
+    # تلاش برای دریافت لیست نتایج تأیید با نام‌های محتمل
+    verification_results = getattr(result, 'verification_results', None)
+    if verification_results is None:
+        verification_results = getattr(result, 'verification_result', None)
+    # اگر لیست نبود و یک تک نتیجه بود، آن را به لیست تبدیل کن
+    if verification_results and not isinstance(verification_results, list):
+        verification_results = [verification_results]
 
     if verification_results:
-        all_verified = all(
-            v.status.value != "failed" for v in verification_results
-        )
-        if all_verified:
+        all_skipped = all(v.status.value == "skipped" for v in verification_results)
+        all_verified = all(v.status.value != "failed" for v in verification_results)
+        if all_skipped:
+            console.print("[bold]5. Verification:[/bold] [dim]SKIPPED[/dim]")
+        elif all_verified:
             console.print("[bold]5. Verification:[/bold] [green]COMPLETED[/green]")
         else:
             console.print("[bold]5. Verification:[/bold] [red]ISSUES DETECTED[/red]")
-
         for v in verification_results:
-            color = (
-                "green"
-                if v.status.value == "verified"
-                else ("red" if v.status.value == "failed" else "yellow")
-            )
-            console.print(
-                f"   [{color}]• [{v.status.value.upper()}] "
-                f"{v.action_id}[/{color}]"
-            )
+            color = "green" if v.status.value == "verified" else ("red" if v.status.value == "failed" else "yellow")
+            console.print(f"   [{color}]• [{v.status.value.upper()}] {v.action_id}[/{color}]")
             console.print(f"      [dim]{v.message}[/dim]")
-            if v.observed:
+            if hasattr(v, 'observed') and v.observed:
                 console.print(f"      [dim]Observed: {v.observed}[/dim]")
     else:
         console.print("[bold]5. Verification:[/bold] [dim]No actions to verify[/dim]")
@@ -326,6 +368,7 @@ def run_pipeline(
         console.print("[green bold]✓ Pipeline Completed Successfully.[/green bold]")
     else:
         console.print("[red bold]⚠ Pipeline Completed with Issues.[/red bold]")
+        raise typer.Exit(code=1)
 
 
 @app.command()

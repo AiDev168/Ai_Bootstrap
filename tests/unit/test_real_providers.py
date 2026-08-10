@@ -180,3 +180,27 @@ def test_mock_provider_deterministic() -> None:
     d1 = provider.decide("fix env", caps)
     d2 = provider.decide("fix env", caps)
     assert d1.selected_capability_ids == d2.selected_capability_ids
+
+
+def test_provider_factory_supports_three_deployment_modes() -> None:
+    from ai_engineering_bootstrap.agent.provider import build_provider
+
+    assert isinstance(build_provider(ProviderConfig("local_server", base_url="http://localhost:1234")), LocalServerProvider)
+    assert isinstance(build_provider(ProviderConfig("in_process", options={"model_instance": object()})), InProcessProvider)
+    assert isinstance(build_provider(ProviderConfig("mock")), MockProvider)
+
+
+def test_provider_factory_reads_remote_api_key_from_environment(monkeypatch) -> None:
+    from ai_engineering_bootstrap.agent.provider import build_provider
+
+    monkeypatch.setenv("TEST_LLM_KEY", "secret")
+    provider = build_provider(
+        ProviderConfig(
+            "remote_api",
+            base_url="https://example.test/v1",
+            model="test",
+            options={"api_key_env": "TEST_LLM_KEY"},
+        )
+    )
+    assert isinstance(provider, RemoteAPIProvider)
+    assert provider.config.api_key == "secret"

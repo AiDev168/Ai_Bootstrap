@@ -66,7 +66,13 @@ class EnvironmentReadiness:
 
         dev_ready = True
         for check in checks:
-            if check.name in dev_critical_names and check.status == CheckStatus.FAILED:
+            if (
+                check.status == CheckStatus.FAILED
+                and (
+                    check.name in dev_critical_names
+                    or check.category == CheckCategory.DEPENDENCIES
+                )
+            ):
                 dev_ready = False
                 break
 

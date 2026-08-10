@@ -91,3 +91,12 @@ def test_execute_deterministic_order() -> None:
     assert len(result.results) == 5
     for i, res in enumerate(result.results):
         assert res.action_id == f"action_{i}"
+
+
+def test_safe_mode_skipped_actions_do_not_make_run_fail() -> None:
+    """Safe-mode simulation is a successful execution outcome, not a failure."""
+    action = ExecutionPlanAction(action_id="install_git", description="Git", priority=1)
+    plan = ExecutionPlan(is_actionable=True, actions=[action], summary="Test")
+    result = ExecutorEngine().execute(plan)
+    assert result.results[0].status == ExecutionStatus.SKIPPED
+    assert result.is_success is True

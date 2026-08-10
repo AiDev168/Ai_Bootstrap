@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
@@ -262,6 +263,34 @@ class InProcessProvider(LLMProvider):
         return f"Context: {context}. Available: {[c.capability_id for c in capabilities]}. Output JSON."
 
 
+def build_provider(config: ProviderConfig) -> LLMProvider:
+    """Create a provider from a validated provider configuration."""
+    if config.provider_type == "local_server":
+        return LocalServerProvider(config)
+    if config.provider_type == "remote_api":
+        api_key = config.api_key
+        env_name = config.options.get("api_key_env")
+        if env_name:
+            api_key = os.environ.get(str(env_name))
+        if not api_key:
+            raise ProviderConnectionError("Remote API provider requires an API key.")
+        return RemoteAPIProvider(
+            ProviderConfig(
+                provider_type=config.provider_type,
+                model=config.model,
+                base_url=config.base_url,
+                api_key=api_key,
+                timeout=config.timeout,
+                options=config.options,
+            )
+        )
+    if config.provider_type == "in_process":
+        return InProcessProvider(config)
+    if config.provider_type == "mock":
+        return MockProvider()
+    raise ValueError(f"Unsupported provider type: {config.provider_type}")
+
+
 __all__ = [
     "InProcessProvider",
     "LLMProvider",
@@ -269,4 +298,5 @@ __all__ = [
     "MockProvider",
     "ProviderConfig",
     "RemoteAPIProvider",
+    "build_provider",
 ]

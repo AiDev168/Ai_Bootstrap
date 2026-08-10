@@ -35,7 +35,7 @@ class AuditService:
             return CheckCategory.PYTHON
         if "virtual" in name_lower or "editable" in name_lower:
             return CheckCategory.ENVIRONMENT
-        if name_lower in ["typer", "rich", "pytest", "ruff"]:
+        if name_lower in ["typer", "rich", "pytest", "ruff"] or "dependency" in name_lower or name_lower in {"setuptools", "wheel"}:
             return CheckCategory.DEPENDENCIES
         if "git" in name_lower:
             return CheckCategory.TOOLS

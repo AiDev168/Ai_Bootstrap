@@ -1,174 +1,86 @@
 # AI Engineering Bootstrap Roadmap
 
-## Product Direction
+## Product Goal
 
-The project is evolving from a deterministic bootstrap/audit CLI into a
-controlled AI engineering environment platform.
+Build a controlled AI Engineering Bootstrap platform that can inspect an engineering
+environment, diagnose deficiencies, generate a deterministic remediation plan,
+obtain required human approval, execute approved changes, independently verify the
+result, recover from failures, and expose the same backend through a professional GUI.
 
-The target product workflow is:
+## Frozen Execution Model
 
 ```text
-Inspect
-  ↓
 Doctor
   ↓
-Plan
+AuditReport
   ↓
-Validate / Safety Policy
+Agent / LLM Decision (optional decision layer)
   ↓
-Human Approval (when required)
+Planner
   ↓
-Execute
+ExecutionPlan
   ↓
-Verify
+Validation / Safety Gate
   ↓
-Recover / Re-plan
+Human Approval when required
+  ↓
+Executor / Real Handler
+  ↓
+Verification
+  ↓
+Recovery / Re-plan
 ```
 
-The final primary interface is a professional GUI.
+Agent never executes actions directly. GUI and CLI never contain remediation business
+logic.
 
-CLI remains important for developer workflows, automation, diagnostics, and CI/CD,
-but excessive CLI cosmetic work is not a priority.
+## Completed Milestones
 
-## Completed Foundation
-
-### Phase 0 — Bootstrap Prototype
-
-**Status: Completed**
-
-Initial project/bootstrap prototype.
-
-### Phase 1 — Core Bootstrap and Validation
-
-**Status: Completed**
-
-Includes:
-
-- environment inspection;
-- audit CLI;
-- project/template generation;
-- typed models;
-- deterministic tests;
-- safe destination/collision handling.
-
-### Doctor V3 Foundation
-
-**Status: Completed**
-
-Includes:
-
-1. Model Unification
+1. Doctor Foundation
 2. Health Score
-3. Check Categorization
-4. CI/CD Audit JSON
-5. Context-Aware Recommendations
+3. Model Unification
+4. Categorization
+5. CI/CD Output
+6. Context-Aware Recommendations
+7. Planner Foundation
+8. Executor Foundation
+9. Doctor → Planner → Executor Pipeline
+10. Execution Plan Validation
+11. Action Policy & Safety Gate
+12. Real Action Handler Architecture
+13. Controlled Real Execution — Phase 1
+14. Post-Execution Verification Foundation
+15. Retry / Failure / Re-plan Foundation
+16. Capability / Tool Registry Foundation
+17. Human Approval / Safety Controls
+18. Agent / LLM Decision Layer Foundation
+19. LLM Provider Integration
+20. Agent Decision → Planner Integration
+21. Capability → Action Contract Binding
+22. Environment Dependency Discovery & Remediation Planning
+23. Controlled Real Action Pack — Phase 1
+24. Dependency Installation Workflow
 
-### Planner Foundation
+## Next Milestones
 
-**Status: Completed**
+25. Failure → Recovery → Re-plan Integration
+26. Execution Audit & Run Evidence
+27. Agent Runtime / Session Boundary
+28. End-to-End Autonomous Environment Bootstrap
+29. Engineering Environment Bootstrap + Cursor Integration
+30. End-to-End Hardening & Security
+31. Stable Backend API / Service Boundary
+32. GUI Foundation
+33. Professional GUI
 
-Includes:
+## Cursor Boundary
 
-- `ExecutionPlan`;
-- `ExecutionPlanAction`;
-- stable action IDs;
-- deterministic ordering;
-- priorities;
-- duplicate-action elimination;
-- safe handling of unknown checks;
-- audit → plan conversion.
+Cursor is part of the engineering-environment bootstrap standard, not the runtime
+Agent execution engine. Cursor installation, `.cursor/rules`, development tooling,
+and developer-machine verification belong to milestone 29.
 
-### Controlled Execution Core
+## Safety Rule
 
-**Status: Completed**
-
-Includes:
-
-- Executor Foundation;
-- Safe/Mock execution;
-- execution-plan validation;
-- Action Policy / Safety Gate;
-- Safe vs Real execution modes;
-- Real Action Handler architecture;
-- controlled read-only real action;
-- post-execution verification;
-- bounded failure/retry/re-plan signalling;
-- capability/tool registry.
-
-### Agent / LLM Decision Layer
-
-**Status: Foundation Completed**
-
-Includes:
-
-- structured `AgentDecision`;
-- `LLMProvider` contract;
-- Mock provider;
-- local HTTP provider for LM Studio/Ollama style servers;
-- remote API-key provider;
-- in-process Python provider;
-- capability validation;
-- no direct Agent → Executor path.
-
-### Human Approval / Safety Controls
-
-**Status: Foundation Completed**
-
-Includes:
-
-- approval request/result contracts;
-- explicit approval provider boundary;
-- action/plan/run binding;
-- pending/rejected/approved handling;
-- fail-closed behavior.
-
-### End-to-End Hardening
-
-**Status: Test Foundation Completed**
-
-The current repository contains hardening tests covering the critical
-Doctor → Planner → validation → approval → execution boundaries.
-
-The implementation must continue to preserve these invariants.
-
-## Current Remaining Direction
-
-The controlled core is substantially implemented. Before GUI work, remaining
-work must be limited to concrete gaps demonstrated by the current source/tests.
-
-Potential downstream areas, to be taken only when justified by the repository:
-
-1. strengthen end-to-end integration where a current test exposes a real gap;
-2. add approved real actions incrementally, each with explicit policy and
-   independent verification;
-3. complete any required production hardening identified by tests;
-4. build the professional GUI only after the controlled backend contracts are
-   stable.
-
-Do not introduce a new framework, orchestration model, or autonomous behavior
-merely because it is available.
-
-## GUI Foundation
-
-**Status: Deferred**
-
-The GUI is the future primary product interface.
-
-It must consume the existing application/core services and must not duplicate:
-
-- Doctor logic;
-- Planner logic;
-- Safety Policy;
-- Approval logic;
-- Executor logic;
-- Verification logic.
-
-GUI work begins only after the controlled core is considered stable.
-
-## Long-Term Direction
-
-After the deterministic bootstrap/execution core and GUI are stable, the platform
-can evolve toward richer AI-assisted engineering workflows, knowledge integration,
-and controlled agent capabilities.
-
-Those capabilities are downstream of the stable core and must not destabilize it.
+No generic shell execution capability is introduced as a shortcut. Real remediation
+actions remain typed, narrowly scoped, policy-controlled, approval-aware, and
+independently verifiable.

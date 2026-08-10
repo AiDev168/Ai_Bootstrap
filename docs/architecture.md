@@ -5,7 +5,7 @@
 The project is a layered, deterministic AI Engineering Bootstrap platform.
 
 The current implementation has evolved beyond the original Phase 1 audit/generation
-CLI. The active controlled core pipeline is:
+CLI. The active core pipeline is:
 
 ```text
 Probes
@@ -18,21 +18,10 @@ Planner
    ↓
 ExecutionPlan
    ↓
-Validation / Safety Policy
-   ↓
-Human Approval (conditional)
-   ↓
 Executor
-   ↓
-Independent Verification
-   ↓
-Recovery / Re-plan Signal
    ↓
 Application / CLI / GUI
 ```
-
-The Agent/LLM layer produces structured decisions for Planner. It is not an
-execution layer and has no direct access to Executor or handlers.
 
 The final product is intended to provide a professional GUI, while the CLI remains
 important for development, diagnostics, automation, and CI/CD.
@@ -157,68 +146,32 @@ Planner currently:
 
 Planner must consume public audit models and must not inspect probes.
 
-## 7. Controlled Execution Boundary
+## 7. Executor Boundary
 
-Executor is the only layer allowed to perform environment-changing actions.
+Executor is the only layer allowed to modify the host environment.
 
-Before dispatch, the plan passes through deterministic validation and Safety
-Policy. Human approval is required when the action policy requires it.
+The Executor Foundation is the next architectural milestone.
 
-The current controlled boundary is:
+It must consume `ExecutionPlan` and execute only explicitly approved actions.
+
+Executor must not become a second diagnostic system.
+
+The intended boundary is:
 
 ```text
-READ / DECIDE
+READ-ONLY
 Probe
 Doctor
 Planner
-Agent / LLM
         │
         ▼
-CONTROL
-Plan Validation
-Safety Policy
-Human Approval (conditional)
-        │
-        ▼
-EXECUTE
+WRITE
 Executor
-        │
-        ▼
-OBSERVE
-Independent Verification
-        │
-        ▼
-RECOVER / REPORT
-Bounded Recovery
 ```
-
-The Agent/LLM can propose structured decisions but cannot directly invoke an
-Executor handler, shell command, subprocess, or filesystem mutation path.
-
-Executor dispatches only explicitly registered handlers. Safe/Real handler
-selection is determined by execution mode and registry state.
-
-Verification is independent of executor result messages and is read-only.
 
 No remediation should be added to Doctor, Planner, CLI, or GUI.
 
-## 8. Agent / LLM Decision Layer
-
-The Agent layer consumes capability metadata and runtime context and produces a
-structured decision. It is provider-independent through the `LLMProvider`
-contract.
-
-Supported provider foundations include:
-
-- local HTTP servers such as LM Studio / Ollama;
-- remote API-key providers;
-- in-process Python model providers;
-- mock provider for deterministic tests.
-
-The Agent layer must not execute actions. Its output must pass through Planner,
-validation, Safety Policy, and the controlled execution path.
-
-## 9. Application / Presentation
+## 8. Application / Presentation
 
 CLI and GUI are application/presentation entry points.
 
@@ -234,7 +187,7 @@ They must not contain independent business rules.
 The future GUI is the primary product interface. CLI presentation should remain
 stable, deterministic, scriptable, and useful without becoming a second product.
 
-## 10. Determinism
+## 9. Determinism
 
 For identical inputs/environment state, the system should produce stable:
 
@@ -249,16 +202,16 @@ For identical inputs/environment state, the system should produce stable:
 
 Determinism is required for testing, CI/CD, debugging, and future GUI behavior.
 
-## 11. Read/Write Safety
+## 10. Read/Write Safety
 
 Audit and planning commands are read-only.
 
-Safe execution handlers simulate actions. Real execution is disabled by default
-and is available only for explicitly approved, policy-registered handlers.
+The current `bootstrap` command is also non-mutating: it demonstrates audit and
+planning but does not execute fixes.
 
-Only the controlled Executor boundary may perform system changes.
+Only the future Executor may perform system changes.
 
-## 12. Existing Generation Boundary
+## 11. Existing Generation Boundary
 
 Project generation remains a separate application capability.
 
@@ -267,7 +220,7 @@ controlled file generation according to the accepted generation ADR.
 
 It must not be mixed with Doctor/Planner business logic.
 
-## 13. Architecture Change Rule
+## 12. Architecture Change Rule
 
 Accepted interfaces, model contracts, dependency direction, collision semantics,
 or read/write boundaries must not be changed casually.
@@ -275,3 +228,75 @@ or read/write boundaries must not be changed casually.
 Use a new or superseding ADR for architectural changes.
 
 Do not redesign unrelated subsystems while implementing a feature.
+
+## 13. Agent and Capability Boundary
+
+The Agent/LLM layer is decision-only. It consumes context and capability metadata and
+returns a structured `AgentDecision`. It must not contain executor handlers,
+subprocess access, shell execution, or filesystem remediation logic.
+
+```text
+Context + Capability Metadata
+            ↓
+        Agent / LLM
+            ↓
+       AgentDecision
+            ↓
+          Planner
+            ↓
+      ExecutionPlan
+```
+
+`CapabilityRegistry` contains metadata only. `CapabilityActionBinder` validates that
+each advertised capability maps to a registered action and an explicit safety policy.
+Capability discovery does not grant execution authority.
+
+## 14. Controlled Dependency Remediation
+
+Project dependencies are discovered from `pyproject.toml` using read-only metadata
+inspection. Missing Python dependencies become typed `install_python_package`
+actions with explicit package context.
+
+The remediation boundary is:
+
+```text
+Dependency Discovery
+       ↓
+AuditReport
+       ↓
+Planner
+       ↓
+ExecutionPlan
+       ↓
+Validator / SafetyGate
+       ↓
+Human Approval (REAL mutations)
+       ↓
+Real Handler
+       ↓
+Independent Verification
+```
+
+Real dependency handlers are narrowly scoped. They do not accept arbitrary shell
+commands, shell strings, or arbitrary command-line arguments. Subprocess calls use
+argument arrays and `shell=False`.
+
+Safe mode never mutates the environment; it simulates remediation actions.
+
+## 15. LLM Provider Boundary
+
+The Agent provider contract supports three required deployment modes:
+
+1. local HTTP server (LM Studio / OpenAI-compatible local servers, including Ollama
+   deployments exposing the compatible API);
+2. remote API with an API key supplied directly or from an environment variable;
+3. in-process Python model/runtime.
+
+Provider selection does not change Agent, Planner, Safety, or Executor contracts.
+
+## 16. Verification Boundary
+
+A successful handler result is not considered proof of the environment state.
+Registered verifiers independently inspect the target state. Safe-mode simulated
+results are explicitly marked `SKIPPED` for verification because no real state was
+changed.

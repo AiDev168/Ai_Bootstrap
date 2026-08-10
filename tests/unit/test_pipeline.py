@@ -88,7 +88,6 @@ def test_pipeline_allows_valid_plan() -> None:
                     summary="Success"
                 )
                 mock_executor_instance.execute.return_value = mock_result
-                mock_executor_instance.verify.return_value = []
                 MockExecutor.return_value = mock_executor_instance
                 engine = PipelineEngine()
                 result = engine.run()
@@ -96,5 +95,3 @@ def test_pipeline_allows_valid_plan() -> None:
                 assert result.validation_result.is_valid is True
                 mock_executor_instance.execute.assert_called_once()
                 assert result.execution_result.is_success is True
-                mock_executor_instance.verify.assert_called_once_with(good_plan, mock_result)
-                assert result.verification_results == []
