@@ -39,43 +39,41 @@ class ExecutorEngine:
         self._safety_gate = SafetyGate()
         self._verifier_registry = VerifierRegistry()
 
-
-    def verify(self, plan: ExecutionPlan, execution_result: ExecutionResult) -> list[VerificationResult]:
-        """Verify successful executions using independent, read-only verifiers."""
+    def verify(
+        self,
+        plan: ExecutionPlan,
+        execution_result: ExecutionResult,
+    ) -> list[VerificationResult]:
+        """Verify successful action results using independent read-only verifiers."""
         results: list[VerificationResult] = []
-        context = ExecutionContext(
-            mode=self._mode,
-            dry_run=(self._mode == ExecutionMode.SAFE),
-            is_approved=self._is_approved,
-        )
-        action_by_id = {action.action_id: action for action in plan.actions}
-
-        for action_result in execution_result.results:
-            action = action_by_id.get(action_result.action_id)
-            if action is None:
-                results.append(
-                    VerificationResult(
-                        action_id=action_result.action_id,
-                        status=VerificationStatus.FAILED,
-                        message="Execution result has no matching plan action.",
-                        details={"error": "plan_action_not_found"},
-                    )
-                )
-                continue
-
+        by_action = {result.action_id: result for result in execution_result.results}
+        for action in plan.actions:
+            result = by_action.get(action.action_id)
             verifier = self._verifier_registry.get_verifier(action.action_id)
             if verifier is None:
                 results.append(
                     VerificationResult(
-                        action_id=action.action_id,
-                        status=VerificationStatus.SKIPPED,
-                        message="No verifier registered for this action.",
+                        action.action_id,
+                        VerificationStatus.SKIPPED,
+                        "No verifier registered for this action.",
                     )
                 )
                 continue
-
-            results.append(verifier.verify(action, action_result, context))
-
+            if result is None:
+                results.append(
+                    VerificationResult(
+                        action.action_id,
+                        VerificationStatus.SKIPPED,
+                        "No execution result exists for this action.",
+                    )
+                )
+                continue
+            context = ExecutionContext(
+                mode=self._mode,
+                dry_run=self._mode == ExecutionMode.SAFE,
+                is_approved=self._is_approved,
+            )
+            results.append(verifier.verify(action, result, context))
         return results
 
     def execute(

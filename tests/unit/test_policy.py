@@ -51,3 +51,21 @@ def test_approval_requirement() -> None:
     # با تأیید باید بگذرد
     allowed, reason = gate.evaluate("test_approval_action", ExecutionMode.REAL, is_approved=True)
     assert allowed is True
+
+
+def test_human_approval_is_only_required_for_real_execution() -> None:
+    gate = SafetyGate()
+    gate.register_policy(
+        ActionPolicy(
+            action_id="test_mutation",
+            allowed=True,
+            risk=ActionRisk.MEDIUM,
+            allowed_modes=[ExecutionMode.SAFE, ExecutionMode.REAL],
+            approval_required=ApprovalRequirement.HUMAN,
+        )
+    )
+    allowed, _ = gate.evaluate("test_mutation", ExecutionMode.SAFE)
+    assert allowed is True
+    allowed, reason = gate.evaluate("test_mutation", ExecutionMode.REAL)
+    assert allowed is False
+    assert "requires human approval" in reason

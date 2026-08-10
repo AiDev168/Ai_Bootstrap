@@ -11,15 +11,20 @@ from ai_engineering_bootstrap.planner.models import ExecutionPlanAction
 
 
 class _SafeHandlerBase:
-    """Base class providing safe behavior for all mock handlers."""
+    """Base class providing safe, non-mutating simulation."""
 
     def _simulate_success(self, action: ExecutionPlanAction) -> ActionResult:
         return ActionResult(
             action_id=action.action_id,
             status=ExecutionStatus.SKIPPED,
             message=f"Action '{action.action_id}' simulated successfully (Safe Mode).",
-            details={"simulated": True, "description": action.description}
+            details={"simulated": True, "description": action.description},
         )
+
+
+class CheckPythonVersionSafeHandler(_SafeHandlerBase, ActionHandler):
+    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+        return self._simulate_success(action)
 
 
 class InstallGitHandler(_SafeHandlerBase, ActionHandler):
@@ -47,13 +52,42 @@ class UpgradePythonHandler(_SafeHandlerBase, ActionHandler):
         return self._simulate_success(action)
 
 
-# نگاشت پیش‌فرض هندلرهای ایمن
+class CreateVirtualEnvSafeHandler(_SafeHandlerBase, ActionHandler):
+    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+        return self._simulate_success(action)
+
+
+class InstallPythonPackageSafeHandler(_SafeHandlerBase, ActionHandler):
+    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+        return self._simulate_success(action)
+
+
+class InstallProjectDependenciesSafeHandler(_SafeHandlerBase, ActionHandler):
+    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+        return self._simulate_success(action)
+
+
 DEFAULT_SAFE_HANDLERS = {
+    "check_python_version_real": CheckPythonVersionSafeHandler(),
     "install_git": InstallGitHandler(),
     "install_docker": InstallDockerHandler(),
     "fix_venv": FixVenvHandler(),
     "fix_editable": FixEditableHandler(),
     "upgrade_python": UpgradePythonHandler(),
+    "create_virtualenv": CreateVirtualEnvSafeHandler(),
+    "install_python_package": InstallPythonPackageSafeHandler(),
+    "install_project_dependencies": InstallProjectDependenciesSafeHandler(),
 }
 
-__all__ = ["DEFAULT_SAFE_HANDLERS", "FixVenvHandler", "InstallDockerHandler", "InstallGitHandler"]
+__all__ = [
+    "DEFAULT_SAFE_HANDLERS",
+    "CheckPythonVersionSafeHandler",
+    "CreateVirtualEnvSafeHandler",
+    "FixEditableHandler",
+    "FixVenvHandler",
+    "InstallDockerHandler",
+    "InstallGitHandler",
+    "InstallProjectDependenciesSafeHandler",
+    "InstallPythonPackageSafeHandler",
+    "UpgradePythonHandler",
+]

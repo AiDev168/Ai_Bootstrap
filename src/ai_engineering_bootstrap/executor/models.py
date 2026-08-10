@@ -31,7 +31,7 @@ class ExecutionResult:
     @staticmethod
     def create_from_actions(results: list[ActionResult]) -> "ExecutionResult":
         """Factory to create a result from a list of action results."""
-        failed_count = sum(1 for r in results if r.status != ExecutionStatus.SUCCESS)
+        failed_count = sum(1 for r in results if r.status == ExecutionStatus.FAILED)
         is_success = failed_count == 0
         
         if not results:

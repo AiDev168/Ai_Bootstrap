@@ -1,4 +1,4 @@
-"""Capability Registry for Agent/LLM discovery."""
+"""Capability metadata and discovery registry."""
 
 from __future__ import annotations
 
@@ -20,24 +20,21 @@ class CapabilityRisk(str, Enum):
 
 @dataclass(frozen=True)
 class Capability:
-    """
-    Metadata describing a system capability.
-
-    This class contains NO executable logic, handlers, or callables.
-    It is purely for discovery and description by future Agent/LLM layers.
-    """
+    """Pure metadata describing an executable capability."""
 
     capability_id: str
     name: str
     description: str
     action_id: str
     risk: CapabilityRisk = CapabilityRisk.LOW
-    supported_modes: list[ExecutionMode] = field(default_factory=lambda: [ExecutionMode.SAFE])
+    supported_modes: list[ExecutionMode] = field(
+        default_factory=lambda: [ExecutionMode.SAFE]
+    )
     requires_human_approval: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def supports_mode(self, mode: ExecutionMode) -> bool:
-        """Check if this capability supports the given execution mode."""
+        """Return whether the capability advertises support for a mode."""
         return mode in self.supported_modes
 
 
@@ -46,51 +43,116 @@ class DuplicateCapabilityError(ValueError):
 
 
 class CapabilityRegistry:
-    """
-    Central registry for capability metadata.
-
-    Provides discovery APIs for future Agent/LLM layers without exposing
-    execution internals or handlers.
-    """
+    """Registry containing discovery metadata only; never execution objects."""
 
     def __init__(self) -> None:
         self._capabilities: dict[str, Capability] = {}
 
     def register(self, capability: Capability) -> None:
-        """
-        Register a new capability.
-
-        Raises:
-            DuplicateCapabilityError: If the capability_id already exists.
-            ValueError: If the capability definition is invalid.
-        """
+        """Register a capability with fail-closed validation."""
         if not capability.capability_id:
             raise ValueError("capability_id cannot be empty.")
         if not capability.action_id:
             raise ValueError("action_id cannot be empty.")
-
         if capability.capability_id in self._capabilities:
             raise DuplicateCapabilityError(
                 f"Capability '{capability.capability_id}' is already registered."
             )
-
         self._capabilities[capability.capability_id] = capability
 
     def get(self, capability_id: str) -> Capability | None:
-        """Retrieve a capability by ID. Returns None if not found."""
+        """Retrieve capability metadata by ID."""
         return self._capabilities.get(capability_id)
 
     def list_capabilities(self) -> list[Capability]:
-        """Return a sorted list of all registered capabilities."""
-        return sorted(self._capabilities.values(), key=lambda c: c.capability_id)
+        """Return capabilities in deterministic order."""
+        return sorted(self._capabilities.values(), key=lambda item: item.capability_id)
 
     def find_by_action(self, action_id: str) -> list[Capability]:
-        """Find all capabilities associated with a specific action_id."""
-        return [c for c in self._capabilities.values() if c.action_id == action_id]
+        """Return capabilities mapped to an action."""
+        return [
+            capability
+            for capability in self._capabilities.values()
+            if capability.action_id == action_id
+        ]
 
     def is_registered(self, capability_id: str) -> bool:
-        """Check if a capability ID is registered."""
+        """Return whether a capability is registered."""
         return capability_id in self._capabilities
+
+
+_DEFAULT_CAPABILITIES = (
+    Capability(
+        "check_python_version",
+        "Check Python version",
+        "Read the active Python version and compare it with the project minimum.",
+        "check_python_version_real",
+        CapabilityRisk.LOW,
+        [ExecutionMode.SAFE, ExecutionMode.REAL],
+    ),
+    Capability(
+        "create_virtual_environment",
+        "Create Python virtual environment",
+        "Create the project's isolated .venv without executing arbitrary shell commands.",
+        "create_virtualenv",
+        CapabilityRisk.MEDIUM,
+        [ExecutionMode.SAFE, ExecutionMode.REAL],
+        True,
+    ),
+    Capability(
+        "install_python_package",
+        "Install Python package",
+        "Install one explicitly identified Python package into the selected interpreter.",
+        "install_python_package",
+        CapabilityRisk.MEDIUM,
+        [ExecutionMode.SAFE, ExecutionMode.REAL],
+        True,
+    ),
+    Capability(
+        "install_project_dependencies",
+        "Install project dependencies",
+        "Install dependencies declared by the project's pyproject.toml.",
+        "install_project_dependencies",
+        CapabilityRisk.MEDIUM,
+        [ExecutionMode.SAFE, ExecutionMode.REAL],
+        True,
+    ),
+    Capability(
+        "install_git",
+        "Install Git",
+        "Install Git using a future approved platform-specific remediation handler.",
+        "install_git",
+        CapabilityRisk.MEDIUM,
+        [ExecutionMode.SAFE],
+        True,
+    ),
+    Capability(
+        "install_docker",
+        "Install Docker",
+        "Install Docker using a future approved platform-specific remediation handler.",
+        "install_docker",
+        CapabilityRisk.MEDIUM,
+        [ExecutionMode.SAFE],
+        True,
+    ),
+    Capability(
+        "fix_editable_install",
+        "Install project in editable mode",
+        "Install the current project in editable mode with development dependencies.",
+        "fix_editable",
+        CapabilityRisk.MEDIUM,
+        [ExecutionMode.SAFE],
+        True,
+    ),
+)
+
+
+def default_capability_registry() -> CapabilityRegistry:
+    """Build the canonical discovery registry for the bootstrap platform."""
+    registry = CapabilityRegistry()
+    for capability in _DEFAULT_CAPABILITIES:
+        registry.register(capability)
+    return registry
 
 
 __all__ = [
@@ -98,4 +160,5 @@ __all__ = [
     "CapabilityRegistry",
     "CapabilityRisk",
     "DuplicateCapabilityError",
+    "default_capability_registry",
 ]

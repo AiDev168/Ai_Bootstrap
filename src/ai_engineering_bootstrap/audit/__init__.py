@@ -1,5 +1,11 @@
 """Audit module public API."""
 
+from pathlib import Path
+
+from ai_engineering_bootstrap.audit.dependencies import (
+    DependencyDiscovery,
+    ProjectDependencyProbe,
+)
 from ai_engineering_bootstrap.audit.models import (
     AuditCheck,
     AuditReport,
@@ -11,7 +17,6 @@ from ai_engineering_bootstrap.probes.doctor import (
     EditableInstallProbe,
     GitExecutableProbe,
     OSProbe,
-    PackageProbe,
     PlatformProbe,
     PythonVersionProbe,
     RuntimeTargetProbe,
@@ -20,16 +25,14 @@ from ai_engineering_bootstrap.probes.doctor import (
 from ai_engineering_bootstrap.probes.gpu import GpuProbe
 
 
-def default_audit_service() -> AuditService:
+def default_audit_service(project_root: Path | None = None) -> AuditService:
     """Create the default audit service with standard probes."""
+    root = (project_root or Path.cwd()).resolve()
     probes = [
         PythonVersionProbe(),
         VirtualEnvProbe(),
         EditableInstallProbe(),
-        PackageProbe("typer"),
-        PackageProbe("rich"),
-        PackageProbe("pytest"),
-        PackageProbe("ruff"),
+        *[ProjectDependencyProbe(req) for req in DependencyDiscovery(root).discover(include_dev=True)],
         GitExecutableProbe(),
         DockerExecutableProbe(),
         OSProbe(),

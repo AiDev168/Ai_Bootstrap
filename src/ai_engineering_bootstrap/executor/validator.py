@@ -31,6 +31,10 @@ class ExecutionPlanValidator:
         "install_git",
         "install_docker",
         "upgrade_python",
+        "check_python_version_real",
+        "create_virtualenv",
+        "install_python_package",
+        "install_project_dependencies",
     }
 
     def validate(self, plan: ExecutionPlan) -> ValidationResult:

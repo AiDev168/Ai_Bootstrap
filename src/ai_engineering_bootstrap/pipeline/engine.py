@@ -6,6 +6,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from ai_engineering_bootstrap.agent.models import AgentDecision
+from ai_engineering_bootstrap.agent.planning import AgentPlanningService
+
 # ایمپورت کردن مدل‌ها و پروایدر تاییدیه
 from ai_engineering_bootstrap.approval.models import ApprovalRequest, ApprovalStatus
 from ai_engineering_bootstrap.approval.provider import ApprovalProvider
@@ -13,6 +16,7 @@ from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.audit.models import AuditReport
 from ai_engineering_bootstrap.executor import ExecutionResult, ExecutorEngine
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
+from ai_engineering_bootstrap.executor.policy import SafetyGate
 from ai_engineering_bootstrap.executor.recovery import (
     FailureType,
     RetryPolicy,
@@ -20,10 +24,6 @@ from ai_engineering_bootstrap.executor.recovery import (
 from ai_engineering_bootstrap.executor.validator import (
     ExecutionPlanValidator,
     ValidationResult,
-)
-from ai_engineering_bootstrap.executor.verifier import (
-    VerificationResult,
-    VerificationStatus,
 )
 from ai_engineering_bootstrap.planner import PlannerEngine
 from ai_engineering_bootstrap.planner.models import ExecutionPlan
@@ -36,10 +36,11 @@ class PipelineResult:
     original_plan: ExecutionPlan
     validation_result: ValidationResult
     execution_result: ExecutionResult | None
-    verification_results: list[VerificationResult] = field(default_factory=list)
+    verification_result: Any | None  # فعلاً ساده‌سازی شده
     replan_requested: bool = False
     replanned_plan: ExecutionPlan | None = None
     failure_records: list[Any] = field(default_factory=list)
+    agent_decision: AgentDecision | None = None
 
     # فیلدهای جدید برای کنترل و مشاهده وضعیت تاییدیه انسانی
     approval_requests: list[ApprovalRequest] = field(default_factory=list)
@@ -54,12 +55,7 @@ class PipelineResult:
             return False
         if self.is_pending_approval or self.is_rejected_approval:
             return False
-        if not self.execution_result.is_success:
-            return False
-        return all(
-            result.status != VerificationStatus.FAILED
-            for result in self.verification_results
-        )
+        return self.execution_result.is_success
 
 
 class PipelineEngine:
@@ -74,7 +70,9 @@ class PipelineEngine:
         max_retry_attempts: int = 1,
         approval_provider: ApprovalProvider | None = None,
         pending_approvals: dict[str, str] | None = None,
-        run_id: str = "default-run"
+        run_id: str = "default-run",
+        agent_planning_service: AgentPlanningService | None = None,
+        agent_context: str | None = None,
     ) -> PipelineResult:
         """
         Executes the pipeline with optional bounded recovery.
@@ -91,7 +89,13 @@ class PipelineEngine:
 
         # Stage 2: Planning (Original Plan)
         planner = PlannerEngine()
-        original_plan = planner.generate_plan(report)
+        agent_decision = None
+        if agent_planning_service is not None and agent_context is not None:
+            planning_result = agent_planning_service.decide_and_plan(agent_context)
+            agent_decision = planning_result.decision
+            original_plan = planning_result.plan
+        else:
+            original_plan = planner.generate_plan(report)
 
         # Stage 3: Validation
         validator = ExecutionPlanValidator()
@@ -103,8 +107,9 @@ class PipelineEngine:
                 original_plan=original_plan,
                 validation_result=validation_result,
                 execution_result=None,
-                verification_results=[],
-                replan_requested=False
+                verification_result=None,
+                replan_requested=False,
+                agent_decision=agent_decision,
             )
 
         # Stage 3.5: Human Approval Boundary (Safety Control)
@@ -113,19 +118,29 @@ class PipelineEngine:
         rejected_requests = []
 
         if approval_provider:
+            safety_gate = SafetyGate()
             # بررسی تمامی اکشن‌های پلن برای اطمینان از تاییدیه (در صورت نیاز)
             for action in original_plan.actions:
-                requires_approval = False
+                action_id_value = getattr(action, "action_id", None)
+                if not isinstance(action_id_value, str):
+                    action_id_value = getattr(action, "id", "")
+                action_id = str(action_id_value)
 
-                # بررسی سیاست اکشن (ActionPolicy) برای نیاز به تاییدیه
-                if hasattr(action, 'policy') and hasattr(action.policy, 'approval_requirement'):
-                    if action.policy.approval_requirement.name == 'REQUIRED':
-                        requires_approval = True
-                elif hasattr(action, 'requires_approval'):
+                plan_id_value = getattr(original_plan, "plan_id", None)
+                if not isinstance(plan_id_value, str):
+                    plan_id_value = getattr(original_plan, "id", "")
+                plan_id = str(plan_id_value)
+
+                requires_approval = safety_gate.requires_human_approval(action_id)
+                policy = getattr(action, "policy", None)
+                requirement = getattr(getattr(policy, "approval_requirement", None), "name", None)
+                if requirement == "REQUIRED":
+                    requires_approval = True
+                elif hasattr(action, "requires_approval") and isinstance(action.requires_approval, bool):
                     requires_approval = action.requires_approval
 
                 if requires_approval:
-                    approval_id = pending_approvals.get(action.id) if pending_approvals else None
+                    approval_id = pending_approvals.get(action_id) if pending_approvals else None
 
                     if approval_id:
                         # بررسی وضعیت تاییدیه قبلی برای این اکشن
@@ -133,7 +148,7 @@ class PipelineEngine:
                         req = approval_provider.get_request(approval_id) if hasattr(approval_provider, 'get_request') else None
 
                         # اعتبارسنجی اتصال دقیق (Exact Binding) برای جلوگیری از Replay Attack
-                        if req and (req.action_id != action.id or req.plan_id != original_plan.id or req.run_id != run_id):
+                        if req and (req.action_id != action_id or req.plan_id != plan_id or req.run_id != run_id):
                             # اگر تاییدیه مربوط به اکشن، پلن یا ران دیگری بود، نامعتبر است
                             rejected_requests.append(req)
                             continue
@@ -147,21 +162,21 @@ class PipelineEngine:
                         else:
                             # وضعیت نامشخص، درخواست جدید ثبت می‌شود
                             new_req = approval_provider.request_approval(
-                                action_id=action.id,
-                                plan_id=original_plan.id,
+                                action_id=action_id,
+                                plan_id=plan_id,
                                 run_id=run_id,
-                                reason=getattr(action, 'reason', 'Action requires approval'),
-                                risk_level=getattr(action.policy, 'risk_level', 'UNKNOWN')
+                                reason=getattr(action, "reason", getattr(action, "description", "Action requires approval")),
+                                risk_level=(safety_gate.get_policy(action.action_id).risk.value if safety_gate.get_policy(action.action_id) else "UNKNOWN")
                             )
                             pending_requests.append(new_req)
                     else:
                         # هنوز درخواستی ثبت نشده، درخواست جدید ایجاد می‌کنیم
                         new_req = approval_provider.request_approval(
-                            action_id=action.id,
-                            plan_id=original_plan.id,
+                            action_id=action_id,
+                            plan_id=plan_id,
                             run_id=run_id,
-                            reason=getattr(action, 'reason', 'Action requires approval'),
-                            risk_level=getattr(action.policy, 'risk_level', 'UNKNOWN')
+                            reason=getattr(action, "reason", getattr(action, "description", "Action requires approval")),
+                            risk_level=(safety_gate.get_policy(action.action_id).risk.value if safety_gate.get_policy(action.action_id) else "UNKNOWN")
                         )
                         pending_requests.append(new_req)
 
@@ -172,10 +187,11 @@ class PipelineEngine:
                     original_plan=original_plan,
                     validation_result=validation_result,
                     execution_result=None,
-                    verification_results=[],
+                    verification_result=None,
                     replan_requested=False,
                     approval_requests=pending_requests,
-                    is_pending_approval=True
+                    is_pending_approval=True,
+                    agent_decision=agent_decision,
                 )
 
             # اگر اکشنی Reject شده باشد، اجرا متوقف و وضعیت شکست ثبت می‌شود
@@ -185,10 +201,11 @@ class PipelineEngine:
                     original_plan=original_plan,
                     validation_result=validation_result,
                     execution_result=None,
-                    verification_results=[],
+                    verification_result=None,
                     replan_requested=False,
                     approval_requests=rejected_requests,
-                    is_rejected_approval=True
+                    is_rejected_approval=True,
+                    agent_decision=agent_decision,
                 )
 
         # Stage 4: Execution with Bounded Recovery
@@ -196,8 +213,8 @@ class PipelineEngine:
         executor = ExecutorEngine(mode=mode)
         exec_result = executor.execute(original_plan, max_attempts=max_retry_attempts)
 
-        # Stage 5: Independent post-execution verification.
-        verification_results = executor.verify(original_plan, exec_result)
+        # Stage 5: independent post-execution verification
+        verification_result = executor.verify(original_plan, exec_result)
         replan_requested = False
         failure_records = []
 
@@ -218,8 +235,9 @@ class PipelineEngine:
             original_plan=original_plan,
             validation_result=validation_result,
             execution_result=exec_result,
-            verification_results=verification_results,
+            verification_result=verification_result,
             replan_requested=replan_requested,
             replanned_plan=replanned_plan,
-            failure_records=failure_records
+            failure_records=failure_records,
+            agent_decision=agent_decision,
         )

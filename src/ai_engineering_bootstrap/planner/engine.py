@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from ai_engineering_bootstrap.planner.models import ExecutionPlan, ExecutionPlanAction
@@ -24,35 +25,79 @@ class PlannerEngine:
     }
 
     def generate_plan(self, report: AuditReport) -> ExecutionPlan:
-        """Generate an execution plan from an audit report."""
+        """Generate a deterministic remediation plan from an audit report."""
         actions: list[ExecutionPlanAction] = []
-        seen_ids: set[str] = set()
+        seen_keys: set[tuple[str, str]] = set()
 
-        failed_checks = [
-            c for c in report.checks if c.status.value == "failed"
-        ]
-
+        failed_checks = [check for check in report.checks if check.status.value == "failed"]
         for check in failed_checks:
-            if check.name in self.ACTION_MAP:
+            facts = check.facts or {}
+            action_id = facts.get("remediation_action")
+            description = facts.get("remediation_description")
+            priority = facts.get("remediation_priority")
+
+            if action_id is None and check.name in self.ACTION_MAP:
                 action_id, description, priority = self.ACTION_MAP[check.name]
-                
-                if action_id not in seen_ids:
-                    actions.append(ExecutionPlanAction(
-                        action_id=action_id,
-                        description=description,
-                        priority=priority,
-                        context={"check_name": check.name, "details": check.details}
-                    ))
-                    seen_ids.add(action_id)
-        
-        # مرتب‌سازی بر اساس اولویت برای اطمینان از ترتیب قطعی
-        actions.sort(key=lambda x: x.priority)
 
-        is_actionable = len(actions) > 0
-        summary = "No actions required." if not is_actionable else f"{len(actions)} action(s) required to fix the environment."
+            if not action_id:
+                continue
 
+            package = str(facts.get("package", ""))
+            key = (str(action_id), package)
+            if key in seen_keys:
+                continue
+
+            context = {"check_name": check.name, "details": check.details, **facts}
+            if action_id == "create_virtualenv":
+                context.setdefault("venv_path", str(Path.cwd() / ".venv"))
+            if action_id in {"install_python_package", "install_project_dependencies", "fix_editable"}:
+                context.setdefault("project_root", str(Path.cwd()))
+            if action_id in {"install_python_package", "install_project_dependencies", "fix_editable"}:
+                context.setdefault("python_executable", str(Path.cwd() / ".venv" / "bin" / "python"))
+
+            actions.append(
+                ExecutionPlanAction(
+                    action_id=str(action_id),
+                    description=str(description or facts.get("remediation_description") or f"Remediate {check.name}"),
+                    priority=int(priority or 50),
+                    context=context,
+                )
+            )
+            seen_keys.add(key)
+
+        actions.sort(key=lambda item: (item.priority, item.action_id, str(item.context.get("package", ""))))
+        if any(action.action_id == "install_python_package" for action in actions) and any(action.action_id == "create_virtualenv" for action in actions):
+            for action in actions:
+                if action.action_id == "install_python_package":
+                    action.context.setdefault("python_executable", str(Path.cwd() / ".venv" / "bin" / "python"))
+        return self._build_plan(actions)
+
+    def generate_plan_from_decision(self, decision, capability_registry) -> ExecutionPlan:
+        """Convert validated Agent capability IDs into a deterministic plan."""
+        actions: list[ExecutionPlanAction] = []
+        for capability_id in decision.selected_capability_ids:
+            capability = capability_registry.get(capability_id)
+            if capability is None:
+                raise ValueError(f"Unknown capability: {capability_id}")
+            priority = int(capability.metadata.get("priority", 50))
+            actions.append(
+                ExecutionPlanAction(
+                    action_id=capability.action_id,
+                    description=capability.description,
+                    priority=priority,
+                    context={"capability_id": capability.capability_id, **capability.metadata},
+                )
+            )
+        actions.sort(key=lambda item: (item.priority, item.action_id))
+        return self._build_plan(actions)
+
+    @staticmethod
+    def _build_plan(actions: list[ExecutionPlanAction]) -> ExecutionPlan:
+        """Build the immutable plan result from ordered actions."""
+        if not actions:
+            return ExecutionPlan(False, [], "No actions required.")
         return ExecutionPlan(
-            is_actionable=is_actionable,
-            actions=actions,
-            summary=summary
+            True,
+            actions,
+            f"{len(actions)} action(s) required to fix the environment.",
         )

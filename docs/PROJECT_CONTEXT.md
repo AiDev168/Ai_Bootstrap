@@ -6,21 +6,20 @@
 
 GitHub is the source of truth.
 
-Reference development runtime: Ubuntu 24.04 LTS.
+The reference development runtime is Ubuntu 24.04 LTS.
 
 ## Product Goal
 
-Build a controlled AI Engineering Bootstrap platform that can:
+Build a production-grade AI Engineering Bootstrap platform that can:
 
 1. inspect an engineering environment;
 2. diagnose its state;
 3. calculate readiness and health;
 4. generate a deterministic remediation plan;
 5. let the user review/approve that plan;
-6. execute only explicitly permitted actions;
-7. verify execution independently;
-8. expose the same core workflow to CLI and the future professional GUI;
-9. support controlled AI/LLM decision-making without giving the model direct execution authority.
+6. execute approved changes safely;
+7. verify the resulting environment;
+8. provide the complete workflow through a professional GUI.
 
 Target workflow:
 
@@ -29,7 +28,7 @@ Environment
    ↓
 Inspect / Probes
    ↓
-Doctor / AuditService
+Doctor
    ↓
 AuditReport
    ↓
@@ -37,55 +36,49 @@ Planner
    ↓
 ExecutionPlan
    ↓
-Validate / Safety Policy
-   ↓
-Human Approval (when required)
+User Review / Approval
    ↓
 Executor
    ↓
 Verification
    ↓
-Recovery / Re-plan Signal
-   ↓
-Final Result
+Doctor again
 ```
 
 ## Current Implementation Status
 
-The following foundations are present in the current `main` source tree and Git history:
+### Completed
 
 - Bootstrap foundation
 - Environment probes
 - AuditService / Doctor
 - unified Doctor audit models
-- development and production readiness
+- development readiness
+- production readiness
 - Health Score
 - check categorization
 - deterministic audit JSON / CI output
 - context-aware recommendations
 - Planner Foundation
-- ExecutionPlan / ExecutionPlanAction
-- stable action IDs and deterministic ordering
-- Executor Foundation
-- Safe/Mock handlers
-- Safe/Real execution modes
-- Action Policy / Safety Gate
-- Real Action Handler architecture
-- controlled read-only real execution (`check_python_version_real`)
-- post-execution verification contracts and Python version verifier
-- bounded retry / failure classification / re-plan signalling
-- Capability / Tool Registry
-- Agent / LLM Decision Layer
-- Local-server, API-key, and in-process provider contracts
-- Human Approval / Safety Controls
-- End-to-End hardening tests
+- `ExecutionPlan`
+- `ExecutionPlanAction`
+- stable action IDs
+- priority ordering
+- duplicate-action elimination
+- safe handling of unknown failed checks
+- template discovery and safe project generation
 
-## Current Baseline
+### Current Baseline
 
 `main` is the stable integration branch.
 
-The current repository state, source code, tests, and Git history are authoritative.
-Older roadmap statements must not be interpreted as current status.
+Planner Foundation has been merged into `main`.
+
+### Next
+
+```text
+Executor Foundation
+```
 
 ## Architecture
 
@@ -100,48 +93,20 @@ Planner
   ↓
 ExecutionPlan
   ↓
-Validation / Safety Policy
-  ↓
-Human Approval (conditional)
-  ↓
 Executor
   ↓
-Independent Verification
+Application Workflow
   ↓
-Recovery / Re-plan Signal
+CLI / Professional GUI
 ```
 
-The Agent/LLM layer is a decision producer, not an execution layer:
-
-```text
-CapabilityRegistry
-       ↓
-Agent / LLM Decision Engine
-       ↓
-structured decision
-       ↓
-Planner
-       ↓
-ExecutionPlan
-       ↓
-controlled execution path
-```
-
-Provider implementations are behind the `LLMProvider` contract. The current
-provider foundation covers:
-
-- local HTTP servers such as LM Studio / Ollama;
-- remote API-key providers;
-- in-process Python model providers;
-- mock provider for deterministic tests.
-
-## Responsibilities
+### Responsibilities
 
 **Probe**
 
 Read-only environment observation.
 
-**Doctor / AuditService**
+**Doctor**
 
 Single source of diagnostics. Produces readiness, Health Score, categories,
 recommendations, and `AuditReport`.
@@ -150,34 +115,13 @@ recommendations, and `AuditReport`.
 
 Consumes `AuditReport` and produces deterministic `ExecutionPlan`.
 
-**Agent / LLM Decision Layer**
-
-Produces structured capability selections for Planner. It must not directly
-invoke Executor, handlers, subprocesses, or shell commands.
-
-**Safety / Policy**
-
-Evaluates whether a proposed action is permitted for the current execution mode
-and approval state. Unknown or unregistered actions are denied.
-
-**Human Approval**
-
-Provides explicit approval for actions whose policy requires it. Approval is
-bound to the relevant action/plan/run context.
-
 **Executor**
 
-Consumes the validated plan and dispatches only registered handlers.
+Only write-capable layer. Consumes `ExecutionPlan`.
 
-**Verification**
+**Application Workflow**
 
-Independently observes execution outcomes and does not trust executor messages
-as proof of environmental state.
-
-**Recovery**
-
-Classifies failures and applies bounded retry/re-plan/stop decisions. It must
-not bypass Safety Gate.
+Coordinates Doctor → Planner → Executor and verification.
 
 **CLI**
 
@@ -185,8 +129,7 @@ Developer, diagnostic, automation, and CI/CD interface.
 
 **GUI**
 
-Long-term primary product interface. It must use the same core/application
-services and must not duplicate business logic.
+Long-term primary product interface. Must use the same core/application services.
 
 ## Frozen Rules
 
@@ -194,22 +137,16 @@ services and must not duplicate business logic.
 - Never duplicate Doctor models.
 - Doctor is the source of truth for diagnostics.
 - Planner consumes Doctor public models.
-- Agent/LLM does not execute actions.
 - Executor consumes Planner public models.
-- Executor dispatches only registered handlers.
-- Safety Gate is fail-closed.
-- Human approval cannot be bypassed by the model or CLI.
-- Verification is independent and read-only.
-- Retry cannot bypass Safety Gate.
-- CLI/GUI cannot bypass the controlled pipeline.
+- Probe/Doctor/Planner are read-only.
+- Executor alone can modify the environment.
+- CLI/GUI cannot bypass the pipeline.
 - Backward compatibility is mandatory.
 - No unnecessary runtime dependencies.
 - No speculative abstractions.
 - No unrelated refactors during feature implementation.
 - Every feature is tested.
-- `main` is not modified directly for feature work; feature work uses a branch
-  and is merged after verification.
-- The GUI is intentionally deferred until the controlled core is stable.
+- Never commit directly to `main`.
 
 ## Development Workflow
 
@@ -259,25 +196,78 @@ Then inspect:
 
 ```bash
 git status
-git branch --show-current
 git log --oneline --decorate -5
 ```
 
-The current repository and Git history override stale planning text.
+The current repository and Git history override stale roadmap statements.
+
+## Next Feature — Executor Foundation
+
+The immediate feature is:
+
+```text
+feature/executor-foundation
+```
+
+The goal is to establish the execution contract and safety boundary, not to build a
+large remediation framework.
+
+Expected scope:
+
+- Executor public protocol/contract;
+- execution result model(s);
+- consume `ExecutionPlan`;
+- explicit action execution boundary;
+- deterministic behavior;
+- safe/dry-run semantics where required;
+- unit/integration tests;
+- integration path for the future application workflow.
+
+Do not add:
+
+- autonomous agent behavior;
+- LLM integration;
+- broad remediation catalog;
+- GUI business logic;
+- unrelated refactors.
 
 ## Product Priority
 
 Priority order:
 
 ```text
-1. Correct and testable controlled core
-2. Doctor → Planner → controlled execution workflow
-3. Safety, approval, verification, and deterministic recovery
-4. Agent/LLM integration behind explicit contracts
-5. End-to-end hardening
-6. Professional GUI
-7. CLI cosmetic improvements
+1. Correct core architecture
+2. Doctor → Planner → Executor workflow
+3. Safety and deterministic execution
+4. Application workflow
+5. Professional GUI
+6. CLI cosmetic improvements
 ```
 
-The CLI remains a development, diagnostic, automation, and CI/CD interface.
-The professional GUI is deliberately downstream of the stable core.
+The CLI must remain stable and automation-friendly, but professional GUI capability
+is a major product objective.
+
+## Current Foundation Status — Steps 19–24
+
+The following milestones are implemented on the current baseline:
+
+19. **LLM Provider Integration** — local HTTP, remote API-key, in-process Python,
+    plus deterministic Mock provider and provider factory.
+20. **Agent Decision → Planner Integration** — structured Agent decisions can be
+    deterministically converted into `ExecutionPlan` objects without an execution
+    path from Agent to Executor.
+21. **Capability → Action Contract Binding** — capability metadata is validated
+    against registered handlers and explicit policies.
+22. **Environment Dependency Discovery & Remediation Planning** — Python dependencies
+    are discovered from `pyproject.toml`; missing dependencies become typed
+    remediation actions.
+23. **Controlled Real Action Pack — Phase 1** — controlled real handlers exist for
+    virtual-environment creation and Python/project dependency installation. Safe
+    mode remains non-mutating.
+24. **Dependency Installation Workflow** — the complete path from Doctor through
+    planning, validation, safety, approval, real execution, and independent
+    verification is available as a backend workflow.
+
+The next planned milestone is **25. Failure → Recovery → Re-plan Integration**.
+Cursor installation/engineering-environment bootstrap remains a later milestone and
+must not be mixed into dependency remediation for project runtime dependencies.

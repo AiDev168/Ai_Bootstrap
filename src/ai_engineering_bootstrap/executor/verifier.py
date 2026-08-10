@@ -49,14 +49,14 @@ class ActionVerifier(Protocol):
 class VerifierRegistry:
     """Registry mapping action IDs to their verifiers."""
 
-    def __init__(self, verifiers: dict[str, ActionVerifier] | None = None) -> None:
+    def __init__(self) -> None:
         self._verifiers: dict[str, ActionVerifier] = {}
-        if verifiers is None:
-            from ai_engineering_bootstrap.executor.handlers.verifiers import (
-                DEFAULT_VERIFIERS,
-            )
-            verifiers = DEFAULT_VERIFIERS
-        self._verifiers.update(verifiers)
+        # Load default verifiers if any
+        from ai_engineering_bootstrap.executor.handlers.verifiers import (
+            DEFAULT_VERIFIERS,
+        )
+        for action_id, verifier in DEFAULT_VERIFIERS.items():
+            self._verifiers[action_id] = verifier
 
     def get_verifier(self, action_id: str) -> ActionVerifier | None:
         return self._verifiers.get(action_id)
