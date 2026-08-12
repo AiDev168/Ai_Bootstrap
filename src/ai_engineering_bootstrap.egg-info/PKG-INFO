@@ -6,74 +6,208 @@ Requires-Python: >=3.12
 Description-Content-Type: text/markdown
 Requires-Dist: rich
 Requires-Dist: typer
+Requires-Dist: requests
+Requires-Dist: colorama
+Requires-Dist: pytest
 Provides-Extra: dev
-Requires-Dist: pytest; extra == "dev"
 Requires-Dist: ruff; extra == "dev"
 
 # AI Engineering Bootstrap
 
-AI Engineering Bootstrap is a deterministic Python 3.12 command-line application for checking a local engineering environment and creating projects from predefined templates.
+AI Engineering Bootstrap is a deterministic, production-oriented platform for preparing,
+validating, planning, and safely operating an AI engineering environment.
 
-## Phase 1 scope
+The project started as a Python CLI for environment auditing and project generation.
+It is now evolving toward a controlled engineering workflow whose final primary user
+interface will be a professional GUI.
 
-The application will provide two independent capabilities behind one CLI:
+## Product Goal
 
-- A read-only audit of the operating system, running Python interpreter, Git, Docker, and best-effort GPU availability.
-- Safe project generation from `ai-app-template-v1`. The other Phase 1 template identifiers remain reserved for later implementation.
+The target workflow is:
 
-The CLI will use Typer for commands and Rich for human-readable output. Application services, typed models, and side-effecting adapters remain separate as documented in `docs/architecture.md` and the accepted ADRs.
+```text
+Environment
+    ↓
+Probes
+    ↓
+Doctor / Audit
+    ↓
+AuditReport
+    ↓
+Planner
+    ↓
+ExecutionPlan
+    ↓
+User Review / Approval
+    ↓
+Executor
+    ↓
+Verification
+    ↓
+Doctor again
+```
 
-## Commands
+The important architectural principle is that diagnosis, planning, execution, and
+presentation are separate responsibilities.
+
+The CLI is primarily a developer, automation, CI/CD, and diagnostic interface.
+CLI cosmetic polish is not the main product objective. The professional GUI is the
+long-term primary user experience and must reuse the same application/core services.
+
+## Current Implemented Baseline
+
+The current `main` branch includes:
+
+- read-only environment probes;
+- Doctor / AuditService;
+- unified Doctor audit models;
+- development/production readiness;
+- Health Score;
+- check categorization;
+- deterministic JSON/CI audit output;
+- context-aware recommendations;
+- Planner Foundation;
+- deterministic `ExecutionPlan` generation;
+- stable `ExecutionPlanAction` identifiers;
+- priority ordering and duplicate-action elimination;
+- safe handling of unknown audit checks;
+- template discovery and safe project generation.
+
+Recent accepted milestones:
+
+```text
+Doctor V2
+Doctor V3 Model Unification
+Doctor V3 Health Score
+Doctor V3 Check Categorization
+Doctor V3 CI/CD Audit Output
+Doctor V3 Context-Aware Recommendations
+Planner Foundation
+Steps 23–29 Controlled Execution and Bootstrap
+Step 30 End-to-End Hardening & Security
+```
+
+## Current CLI
 
 ```text
 ai-bootstrap audit [--format table|json]
+ai-bootstrap doctor
+ai-bootstrap plan
+ai-bootstrap bootstrap
+ai-bootstrap run-pipeline [--real-execution]
 ai-bootstrap list-templates
 ai-bootstrap create-project PROJECT_NAME --template TEMPLATE_NAME
 ```
 
-The audit is read-only. Project creation writes a new folder in the current directory and fails if that folder already exists.
+`audit` is read-only and can produce deterministic JSON suitable for automation.
 
-## Development baseline
+`doctor` presents categorized health information, readiness, health score, and
+context-aware recommendations.
 
-- Python 3.12 or newer
-- Source layout under `src/`
-- pytest for tests
-- Ruff for linting and formatting
-- Type hints and docstrings for public interfaces
+`plan` converts the current audit report into an `ExecutionPlan`.
 
-The configured development commands are:
+`run-pipeline` runs the controlled backend workflow. Safe Mode remains non-mutating;
+real execution is explicit and remains subject to validation, safety, approval,
+execution, verification, and bounded recovery.
+
+## Architecture
+
+The canonical application pipeline is:
 
 ```text
-make install
-make lint
-make format
-make test
+Probe
+  ↓
+Doctor / AuditService
+  ↓
+AuditReport
+  ↓
+Planner
+  ↓
+ExecutionPlan
+  ↓
+Validation / Safety / Approval
+  ↓
+Executor
+  ↓
+Verification
+  ↓
+Recovery / Re-plan
+  ↓
+CLI / GUI
 ```
 
-## Safety and exclusions
+- Probes observe the environment.
+- Doctor diagnoses and reports.
+- Planner plans remediation.
+- Executor will be the only write-capable layer.
+- CLI and GUI present and orchestrate through application services.
 
-Audits report conditions without installing, configuring, starting, stopping, or modifying host software. Generation will validate input, reject an existing target, and avoid leaving partial output.
+No presentation layer may bypass the pipeline or duplicate business logic.
 
-GitHub provisioning, CI/CD and Dev Container generation, LLM integration, tool calling, autonomous workflows, and multi-agent behavior are outside Phase 1.
+## GUI Priority
 
-## Status
+The final product is intended to have a professional GUI.
 
-Phase 1 currently includes the audit CLI and `ai-app-template-v1` project generation.
+The GUI should eventually expose:
+
+- environment/health dashboard;
+- categorized checks;
+- recommendations;
+- execution plan;
+- user approval;
+- execution progress;
+- execution results and logs;
+- post-execution verification.
+
+The GUI must use the same core/application services as the CLI.
+
+## Development Rules
+
+Never commit directly to `main`.
+
+Every feature is developed on a dedicated branch, tested, committed, pushed,
+and then merged.
+
+Minimum validation:
+
+```bash
+git diff --check
+ruff check .
+pytest
+ai-bootstrap audit
+ai-bootstrap doctor
+ai-bootstrap plan
+```
+
+Run feature-specific smoke tests as required.
 
 ## Documentation Index
 
-The following documents define the project architecture and development process.
-
 | Document | Purpose |
-|----------|---------|
-| docs/architecture.md | System architecture |
-| docs/roadmap.md | Project roadmap |
-| docs/development/git-workflow.md | Git workflow |
-| docs/development/github-setup.md | GitHub & SSH setup |
-| docs/development/coding-standards.md | Coding standards |
-| docs/development/bootstrap-process.md | Bootstrap workflow |
-| ADR/ | Architecture Decision Records |
+|---|---|
+| `AGENTS.md` | Mandatory startup rules for coding AIs |
+| `IMPLEMENTATION_WORKFLOW.md` | Feature implementation workflow |
+| `docs/CONSTITUTION.md` | Frozen project rules |
+| `docs/PROJECT_CONTEXT.md` | Current project state and continuation context |
+| `docs/architecture.md` | Current architecture |
+| `docs/roadmap.md` | Current roadmap and phases |
+| `docs/development/git-workflow.md` | Branch/commit/merge workflow |
+| `docs/development/bootstrap-process.md` | Target bootstrap workflow |
+| `ADR/` | Accepted architectural decisions |
+
+For a new AI, the repository state and Git history are authoritative for what is
+already implemented. Do not treat old roadmap text as proof that a feature is still
+pending.
 
 
-These documents are the primary entry points for understanding the project.
+## Backend and GUI
 
+Run the dependency-free backend and GUI locally:
+
+```bash
+ai-bootstrap serve-gui
+```
+
+The service exposes `/api/v1` endpoints for audit, plan, engineering-environment state,
+and Safe Mode preview/bootstrap operations. REAL execution remains approval-driven through
+the CLI.

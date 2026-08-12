@@ -1,6 +1,8 @@
 rich
 typer
+requests
+colorama
+pytest
 
 [dev]
-pytest
 ruff
