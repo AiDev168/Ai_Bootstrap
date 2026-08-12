@@ -5,12 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import ClassVar
 
+from ai_engineering_bootstrap.executor.security import (
+    validate_project_dependency_context,
+    validate_python_package_context,
+    validate_virtualenv_context,
+)
 from ai_engineering_bootstrap.planner.models import ExecutionPlan
 
 
 @dataclass(frozen=True)
 class ValidationResult:
     """Result of validating an execution plan."""
+
     is_valid: bool
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -19,7 +25,7 @@ class ValidationResult:
 class ExecutionPlanValidator:
     """
     Validates an ExecutionPlan before it reaches the Executor.
-    
+
     This acts as a Safety Gate to prevent invalid or unsafe plans from executing.
     It performs structural validation and allowlist checking.
     """
@@ -40,16 +46,25 @@ class ExecutionPlanValidator:
     def validate(self, plan: ExecutionPlan) -> ValidationResult:
         """
         Validate the given execution plan.
-        
+
         Returns ValidationResult with is_valid=True if safe to execute.
         Returns ValidationResult with is_valid=False if plan should be rejected.
         """
         errors: list[str] = []
         warnings: list[str] = []
 
+        if not plan.is_intact():
+            errors.append(
+                "Execution plan integrity check failed: plan contents changed after creation."
+            )
+
         # طرح خالی معتبر است
         if not plan.actions:
-            return ValidationResult(is_valid=True, errors=[], warnings=[])
+            return ValidationResult(
+                is_valid=not errors,
+                errors=errors,
+                warnings=warnings,
+            )
 
         seen_actions: set[tuple[str, str]] = set()
 
@@ -75,7 +90,15 @@ class ExecutionPlanValidator:
                     f"Action ID '{action.action_id}' is not recognized/implemented "
                     "and is blocked by Safety Gate."
                 )
-            
+
+            context = action.context if isinstance(action.context, dict) else {}
+            if action.action_id == "install_python_package":
+                errors.extend(validate_python_package_context(context))
+            elif action.action_id == "install_project_dependencies":
+                errors.extend(validate_project_dependency_context(context))
+            elif action.action_id == "create_virtualenv":
+                errors.extend(validate_virtualenv_context(context))
+
             # 4. بررسی توضیحات (تولید هشدار اگر خالی باشد، اما خطا نیست)
             if not action.description or not action.description.strip():
                 warnings.append(f"Action '{action.action_id}' has no description.")

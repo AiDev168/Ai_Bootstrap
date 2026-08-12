@@ -14,13 +14,19 @@ from ai_engineering_bootstrap.executor.handlers.base import (
     ExecutionContext,
 )
 from ai_engineering_bootstrap.executor.models import ActionResult, ExecutionStatus
+from ai_engineering_bootstrap.executor.security import validate_python_package_context
 from ai_engineering_bootstrap.planner.models import ExecutionPlanAction
 
 CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
 _PACKAGE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 
 
-def _result(action: ExecutionPlanAction, status: ExecutionStatus, message: str, **details: object) -> ActionResult:
+def _result(
+    action: ExecutionPlanAction,
+    status: ExecutionStatus,
+    message: str,
+    **details: object,
+) -> ActionResult:
     return ActionResult(
         action_id=action.action_id,
         status=status,
@@ -32,7 +38,9 @@ def _result(action: ExecutionPlanAction, status: ExecutionStatus, message: str, 
 class CreateVirtualEnvHandler(ActionHandler):
     """Create an isolated Python virtual environment."""
 
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         if context.dry_run:
             return _result(
                 action,
@@ -43,7 +51,11 @@ class CreateVirtualEnvHandler(ActionHandler):
 
         target = Path(str(action.context.get("venv_path", ".venv"))).expanduser()
         if target.exists() and not target.is_dir():
-            return _result(action, ExecutionStatus.FAILED, "Virtual environment target is not a directory.")
+            return _result(
+                action,
+                ExecutionStatus.FAILED,
+                "Virtual environment target is not a directory.",
+            )
         if target.exists() and (target / "pyvenv.cfg").is_file():
             return _result(
                 action,
@@ -55,7 +67,11 @@ class CreateVirtualEnvHandler(ActionHandler):
         try:
             venv.EnvBuilder(with_pip=True, clear=False, symlinks=True).create(target)
         except (OSError, subprocess.SubprocessError) as error:
-            return _result(action, ExecutionStatus.FAILED, f"Virtual environment creation failed: {error}")
+            return _result(
+                action,
+                ExecutionStatus.FAILED,
+                f"Virtual environment creation failed: {error}",
+            )
 
         return _result(
             action,
@@ -71,13 +87,19 @@ class InstallPythonPackageHandler(ActionHandler):
     def __init__(self, runner: CommandRunner = subprocess.run) -> None:
         self._runner = runner
 
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         package = str(action.context.get("package", "")).strip()
         requirement = str(action.context.get("requirement", package)).strip()
-        if not package or not _PACKAGE_NAME.fullmatch(package):
-            return _result(action, ExecutionStatus.FAILED, "Invalid package name.")
-        if requirement != package and not requirement.startswith(package):
-            return _result(action, ExecutionStatus.FAILED, "Package requirement does not match package name.")
+        context_errors = validate_python_package_context(action.context)
+        if context_errors:
+            return _result(
+                action,
+                ExecutionStatus.FAILED,
+                context_errors[0],
+                security_validation="failed",
+            )
 
         if context.dry_run:
             return _result(
@@ -89,7 +111,13 @@ class InstallPythonPackageHandler(ActionHandler):
             )
 
         python_executable = str(action.context.get("python_executable", sys.executable))
-        command: Sequence[str] = (python_executable, "-m", "pip", "install", requirement)
+        command: Sequence[str] = (
+            python_executable,
+            "-m",
+            "pip",
+            "install",
+            requirement,
+        )
         try:
             completed = self._runner(
                 command,
@@ -100,7 +128,9 @@ class InstallPythonPackageHandler(ActionHandler):
                 shell=False,
             )
         except (OSError, subprocess.SubprocessError) as error:
-            return _result(action, ExecutionStatus.FAILED, f"Package installation failed: {error}")
+            return _result(
+                action, ExecutionStatus.FAILED, f"Package installation failed: {error}"
+            )
 
         output = (completed.stdout or completed.stderr or "").strip()
         if completed.returncode != 0:
@@ -128,7 +158,9 @@ class InstallProjectDependenciesHandler(ActionHandler):
     def __init__(self, runner: CommandRunner = subprocess.run) -> None:
         self._runner = runner
 
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         if context.dry_run:
             return _result(
                 action,
@@ -137,10 +169,16 @@ class InstallProjectDependenciesHandler(ActionHandler):
                 simulated=True,
             )
 
-        project_root = Path(str(action.context.get("project_root", Path.cwd()))).resolve()
+        project_root = Path(
+            str(action.context.get("project_root", Path.cwd()))
+        ).resolve()
         pyproject = project_root / "pyproject.toml"
         if not pyproject.is_file():
-            return _result(action, ExecutionStatus.FAILED, f"No pyproject.toml found at {project_root}.")
+            return _result(
+                action,
+                ExecutionStatus.FAILED,
+                f"No pyproject.toml found at {project_root}.",
+            )
 
         python_executable = str(action.context.get("python_executable", sys.executable))
         extras = str(action.context.get("extras", "dev")).strip()
@@ -163,7 +201,11 @@ class InstallProjectDependenciesHandler(ActionHandler):
                 shell=False,
             )
         except (OSError, subprocess.SubprocessError) as error:
-            return _result(action, ExecutionStatus.FAILED, f"Project dependency installation failed: {error}")
+            return _result(
+                action,
+                ExecutionStatus.FAILED,
+                f"Project dependency installation failed: {error}",
+            )
 
         output = (completed.stdout or completed.stderr or "").strip()
         if completed.returncode != 0:

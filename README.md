@@ -69,6 +69,8 @@ Doctor V3 Check Categorization
 Doctor V3 CI/CD Audit Output
 Doctor V3 Context-Aware Recommendations
 Planner Foundation
+Steps 23–29 Controlled Execution and Bootstrap
+Step 30 End-to-End Hardening & Security
 ```
 
 ## Current CLI

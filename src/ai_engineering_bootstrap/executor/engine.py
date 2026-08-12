@@ -87,6 +87,13 @@ class ExecutorEngine:
         max_attempts: int = 1,
     ) -> ExecutionResult:
         """Process all actions deterministically with optional retry."""
+        if not plan.is_intact():
+            return ExecutionResult(
+                is_success=False,
+                results=[],
+                summary="Execution blocked: execution plan integrity check failed.",
+            )
+
         results: list[ActionResult] = []
         context = ExecutionContext(
             mode=self._mode,
@@ -102,7 +109,10 @@ class ExecutorEngine:
                         action_id=action.action_id,
                         status=ExecutionStatus.SKIPPED,
                         message="Action rejected by human approval.",
-                        details={"reason": "human_rejection", "action_index": action_index},
+                        details={
+                            "reason": "human_rejection",
+                            "action_index": action_index,
+                        },
                     )
                 )
                 continue
