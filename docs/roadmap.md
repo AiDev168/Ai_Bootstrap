@@ -63,11 +63,11 @@ logic.
 25. Failure → Recovery → Re-plan Integration
 26. Execution Audit & Run Evidence
 27. Agent Runtime / Session Boundary
+28. End-to-End Environment Bootstrap
+29. Engineering Environment Bootstrap + Cursor Integration
 
 ## Next Milestones
 
-28. End-to-End Autonomous Environment Bootstrap
-29. Engineering Environment Bootstrap + Cursor Integration
 30. End-to-End Hardening & Security
 31. Stable Backend API / Service Boundary
 32. GUI Foundation
@@ -84,8 +84,10 @@ logic.
 ## Cursor Boundary
 
 Cursor is part of the engineering-environment bootstrap standard, not the runtime
-Agent execution engine. Cursor installation, `.cursor/rules`, development tooling,
-and developer-machine verification belong to milestone 29.
+Agent execution engine. Milestone 29 provides the canonical repository rules and
+read-only engineering-tool verification. Installing operating-system tools or the
+Cursor binary remains an explicit Executor capability and is not performed by the
+engineering inspection service.
 
 ## Safety Rule
 

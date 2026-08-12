@@ -1,6 +1,7 @@
 """Unit tests for the Typer audit command."""
 
 import json
+from unittest.mock import MagicMock
 
 from typer.testing import CliRunner
 
@@ -81,3 +82,59 @@ def test_audit_json_exit_code_on_success(monkeypatch: object) -> None:
     result = runner.invoke(cli.app, ["audit", "--format", "json"])
 
     assert result.exit_code == 0
+
+
+def test_bootstrap_cli_defaults_to_safe_mode(monkeypatch: object) -> None:
+    service = type("Service", (), {})()
+    service.run = lambda **kwargs: type(
+        "Result",
+        (),
+        {
+            "final_audit_report": StubAuditService().run(),
+            "environment_ready": True,
+            "action_results": (),
+            "rejected_actions": (),
+            "is_success": True,
+        },
+    )()
+
+    monkeypatch.setattr(cli, "EnvironmentBootstrapService", lambda: service)
+
+    result = runner.invoke(cli.app, ["bootstrap"])
+
+    assert result.exit_code == 0
+
+
+def test_bootstrap_cli_rejects_interactive_approval_in_safe_mode() -> None:
+    result = runner.invoke(cli.app, ["bootstrap", "--interactive-approval"])
+
+    assert result.exit_code != 0
+    assert "requires --real-execution" in result.output
+
+
+def test_run_pipeline_interactive_approval_uses_bootstrap_service(monkeypatch: object) -> None:
+    result_object = type(
+        "PipelineResult",
+        (),
+        {
+            "audit_report": StubAuditService().run(),
+            "original_plan": type("Plan", (), {"is_actionable": False, "actions": []})(),
+            "validation_result": type("Validation", (), {"is_valid": True, "errors": []})(),
+            "execution_result": None,
+            "verification_result": None,
+            "is_success": True,
+        },
+    )()
+    bootstrap_result = type("BootstrapResult", (), {"pipeline_result": result_object})()
+    service = MagicMock()
+    service.run.return_value = bootstrap_result
+    monkeypatch.setattr(cli, "EnvironmentBootstrapService", lambda: service)
+
+    result = runner.invoke(
+        cli.app,
+        ["run-pipeline", "--real-execution", "--interactive-approval"],
+        input="",
+    )
+
+    assert result.exit_code == 0
+    service.run.assert_called_once()

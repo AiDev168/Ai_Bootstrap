@@ -12,7 +12,8 @@ dependencies = [
     "rich",
     "typer",
     "requests",
-    "colorama"
+    "colorama",
+    "pytest",
 ]
 
 [project.scripts]
@@ -20,7 +21,6 @@ ai-bootstrap = "ai_engineering_bootstrap.cli:app"
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
     "ruff",
 ]
 
