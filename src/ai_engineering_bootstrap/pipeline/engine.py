@@ -192,6 +192,7 @@ class PipelineEngine:
         agent_planning_service: AgentPlanningService | None = None,
         agent_context: str | None = None,
         max_replans: int = 1,
+        plan_override: ExecutionPlan | None = None,
     ) -> PipelineResult:
         """Run one bounded pipeline execution and at most ``max_replans`` recovery cycles."""
         evidence = ExecutionAuditService(run_id)
@@ -202,7 +203,9 @@ class PipelineEngine:
         planner = PlannerEngine()
         agent_decision = None
         agent_metadata: dict[str, Any] = {}
-        if agent_planning_service is not None and agent_context is not None:
+        if plan_override is not None:
+            original_plan = plan_override
+        elif agent_planning_service is not None and agent_context is not None:
             runtime_result = AgentRuntime(agent_planning_service).run(agent_context, run_id)
             agent_decision = runtime_result.planning.decision
             original_plan = runtime_result.planning.plan

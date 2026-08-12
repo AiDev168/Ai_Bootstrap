@@ -194,6 +194,18 @@ configured provider and Planner bridge, but it has no execution method, shell ac
 or direct handler access. Execution remains downstream of validation, approval,
 SafetyGate, Executor, and Verification.
 
+## 9. Application / Bootstrap Services
+
+Environment bootstrap orchestration lives above the pipeline and does not own
+remediation handlers. `EnvironmentBootstrapService` coordinates the canonical
+Doctor → Planner → Validator → Approval → Executor → Verification workflow and
+performs a final read-only Doctor audit. In REAL interactive mode, required actions
+are approved independently and executed one at a time.
+
+`EngineeringEnvironmentService` is read-only. It reports required development tools,
+optional tools, Cursor CLI detection, and the presence of the canonical `.cursor/rules`
+configuration. It does not install operating-system tools or Cursor directly.
+
 ## 9. Application / Presentation
 
 CLI and GUI are application/presentation entry points.

@@ -26,9 +26,14 @@ class AuditService:
         self._recommendation_engine = RecommendationEngine()
 
     @staticmethod
-    def _map_category(name: str) -> CheckCategory:
+    def _map_category(name: str, facts: dict[str, Any] | None = None) -> CheckCategory:
         """Map a check name to its category."""
         name_lower = name.lower()
+        facts = facts or {}
+        if facts.get("remediation_action") == "install_python_package":
+            return CheckCategory.DEPENDENCIES
+        if facts.get("package") and facts.get("source", "").startswith(("project", "optional:")):
+            return CheckCategory.DEPENDENCIES
         if "gpu" in name_lower or "cuda" in name_lower:
             return CheckCategory.SYSTEM
         if "python" in name_lower:
@@ -61,12 +66,12 @@ class AuditService:
                 }
                 status = status_map.get(result.status, CheckStatus.FAILED)
 
-                # تعیین دسته‌بندی
-                category = self._map_category(getattr(result, 'name', 'Unknown'))
-
                 # استخراج جزئیات
                 details = getattr(result, 'details', "")
                 facts = getattr(result, 'facts', {}) or {}
+
+                # تعیین دسته‌بندی
+                category = self._map_category(getattr(result, 'name', 'Unknown'), facts)
 
                 if not details and hasattr(result, 'diagnostic') and result.diagnostic:
                     details = result.diagnostic

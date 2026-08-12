@@ -13,6 +13,8 @@ from rich.table import Table
 
 from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.audit.models import AuditReport, CheckStatus
+from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
+from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.exceptions import BootstrapError
 from ai_engineering_bootstrap.executor import ExecutorEngine
 from ai_engineering_bootstrap.generation import (
@@ -183,6 +185,27 @@ def doctor() -> None:
         console.print("Environment already satisfies the project requirements.")
 
 
+@app.command("engineering-bootstrap")
+def engineering_bootstrap() -> None:
+    """Inspect engineering tooling and Cursor integration."""
+    report = EngineeringEnvironmentService().run()
+    console.print("[bold cyan]Engineering Environment Bootstrap[/bold cyan]\n")
+    for tool in report.tools:
+        status = "[green]AVAILABLE[/green]" if tool.available else "[red]MISSING[/red]"
+        requirement = "required" if tool.required else "optional"
+        location = f" — {tool.path}" if tool.path else ""
+        console.print(f"• {tool.name} ({requirement}): {status}{location}")
+    rules = "[green]PRESENT[/green]" if report.cursor_rules_present else "[red]MISSING[/red]"
+    cursor = "[green]AVAILABLE[/green]" if report.cursor_available else "[yellow]NOT DETECTED[/yellow]"
+    console.print(f"• Cursor rules: {rules}")
+    console.print(f"• Cursor CLI: {cursor}")
+    console.print()
+    if report.is_ready:
+        console.print("[green bold]✓ Engineering environment is ready.[/green bold]")
+    else:
+        console.print("[yellow bold]⚠ Engineering environment needs attention.[/yellow bold]")
+
+
 @app.command()
 def plan() -> None:
     """Generate an execution plan based on the latest audit."""
@@ -277,31 +300,24 @@ def run_pipeline(
         from ai_engineering_bootstrap.approval.provider import InMemoryApprovalProvider
         approval_provider = InMemoryApprovalProvider()
 
-    result = engine.run(
-        mode=mode,
-        approval_provider=approval_provider,
-        pending_approvals=pending_approvals,
-        run_id=run_id,
-    )
-
-    if interactive_approval and result.is_pending_approval:
-        approval_ids: dict[str, list[str]] = {}
-        for request in result.approval_requests:
-            approval_target = request.reason or request.action_id
-            answer = typer.confirm(
-                f"Approve {approval_target} ({request.risk_level})?",
+    if interactive_approval:
+        bootstrap_result = EnvironmentBootstrapService().run(
+            mode=mode,
+            approval_provider=approval_provider,
+            approval_callback=lambda request: typer.confirm(
+                f"Approve {request.reason or request.action_id} ({request.risk_level})?",
                 default=False,
-            )
-            if answer:
-                approval_provider.approve(request.approval_id)
-            else:
-                approval_provider.reject(request.approval_id)
-            approval_ids.setdefault(request.action_id, []).append(request.approval_id)
-
+            ),
+            run_id=run_id,
+        )
+        result = bootstrap_result.pipeline_result
+        if result is None:
+            raise typer.Exit(code=1)
+    else:
         result = engine.run(
             mode=mode,
             approval_provider=approval_provider,
-            pending_approvals=approval_ids,
+            pending_approvals=pending_approvals,
             run_id=run_id,
         )
     # 1. Audit
@@ -371,23 +387,103 @@ def run_pipeline(
 
 
 @app.command()
-def bootstrap() -> None:
-    """Run audit, display plan, and (in future) execute fixes."""
-    # فعلاً فقط audit و plan را نمایش می‌دهد
-    audit_service = default_audit_service()
-    report = audit_service.run()
-    # نمایش خلاصه دکتر
-    r = report.readiness
-    if r.development_ready:
-        console.print("[green]Environment is ready.[/green]")
-    else:
-        console.print("[red]Environment needs attention. Generating plan...[/red]")
-        engine = PlannerEngine()
-        plan = engine.generate_plan(report)
-        if plan.is_actionable:
-            console.print("\n[bold]Required Actions:[/bold]")
-            for action in plan.actions:
-                console.print(f"• {action.description}")
+def bootstrap(
+    real_execution: bool = typer.Option(
+        False,
+        "--real-execution",
+        help="Enable REAL execution mode.",
+    ),
+    interactive_approval: bool = typer.Option(
+        False,
+        "--interactive-approval",
+        help="Prompt separately for each required REAL action.",
+    ),
+) -> None:
+    """Run the complete environment bootstrap workflow."""
+    from ai_engineering_bootstrap.executor.mode import ExecutionMode
+
+    if interactive_approval and not real_execution:
+        raise typer.BadParameter("--interactive-approval requires --real-execution")
+
+    mode = ExecutionMode.REAL if real_execution else ExecutionMode.SAFE
+    console.print(
+        f"[bold cyan]Running Environment Bootstrap ({mode.value.upper()} MODE)...[/bold cyan]\n"
+    )
+    if real_execution:
+        console.print("[yellow bold]⚠️ REAL EXECUTION MODE ACTIVE[/yellow bold]")
+        console.print("Only explicitly approved, typed actions will run.\n")
+
+    approval_provider = None
+    approval_callback = None
+    if interactive_approval:
+        from ai_engineering_bootstrap.approval.provider import InMemoryApprovalProvider
+
+        approval_provider = InMemoryApprovalProvider()
+
+        def approval_callback(request: object) -> bool:
+            reason = getattr(request, "reason", "Action requires approval")
+            risk = getattr(request, "risk_level", "UNKNOWN")
+            return typer.confirm(f"Approve {reason} ({risk})?", default=False)
+
+    result = EnvironmentBootstrapService().run(
+        mode=mode,
+        approval_provider=approval_provider,
+        approval_callback=approval_callback,
+    )
+
+    console.print(
+        f"[bold]Final Audit:[/bold] Health Score "
+        f"{result.final_audit_report.readiness.health_score}/100"
+    )
+    console.print(
+        f"[bold]Environment Ready:[/bold] "
+        f"{'[green]YES[/green]' if result.environment_ready else '[red]NO[/red]'}"
+    )
+
+    missing_checks = [
+        check
+        for check in result.final_audit_report.checks
+        if check.status == CheckStatus.FAILED
+    ]
+    if missing_checks:
+        console.print("\n[bold]Missing / Failed Requirements:[/bold]")
+        for check in missing_checks:
+            requirement = str(check.facts.get("requirement", "")).strip()
+            target = requirement or str(check.facts.get("package", "")).strip() or check.name
+            console.print(
+                f"   [red]• [MISSING][/red] {target} "
+                f"[dim]({check.name})[/dim]"
+            )
+            if check.details:
+                console.print(f"      [dim]{check.details}[/dim]")
+
+    for execution in result.action_results:
+        for action_result in execution.results:
+            color = (
+                "green"
+                if action_result.status.value == "success"
+                else "red"
+                if action_result.status.value == "failed"
+                else "yellow"
+            )
+            target = str(action_result.details.get("package", "")).strip()
+            label = action_result.action_id
+            if action_result.action_id == "install_python_package" and target:
+                label = f"Install Python package: {target}"
+            console.print(
+                f"[{color}]• [{action_result.status.value.upper()}] "
+                f"{label}[/{color}]"
+            )
+            console.print(f"  [dim]{action_result.message}[/dim]")
+
+    if result.rejected_actions:
+        console.print(
+            "[yellow]Rejected actions:[/yellow] "
+            + ", ".join(result.rejected_actions)
+        )
+
+    if not result.is_success:
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

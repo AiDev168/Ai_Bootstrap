@@ -275,6 +275,7 @@ The following milestones are implemented on the current baseline:
 27. **Agent Runtime / Session Boundary** — Agent decision/planning is isolated inside
     a bounded session object with explicit lifecycle identity and no execution API.
 
-The next planned milestone is **28. End-to-End Autonomous Environment Bootstrap**.
-Cursor installation/engineering-environment bootstrap remains a later milestone and
-must not be mixed into dependency remediation for project runtime dependencies.
+Milestones 28 and 29 now establish the application-level environment bootstrap and
+engineering-environment verification boundaries. The next planned milestone is
+**30. End-to-End Hardening & Security**. Cursor remains an engineering-environment
+concern and is not part of the Agent execution engine.

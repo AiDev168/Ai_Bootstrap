@@ -4,8 +4,6 @@
 
 The bootstrap process is a controlled environment workflow, not merely a checklist.
 
-The target workflow is:
-
 ```text
 Inspect
   ↓
@@ -13,115 +11,49 @@ Doctor
   ↓
 Plan
   ↓
+Validate
+  ↓
 Review / Approve
   ↓
 Execute
   ↓
 Verify
+  ↓
+Doctor again
 ```
 
-## Stage 1 — Inspect
+## Milestone 28 — End-to-End Environment Bootstrap
 
-Read-only probes inspect:
+`EnvironmentBootstrapService` is the application-level orchestrator. It does not
+contain remediation handlers and does not bypass the existing `PipelineEngine`.
 
-- operating system;
-- Python;
-- virtual environment;
-- installed dependencies;
+In REAL interactive mode, every approval-required action is handled independently:
+
+1. create an approval request for the current typed action;
+2. ask the user for that action only;
+3. execute it immediately when approved;
+4. skip it when rejected;
+5. continue to the next planned action;
+6. perform a final read-only Doctor audit.
+
+This preserves the required behavior for plans containing multiple instances of the
+same action ID, such as separate Python package installations.
+
+## Milestone 29 — Engineering Environment Bootstrap
+
+The engineering environment service is read-only and reports:
+
 - Git;
-- Docker;
-- platform;
-- runtime target;
-- best-effort GPU state.
+- Pytest;
+- Ruff;
+- Docker when available;
+- Cursor CLI when available;
+- canonical repository Cursor rules.
 
-No changes are performed.
+The repository rules are stored in `.cursor/rules/project.mdc`. Generated AI projects
+continue to receive the existing template rules under
+`templates/ai-app-template-v1/.cursor/rules/`.
 
-## Stage 2 — Doctor
-
-Doctor aggregates the inspection results into an `AuditReport`.
-
-It provides:
-
-- check status;
-- categories;
-- readiness;
-- Health Score;
-- context-aware recommendations;
-- deterministic JSON for automation.
-
-Doctor does not fix anything.
-
-## Stage 3 — Plan
-
-Planner converts the `AuditReport` into an `ExecutionPlan`.
-
-Planner:
-
-- maps known failures to actions;
-- assigns stable action IDs;
-- assigns priorities;
-- removes duplicate actions;
-- preserves deterministic ordering;
-- safely ignores unknown failures.
-
-Planner remains read-only.
-
-## Stage 4 — Review / Approval
-
-The execution plan must be visible before system-changing operations.
-
-The professional GUI is the preferred long-term interface for review and approval.
-
-CLI remains useful for diagnostics and automation.
-
-## Stage 5 — Execute
-
-Executor is the only component allowed to modify the environment.
-
-Execution must be:
-
-- explicit;
-- controlled;
-- observable;
-- testable;
-- limited to approved actions.
-
-The current `bootstrap` command does not yet execute changes.
-
-## Stage 6 — Verify
-
-After execution, run Doctor again.
-
-The intended remediation loop is:
-
-```text
-Doctor(before)
-    ↓
-Planner
-    ↓
-User approval
-    ↓
-Executor
-    ↓
-Doctor(after)
-```
-
-This verifies that the requested environment state was actually achieved.
-
-## Long-Term Command
-
-The target CLI workflow is:
-
-```bash
-ai-bootstrap bootstrap
-```
-
-The target GUI workflow should provide the same core process with a richer interactive
-experience.
-
-## Safety Rule
-
-No installation, configuration, or other host modification belongs in Probe,
-Doctor, Planner, CLI, or GUI business logic.
-
-Only Executor may perform system changes.
+Operating-system tool installation and Cursor binary installation are intentionally
+not implemented as generic shortcuts. They require explicit typed Executor handlers,
+policies, approvals, and verifiers.
