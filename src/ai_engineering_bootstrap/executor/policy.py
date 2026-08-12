@@ -70,15 +70,31 @@ class SafetyGate:
             [ExecutionMode.SAFE], ApprovalRequirement.HUMAN
         )
 
-        # اکشن‌های MOCK (فقط در حالت SAFE مجازند)
-        mock_actions = ["install_git", "install_docker", "fix_venv", "fix_editable", "upgrade_python"]
+        self._policies["install_git"] = ActionPolicy(
+            action_id="install_git",
+            allowed=True,
+            risk=ActionRisk.MEDIUM,
+            allowed_modes=[ExecutionMode.SAFE],
+            approval_required=ApprovalRequirement.HUMAN,
+        )
+
+        for action_id, risk in (("install_docker", ActionRisk.HIGH), ("install_cursor", ActionRisk.MEDIUM)):
+            self._policies[action_id] = ActionPolicy(
+                action_id=action_id,
+                allowed=True,
+                risk=risk,
+                allowed_modes=[ExecutionMode.SAFE, ExecutionMode.REAL],
+                approval_required=ApprovalRequirement.HUMAN,
+            )
+
+        mock_actions = ["fix_venv", "fix_editable", "upgrade_python"]
         for action_id in mock_actions:
             self._policies[action_id] = ActionPolicy(
                 action_id=action_id,
                 allowed=True,
                 risk=ActionRisk.LOW,
-                allowed_modes=[ExecutionMode.SAFE], # در حالت REAL مجاز نیستند
-                approval_required=ApprovalRequirement.NONE
+                allowed_modes=[ExecutionMode.SAFE],
+                approval_required=ApprovalRequirement.NONE,
             )
 
     def register_policy(self, policy: ActionPolicy) -> None:

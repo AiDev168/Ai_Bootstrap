@@ -41,8 +41,8 @@ class EngineeringEnvironmentReport:
 class EngineeringEnvironmentService:
     """Inspect the engineering environment without modifying the host."""
 
-    REQUIRED_TOOLS = ("git", "pytest", "ruff")
-    OPTIONAL_TOOLS = ("docker", "cursor")
+    REQUIRED_TOOLS = ("git", "pytest", "ruff", "cursor")
+    OPTIONAL_TOOLS = ("docker",)
 
     def __init__(self, project_root: Path | None = None) -> None:
         self.project_root = (project_root or Path.cwd()).resolve()

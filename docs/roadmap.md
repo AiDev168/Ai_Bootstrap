@@ -83,11 +83,7 @@ logic.
 
 ## Cursor Boundary
 
-Cursor is part of the engineering-environment bootstrap standard, not the runtime
-Agent execution engine. Milestone 29 provides the canonical repository rules and
-read-only engineering-tool verification. Installing operating-system tools or the
-Cursor binary remains an explicit Executor capability and is not performed by the
-engineering inspection service.
+Cursor is part of the engineering-environment bootstrap standard, not the runtime Agent execution engine. Milestone 29 provides canonical repository rules, explicit remediation actions, human approval, and independent verification for Cursor and other engineering tools.
 
 ## Safety Rule
 

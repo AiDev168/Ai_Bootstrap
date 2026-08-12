@@ -21,6 +21,7 @@ class PlannerEngine:
         "Editable Install": ("fix_editable", 'Run: pip install -e ".[dev]"', 2),
         "Git": ("install_git", "Install Git and add to PATH", 3),
         "Docker": ("install_docker", "Install Docker and start the daemon", 4),
+        "Cursor": ("install_cursor", "Install Cursor desktop and integrate it with the development environment", 5),
         "Python Version": ("upgrade_python", "Upgrade Python to the required version", 5),
     }
 

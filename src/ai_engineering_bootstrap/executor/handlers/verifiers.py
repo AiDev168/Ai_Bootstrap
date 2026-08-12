@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -251,15 +252,138 @@ class ProjectDependenciesVerifier(ActionVerifier):
         )
 
 
+class ExecutableVerifier(ActionVerifier):
+    """Verify an installed executable independently from its handler."""
+
+    def __init__(
+        self, executable: str, version_args: tuple[str, ...] = ("--version",)
+    ) -> None:
+        self._executable = executable
+        self._version_args = version_args
+
+    def verify(
+        self,
+        action: ExecutionPlanAction,
+        execution_result: ActionResult,
+        context: Any,
+    ) -> VerificationResult:
+        if execution_result.status == ExecutionStatus.SKIPPED:
+            return VerificationResult(
+                action.action_id,
+                VerificationStatus.SKIPPED,
+                "Safe-mode simulation produced no real environment change to verify.",
+            )
+        if execution_result.status == ExecutionStatus.FAILED:
+            return VerificationResult(
+                action.action_id,
+                VerificationStatus.SKIPPED,
+                "Execution failed; nothing to verify.",
+            )
+
+        path = shutil.which(self._executable)
+        if path is None:
+            return VerificationResult(
+                action.action_id,
+                VerificationStatus.FAILED,
+                f"Verification failed: '{self._executable}' is not available in PATH.",
+                expected=self._executable,
+            )
+        try:
+            completed = subprocess.run(
+                (path, *self._version_args),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+                shell=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return VerificationResult(
+                action.action_id,
+                VerificationStatus.FAILED,
+                f"Verification failed for '{self._executable}': {exc}",
+            )
+
+        if completed.returncode != 0:
+            return VerificationResult(
+                action.action_id,
+                VerificationStatus.FAILED,
+                f"Verification failed: '{self._executable}' did not return a valid version.",
+                expected=self._executable,
+                observed=(completed.stderr or completed.stdout).strip()[-1000:],
+            )
+        output = (completed.stdout or completed.stderr).strip()
+        version = output.splitlines()[0] if output else "unknown"
+        return VerificationResult(
+            action.action_id,
+            VerificationStatus.VERIFIED,
+            f"'{self._executable}' is installed and executable.",
+            expected=self._executable,
+            observed=version,
+            details={"path": path},
+        )
+
+
+class DockerServiceVerifier(ExecutableVerifier):
+    """Verify Docker CLI availability and daemon activity."""
+
+    def verify(
+        self,
+        action: ExecutionPlanAction,
+        execution_result: ActionResult,
+        context: Any,
+    ) -> VerificationResult:
+        result = super().verify(action, execution_result, context)
+        if result.status != VerificationStatus.VERIFIED:
+            return result
+        try:
+            service = subprocess.run(
+                ("systemctl", "is-active", "docker"),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+                shell=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return VerificationResult(
+                action.action_id,
+                VerificationStatus.FAILED,
+                f"Docker daemon verification failed: {exc}",
+            )
+        state = (service.stdout or service.stderr).strip()
+        if service.returncode != 0 or state != "active":
+            return VerificationResult(
+                action.action_id,
+                VerificationStatus.FAILED,
+                "Docker CLI is installed but the Docker daemon is not active.",
+                expected="active",
+                observed=state or None,
+            )
+        return VerificationResult(
+            action.action_id,
+            VerificationStatus.VERIFIED,
+            "Docker CLI and daemon independently verified.",
+            expected="active",
+            observed=state,
+            details=result.details,
+        )
+
+
 DEFAULT_VERIFIERS = {
     "check_python_version_real": PythonVersionVerifier(),
     "create_virtualenv": VirtualEnvVerifier(),
     "install_python_package": PythonPackageVerifier(),
     "install_project_dependencies": ProjectDependenciesVerifier(),
+    "install_git": ExecutableVerifier("git"),
+    "install_docker": DockerServiceVerifier("docker"),
+    "install_cursor": ExecutableVerifier("cursor"),
 }
 
 __all__ = [
     "DEFAULT_VERIFIERS",
+    "DockerServiceVerifier",
+    "ExecutableVerifier",
     "ProjectDependenciesVerifier",
     "PythonPackageVerifier",
     "PythonVersionVerifier",

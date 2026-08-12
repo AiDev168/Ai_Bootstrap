@@ -18,6 +18,7 @@ from ai_engineering_bootstrap.audit.models import (
 )
 from ai_engineering_bootstrap.audit.service import AuditService
 from ai_engineering_bootstrap.probes.doctor import (
+    CursorExecutableProbe,
     DockerExecutableProbe,
     EditableInstallProbe,
     GitExecutableProbe,
@@ -40,6 +41,7 @@ def default_audit_service(project_root: Path | None = None) -> AuditService:
         *[ProjectDependencyProbe(req) for req in DependencyDiscovery(root).discover(include_dev=True)],
         GitExecutableProbe(),
         DockerExecutableProbe(),
+        CursorExecutableProbe(),
         OSProbe(),
         PlatformProbe(),
         RuntimeTargetProbe(),

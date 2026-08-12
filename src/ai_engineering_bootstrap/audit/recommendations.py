@@ -54,7 +54,9 @@ class RecommendationEngine:
         elif "git" in name_lower:
             recommendations.append("Install Git and ensure it is available in your PATH.")
         elif "docker" in name_lower:
-            recommendations.append("Install Docker Desktop and ensure the daemon is running.")
+            recommendations.append("Install Docker Engine and ensure the daemon is running.")
+        elif "cursor" in name_lower:
+            recommendations.append("Install Cursor desktop using the approved engineering-environment handler.")
 
         # Fallback for other failures
         else:

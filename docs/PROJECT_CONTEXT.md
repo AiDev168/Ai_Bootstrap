@@ -279,3 +279,7 @@ Milestones 28 and 29 now establish the application-level environment bootstrap a
 engineering-environment verification boundaries. The next planned milestone is
 **30. End-to-End Hardening & Security**. Cursor remains an engineering-environment
 concern and is not part of the Agent execution engine.
+
+## Current Milestone 29 Completion Boundary
+
+Milestone 29 is implemented as an Executor-backed engineering-environment bootstrap. Missing Git, Docker, and Cursor findings can produce typed real actions with per-action human approval and independent verification. Cursor repository rules are present at `.cursor/rules/project.mdc`. Pytest and Ruff remain Python dependencies handled by the existing dependency workflow.

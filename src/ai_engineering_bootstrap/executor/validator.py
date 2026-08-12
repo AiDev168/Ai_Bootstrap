@@ -36,6 +36,7 @@ class ExecutionPlanValidator:
         "fix_editable",
         "install_git",
         "install_docker",
+        "install_cursor",
         "upgrade_python",
         "check_python_version_real",
         "create_virtualenv",

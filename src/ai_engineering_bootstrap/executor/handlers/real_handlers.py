@@ -13,6 +13,10 @@ from ai_engineering_bootstrap.executor.handlers.dependency_handlers import (
     InstallProjectDependenciesHandler,
     InstallPythonPackageHandler,
 )
+from ai_engineering_bootstrap.executor.handlers.system_handlers import (
+    InstallCursorRealHandler,
+    InstallDockerRealHandler,
+)
 from ai_engineering_bootstrap.executor.models import ActionResult, ExecutionStatus
 from ai_engineering_bootstrap.planner.models import ExecutionPlanAction
 
@@ -45,6 +49,8 @@ class CheckPythonVersionRealHandler(ActionHandler):
 
 
 REAL_HANDLERS = {
+    "install_docker": InstallDockerRealHandler(),
+    "install_cursor": InstallCursorRealHandler(),
     "check_python_version_real": CheckPythonVersionRealHandler(),
     "create_virtualenv": CreateVirtualEnvHandler(),
     "install_python_package": InstallPythonPackageHandler(),
@@ -55,6 +61,8 @@ __all__ = [
     "REAL_HANDLERS",
     "CheckPythonVersionRealHandler",
     "CreateVirtualEnvHandler",
+    "InstallCursorRealHandler",
+    "InstallDockerRealHandler",
     "InstallProjectDependenciesHandler",
     "InstallPythonPackageHandler",
 ]

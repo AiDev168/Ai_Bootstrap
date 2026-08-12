@@ -37,6 +37,11 @@ class InstallDockerHandler(_SafeHandlerBase, ActionHandler):
         return self._simulate_success(action)
 
 
+class InstallCursorHandler(_SafeHandlerBase, ActionHandler):
+    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+        return self._simulate_success(action)
+
+
 class FixVenvHandler(_SafeHandlerBase, ActionHandler):
     def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
         return self._simulate_success(action)
@@ -87,6 +92,7 @@ DEFAULT_SAFE_HANDLERS = {
     "check_python_version_real": CheckPythonVersionSafeHandler(),
     "install_git": InstallGitHandler(),
     "install_docker": InstallDockerHandler(),
+    "install_cursor": InstallCursorHandler(),
     "fix_venv": FixVenvHandler(),
     "fix_editable": FixEditableHandler(),
     "upgrade_python": UpgradePythonHandler(),
@@ -101,6 +107,7 @@ __all__ = [
     "CreateVirtualEnvSafeHandler",
     "FixEditableHandler",
     "FixVenvHandler",
+    "InstallCursorHandler",
     "InstallDockerHandler",
     "InstallGitHandler",
     "InstallProjectDependenciesSafeHandler",

@@ -41,19 +41,8 @@ same action ID, such as separate Python package installations.
 
 ## Milestone 29 — Engineering Environment Bootstrap
 
-The engineering environment service is read-only and reports:
+The engineering environment contract now participates in the same controlled remediation path. Doctor reports Git, Docker, and Cursor state; Planner maps missing tools to typed actions; Executor performs only approved real actions; independent verifiers confirm the result.
 
-- Git;
-- Pytest;
-- Ruff;
-- Docker when available;
-- Cursor CLI when available;
-- canonical repository Cursor rules.
+The repository rules are stored in `.cursor/rules/project.mdc`. Generated AI projects continue to receive the existing template rules under `templates/ai-app-template-v1/.cursor/rules/`.
 
-The repository rules are stored in `.cursor/rules/project.mdc`. Generated AI projects
-continue to receive the existing template rules under
-`templates/ai-app-template-v1/.cursor/rules/`.
-
-Operating-system tool installation and Cursor binary installation are intentionally
-not implemented as generic shortcuts. They require explicit typed Executor handlers,
-policies, approvals, and verifiers.
+REAL execution uses explicit handlers for Git, Docker, and Cursor. Each action requires its own human approval. No generic shell execution capability is introduced.

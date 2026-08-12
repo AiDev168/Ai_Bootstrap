@@ -120,7 +120,7 @@ _DEFAULT_CAPABILITIES = (
     Capability(
         "install_git",
         "Install Git",
-        "Install Git using a future approved platform-specific remediation handler.",
+        "Install Git using the approved Linux package handler.",
         "install_git",
         CapabilityRisk.MEDIUM,
         [ExecutionMode.SAFE],
@@ -129,10 +129,19 @@ _DEFAULT_CAPABILITIES = (
     Capability(
         "install_docker",
         "Install Docker",
-        "Install Docker using a future approved platform-specific remediation handler.",
+        "Install Docker Engine using the approved Linux package handler and start its service.",
         "install_docker",
+        CapabilityRisk.HIGH,
+        [ExecutionMode.SAFE, ExecutionMode.REAL],
+        True,
+    ),
+    Capability(
+        "install_cursor",
+        "Install Cursor",
+        "Install the official Cursor Linux desktop package through the approved handler.",
+        "install_cursor",
         CapabilityRisk.MEDIUM,
-        [ExecutionMode.SAFE],
+        [ExecutionMode.SAFE, ExecutionMode.REAL],
         True,
     ),
     Capability(

@@ -1,27 +1,36 @@
 # Engineering Environment Bootstrap
 
-Milestone 29 establishes the engineering-environment contract without bypassing the
-Executor safety boundary.
+Milestone 29 makes the engineering environment a real, controlled remediation target while preserving the Executor safety boundary.
 
 ## Required tooling
 
 - Git
 - Pytest
 - Ruff
+- Cursor desktop
 
 ## Optional tooling
 
-- Docker
-- Cursor CLI
+- Docker is supported as an engineering/production tool and can be installed when the audit requires it.
 
 ## Cursor integration
 
-The repository provides `.cursor/rules/project.mdc` as the canonical Cursor rule set.
-Generated AI application projects continue to receive their own project rules from
-the existing template under `templates/ai-app-template-v1/.cursor/rules/`.
+The repository provides `.cursor/rules/project.mdc` as the canonical Cursor rule set. Generated AI application projects continue to receive their own project rules from `templates/ai-app-template-v1/.cursor/rules/`.
 
-## Safety boundary
+Cursor installation is an explicit typed Executor action. The Linux implementation downloads the official Cursor DEB endpoint and installs it through `apt-get`; it is never executed as a generic shell command.
 
-This milestone does not install operating-system tools or the Cursor binary directly.
-Such mutations require explicit typed Executor handlers and policies. The engineering
-service is therefore read-only and reports what is present and what is missing.
+## Development tooling remediation
+
+Missing Git, Docker, and Cursor findings are converted by Doctor/Planner into explicit actions. REAL execution requires individual human approval for each action. SAFE execution only simulates them.
+
+Pytest and Ruff remain Python dependencies and continue to use the existing dependency-installation workflow.
+
+## Verification
+
+System-tool remediation has independent read-only verifiers:
+
+- Git: executable and version;
+- Docker: executable plus active daemon;
+- Cursor: executable and version.
+
+The final Doctor audit remains the authoritative readiness check.

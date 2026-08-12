@@ -42,7 +42,7 @@ class AuditService:
             return CheckCategory.ENVIRONMENT
         if name_lower in ["typer", "rich", "pytest", "ruff"] or "dependency" in name_lower or name_lower in {"setuptools", "wheel"}:
             return CheckCategory.DEPENDENCIES
-        if "git" in name_lower:
+        if "git" in name_lower or "cursor" in name_lower:
             return CheckCategory.TOOLS
         if "docker" in name_lower:
             return CheckCategory.CONTAINER

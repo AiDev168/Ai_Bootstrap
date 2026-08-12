@@ -186,6 +186,43 @@ class DockerExecutableProbe:
         )
 
 
+class CursorExecutableProbe:
+    """Check whether the Cursor desktop executable is available."""
+
+    def run(self) -> AuditCheck:
+        import shutil
+        import subprocess
+
+        cursor_path = shutil.which("cursor")
+        if cursor_path is None:
+            return AuditCheck(
+                name="Cursor",
+                status=AuditStatus.NOT_FOUND,
+                facts={"remediation_action": "install_cursor", "remediation_description": "Install Cursor desktop and integrate it with the development environment.", "remediation_priority": 5},
+                details="Cursor is not installed or not in PATH",
+            )
+
+        try:
+            result = subprocess.run(
+                [cursor_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+                shell=False,
+            )
+            version = (result.stdout or result.stderr).strip()
+        except (subprocess.SubprocessError, OSError):
+            version = "unknown"
+
+        return AuditCheck(
+            name="Cursor",
+            status=AuditStatus.AVAILABLE,
+            facts={"version": version or "unknown", "path": cursor_path},
+            details="",
+        )
+
+
 class OSProbe:
     """Check operating system."""
 
