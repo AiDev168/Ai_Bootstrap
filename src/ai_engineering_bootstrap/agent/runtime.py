@@ -60,11 +60,17 @@ class AgentRuntime:
     @staticmethod
     def metadata(result: AgentRuntimeResult) -> dict[str, Any]:
         """Expose session identity without exposing provider internals."""
+        decision = result.planning.decision
         return {
             "session_id": result.session.session_id,
             "run_id": result.session.run_id,
             "status": result.session.status.value,
-            "decision_id": result.planning.decision.decision_id,
+            "decision_id": decision.decision_id,
+            "confidence": decision.confidence,
+            "reasoning_summary": decision.reasoning_summary,
+            "selected_capability_ids": decision.selected_capability_ids,
+            "llm_used": decision.metadata.get("llm_used", False),
+            "provider": decision.metadata.get("provider", {}),
         }
 
 

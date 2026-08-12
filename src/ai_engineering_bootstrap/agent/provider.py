@@ -43,6 +43,10 @@ class LLMProvider(ABC):
         """Generate an agent decision."""
         raise NotImplementedError
 
+    def metadata(self) -> dict[str, Any]:
+        """Return safe provider metadata for evidence and observability."""
+        return {"provider_type": self.__class__.__name__}
+
 
 class MockProvider(LLMProvider):
     """Deterministic mock provider for testing."""
@@ -275,6 +279,7 @@ class LocalServerProvider(LLMProvider):
             selected_capability_ids=selected,
             confidence=confidence,
         )
+
 
 
 class RemoteAPIProvider(LLMProvider):

@@ -219,11 +219,17 @@ class PipelineEngine:
             runtime_result = AgentRuntime(agent_planning_service).run(context, run_id)
             candidate = runtime_result.planning.plan
             if candidate.is_actionable:
+                decision = runtime_result.planning.decision
+                provider = decision.metadata.get("provider", {})
                 evidence.record(
                     "agent",
                     "recovery_plan_generated",
-                    decision_id=runtime_result.planning.decision.decision_id,
-                    confidence=runtime_result.planning.decision.confidence,
+                    decision_id=decision.decision_id,
+                    confidence=decision.confidence,
+                    reasoning_summary=decision.reasoning_summary,
+                    selected_capability_ids=decision.selected_capability_ids,
+                    llm_used=decision.metadata.get("llm_used", False),
+                    provider=provider,
                 )
                 return candidate, runtime_result.planning.decision
             evidence.record(

@@ -184,3 +184,16 @@ Run feature-specific smoke tests as required.
 For a new AI, the repository state and Git history are authoritative for what is
 already implemented. Do not treat old roadmap text as proof that a feature is still
 pending.
+
+
+## Backend and GUI
+
+Run the dependency-free backend and GUI locally:
+
+```bash
+ai-bootstrap serve-gui
+```
+
+The service exposes `/api/v1` endpoints for audit, plan, engineering-environment state,
+and Safe Mode preview/bootstrap operations. REAL execution remains approval-driven through
+the CLI.

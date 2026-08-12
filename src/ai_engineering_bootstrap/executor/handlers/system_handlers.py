@@ -31,16 +31,23 @@ class _UbuntuAptHandler(ActionHandler):
         self._runner = runner
 
     def _run(
-        self, command: Sequence[str], timeout: float
+        self,
+        command: Sequence[str],
+        timeout: float,
+        *,
+        interactive: bool = False,
     ) -> subprocess.CompletedProcess[str]:
-        return self._runner(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-            shell=False,
-        )
+        kwargs = {
+            "text": True,
+            "timeout": timeout,
+            "check": False,
+            "shell": False,
+        }
+        if interactive:
+            kwargs.update({"stdin": None, "stdout": None, "stderr": None})
+        else:
+            kwargs["capture_output"] = True
+        return self._runner(command, **kwargs)
 
     @staticmethod
     def _result(
@@ -90,7 +97,7 @@ class InstallGitRealHandler(_UbuntuAptHandler):
         if error:
             return error
         try:
-            result = self._run(("sudo", "apt-get", "install", "-y", "git"), 600)
+            result = self._run(("sudo", "apt-get", "install", "-y", "git"), 600, interactive=True)
         except (OSError, subprocess.SubprocessError) as exc:
             return self._result(
                 action, ExecutionStatus.FAILED, f"Git installation failed: {exc}"
@@ -127,7 +134,7 @@ class InstallDockerRealHandler(_UbuntuAptHandler):
             return error
         try:
             install = self._run(
-                ("sudo", "apt-get", "install", "-y", "docker.io"), 900
+                ("sudo", "apt-get", "install", "-y", "docker.io"), 900, interactive=True
             )
             if install.returncode != 0:
                 output = (install.stderr or install.stdout or "").strip()
@@ -139,7 +146,7 @@ class InstallDockerRealHandler(_UbuntuAptHandler):
                     output=output[-3000:],
                 )
             service = self._run(
-                ("sudo", "systemctl", "enable", "--now", "docker"), 120
+                ("sudo", "systemctl", "enable", "--now", "docker"), 120, interactive=True
             )
         except (OSError, subprocess.SubprocessError) as exc:
             return self._result(
@@ -270,7 +277,7 @@ class InstallCursorRealHandler(_UbuntuAptHandler):
                         "Cursor installer download produced an empty package.",
                     )
                 result = self._run(
-                    ("sudo", "apt-get", "install", "-y", str(deb)), 900
+                    ("sudo", "apt-get", "install", "-y", str(deb)), 900, interactive=True
                 )
         except RuntimeError as exc:
             return self._result(

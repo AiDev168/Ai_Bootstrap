@@ -3,11 +3,13 @@
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Self
 from unittest.mock import MagicMock, patch
 
 from ai_engineering_bootstrap.executor.handlers.base import ExecutionContext
 from ai_engineering_bootstrap.executor.handlers.system_handlers import (
     InstallCursorRealHandler,
+    InstallGitRealHandler,
 )
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 from ai_engineering_bootstrap.executor.models import ExecutionStatus
@@ -31,7 +33,7 @@ class _Response:
     def __init__(self, payload: dict[str, object]) -> None:
         self._payload = json.dumps(payload).encode("utf-8")
 
-    def __enter__(self) -> "_Response":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -127,3 +129,22 @@ def test_cursor_handler_downloads_resolved_package_url_without_shell(
     assert runner.call_args.args[0][0:4] == ("sudo", "apt-get", "install", "-y")
     assert runner.call_args.kwargs["shell"] is False
     downloader.assert_called_once_with(package_url, downloader.call_args.args[1])
+
+
+def test_privileged_handlers_use_interactive_stdio_for_sudo() -> None:
+    calls = []
+
+    def runner(command, **kwargs):
+        calls.append((command, kwargs))
+        return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    handler = InstallGitRealHandler(runner=runner)
+    handler._run(("sudo", "apt-get", "install", "-y", "git"), 10, interactive=True)
+
+    assert calls
+    _, kwargs = calls[0]
+    assert kwargs["stdin"] is None
+    assert kwargs["stdout"] is None
+    assert kwargs["stderr"] is None
+    assert "capture_output" not in kwargs
+    assert kwargs["shell"] is False

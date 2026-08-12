@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from ai_engineering_bootstrap.agent.models import AgentDecision
 from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.executor.capability import CapabilityRegistry
@@ -46,7 +48,18 @@ class AgentDecisionEngine:
                 )
 
         # 4. Return Validated Decision
-        return decision
+        provider_metadata = self._provider.metadata()
+        provider_config = getattr(self._provider, "config", None)
+        if provider_config is not None:
+            provider_metadata = {
+                **provider_metadata,
+                "model": getattr(provider_config, "model", None),
+                "base_url": getattr(provider_config, "base_url", None),
+            }
+        metadata = dict(decision.metadata)
+        metadata.setdefault("provider", provider_metadata)
+        metadata.setdefault("llm_used", provider_metadata.get("provider_type") != "MockProvider")
+        return replace(decision, metadata=metadata)
 
 
 __all__ = ["AgentDecisionEngine"]

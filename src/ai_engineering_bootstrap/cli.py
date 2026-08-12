@@ -17,6 +17,7 @@ from ai_engineering_bootstrap.agent.planning import AgentPlanningService
 from ai_engineering_bootstrap.agent.provider import ProviderConfig, build_provider
 from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.audit.models import AuditReport, CheckStatus
+from ai_engineering_bootstrap.backend.server import serve
 from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
 from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.exceptions import BootstrapError
@@ -300,6 +301,15 @@ def execute() -> None:
     console.print(
         "\n[dim]Note: Real system modification handlers are not yet implemented.[/dim]"
     )
+
+
+@app.command()
+def serve_gui(
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8787, "--port", min=1, max=65535),
+) -> None:
+    """Run the stable backend API and web GUI."""
+    serve(host, port)
 
 
 @app.command()
