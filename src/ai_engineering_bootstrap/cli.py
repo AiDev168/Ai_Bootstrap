@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -11,12 +12,16 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from ai_engineering_bootstrap.agent.engine import AgentDecisionEngine
+from ai_engineering_bootstrap.agent.planning import AgentPlanningService
+from ai_engineering_bootstrap.agent.provider import ProviderConfig, build_provider
 from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.audit.models import AuditReport, CheckStatus
 from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
 from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.exceptions import BootstrapError
 from ai_engineering_bootstrap.executor import ExecutorEngine
+from ai_engineering_bootstrap.executor.capability import default_capability_registry
 from ai_engineering_bootstrap.generation import (
     default_project_generator,
     default_template_catalog,
@@ -31,6 +36,32 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+
+
+def _build_recovery_agent() -> AgentPlanningService | None:
+    """Build the optional LLM-backed recovery planner from environment settings."""
+    provider_type = os.getenv("AI_BOOTSTRAP_AGENT_PROVIDER", "").strip()
+    if not provider_type:
+        return None
+
+    config = ProviderConfig(
+        provider_type=provider_type,
+        model=os.getenv("AI_BOOTSTRAP_AGENT_MODEL"),
+        base_url=os.getenv("AI_BOOTSTRAP_AGENT_BASE_URL"),
+        api_key=os.getenv("AI_BOOTSTRAP_AGENT_API_KEY"),
+        timeout=int(os.getenv("AI_BOOTSTRAP_AGENT_TIMEOUT", "30")),
+        options={
+            "api_key_env": os.getenv("AI_BOOTSTRAP_AGENT_API_KEY_ENV", ""),
+            "temperature": float(os.getenv("AI_BOOTSTRAP_AGENT_TEMPERATURE", "0.1")),
+            "max_tokens": int(os.getenv("AI_BOOTSTRAP_AGENT_MAX_TOKENS", "700")),
+        },
+    )
+    provider = build_provider(config)
+    return AgentPlanningService(
+        AgentDecisionEngine(provider, default_capability_registry()),
+        PlannerEngine(),
+        default_capability_registry(),
+    )
 
 
 def _report_data(report: AuditReport) -> dict[str, Any]:
@@ -291,6 +322,7 @@ def run_pipeline(
         console.print("[yellow bold]⚠️ REAL EXECUTION MODE ACTIVE[/yellow bold]")
         console.print("Only pre-approved, non-destructive actions will run.\n")
     engine = PipelineEngine()
+    recovery_agent = _build_recovery_agent()
     approval_provider = None
     run_id = "cli-run"
     pending_approvals = None
@@ -309,6 +341,7 @@ def run_pipeline(
                 default=False,
             ),
             run_id=run_id,
+            agent_planning_service=recovery_agent,
         )
         result = bootstrap_result.pipeline_result
         if result is None:
@@ -319,6 +352,7 @@ def run_pipeline(
             approval_provider=approval_provider,
             pending_approvals=pending_approvals,
             run_id=run_id,
+            agent_planning_service=recovery_agent,
         )
     # 1. Audit
     r = result.audit_report.readiness

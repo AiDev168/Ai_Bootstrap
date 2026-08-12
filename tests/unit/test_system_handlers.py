@@ -5,10 +5,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from ai_engineering_bootstrap.executor.handlers.base import ExecutionContext
 from ai_engineering_bootstrap.executor.handlers.system_handlers import (
     InstallCursorRealHandler,
 )
-from ai_engineering_bootstrap.executor.handlers.base import ExecutionContext
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 from ai_engineering_bootstrap.executor.models import ExecutionStatus
 from ai_engineering_bootstrap.planner.models import ExecutionPlanAction
@@ -46,14 +46,36 @@ def test_cursor_resolves_official_deb_url_from_api() -> None:
     package_url = "https://downloads.cursor.com/production/client/linux/x64/deb/Cursor-3.13.0-build.deb"
     response = _Response({"downloadUrl": package_url})
 
+    handler = InstallCursorRealHandler()
     with patch(
         "ai_engineering_bootstrap.executor.handlers.system_handlers.urllib.request.urlopen",
         return_value=response,
     ) as opener:
-        resolved = InstallCursorRealHandler._resolve_download_url(api_url)
+        resolved = handler._resolve_download_url(api_url)
 
     assert resolved == package_url
-    opener.assert_called_once_with(api_url, timeout=60)
+    request = opener.call_args.args[0]
+    assert request.full_url == api_url
+    assert request.headers["User-agent"]
+    assert opener.call_args.kwargs["timeout"] == 30
+
+
+def test_cursor_prefers_official_deb_url() -> None:
+    api_url = InstallCursorRealHandler.API_URL.format(platform="linux-x64")
+    deb_url = "https://downloads.cursor.com/production/a/linux/x64/deb/cursor.deb"
+    response = _Response(
+        {
+            "downloadUrl": "https://downloads.cursor.com/production/a/linux/x64/Cursor.AppImage",
+            "debUrl": deb_url,
+        }
+    )
+
+    handler = InstallCursorRealHandler()
+    with patch(
+        "ai_engineering_bootstrap.executor.handlers.system_handlers.urllib.request.urlopen",
+        return_value=response,
+    ):
+        assert handler._resolve_download_url(api_url) == deb_url
 
 
 def test_cursor_rejects_untrusted_resolved_url() -> None:
@@ -65,7 +87,7 @@ def test_cursor_rejects_untrusted_resolved_url() -> None:
         return_value=response,
     ):
         try:
-            InstallCursorRealHandler._resolve_download_url(api_url)
+            InstallCursorRealHandler()._resolve_download_url(api_url)
         except RuntimeError as exc:
             assert "official Cursor download endpoint" in str(exc)
         else:

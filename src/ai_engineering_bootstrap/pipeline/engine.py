@@ -182,6 +182,57 @@ class PipelineEngine:
             if (record := policy.classify_failure(result)).failure_type != FailureType.NONE
         ]
 
+    @staticmethod
+    def _agent_recovery_context(
+        failures: list[FailureRecord],
+        report: AuditReport,
+    ) -> str:
+        """Build a bounded, evidence-based context for Agent recovery planning."""
+        lines = [
+            "Recover the engineering environment after execution failure.",
+            f"Audit health score: {report.readiness.health_score}.",
+            "Failures:",
+        ]
+        for failure in failures:
+            lines.append(
+                f"- action={failure.action_id}; type={failure.failure_type.value}; "
+                f"retryable={failure.is_retryable}; requires_replan={failure.requires_replan}; "
+                f"message={failure.message}; details={failure.details or {}}"
+            )
+        lines.append(
+            "Select only an existing capability that can safely remediate the observed failure. "
+            "Do not invent actions, commands, handlers, URLs, or capabilities."
+        )
+        return "\n".join(lines)
+
+    def _generate_recovery_plan(
+        self,
+        report: AuditReport,
+        failures: list[FailureRecord],
+        agent_planning_service: AgentPlanningService | None,
+        run_id: str,
+        evidence: ExecutionAuditService,
+    ) -> tuple[ExecutionPlan, AgentDecision | None]:
+        """Use the Agent for bounded recovery planning when explicitly configured."""
+        if agent_planning_service is not None:
+            context = self._agent_recovery_context(failures, report)
+            runtime_result = AgentRuntime(agent_planning_service).run(context, run_id)
+            candidate = runtime_result.planning.plan
+            if candidate.is_actionable:
+                evidence.record(
+                    "agent",
+                    "recovery_plan_generated",
+                    decision_id=runtime_result.planning.decision.decision_id,
+                    confidence=runtime_result.planning.decision.confidence,
+                )
+                return candidate, runtime_result.planning.decision
+            evidence.record(
+                "agent",
+                "recovery_plan_empty",
+                decision_id=runtime_result.planning.decision.decision_id,
+            )
+        return PlannerEngine().generate_plan(report), None
+
     def run(
         self,
         mode: ExecutionMode = ExecutionMode.SAFE,
@@ -304,7 +355,16 @@ class PipelineEngine:
             evidence.record("recovery", "replan_requested", replan_count=replan_count)
             current_report = default_audit_service().run()
             evidence.record("audit", "completed_after_failure", health_score=current_report.readiness.health_score)
-            candidate = planner.generate_plan(current_report)
+            recovery_decision = None
+            candidate, recovery_decision = self._generate_recovery_plan(
+                current_report,
+                failures,
+                agent_planning_service,
+                run_id,
+                evidence,
+            )
+            if recovery_decision is not None:
+                agent_decision = recovery_decision
             candidate_validation = validator.validate(candidate)
             evidence.record("replan_validation", "passed" if candidate_validation.is_valid else "failed")
             if not candidate_validation.is_valid:

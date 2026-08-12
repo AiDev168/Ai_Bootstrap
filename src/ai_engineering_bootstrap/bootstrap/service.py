@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from ai_engineering_bootstrap.agent.planning import AgentPlanningService
 from ai_engineering_bootstrap.approval.models import ApprovalRequest
 from ai_engineering_bootstrap.approval.provider import (
     ApprovalProvider,
@@ -65,6 +66,7 @@ class EnvironmentBootstrapService:
         run_id: str = "bootstrap-run",
         max_retry_attempts: int = 1,
         max_replans: int = 1,
+        agent_planning_service: AgentPlanningService | None = None,
     ) -> EnvironmentBootstrapResult:
         """Bootstrap each planned action in deterministic order."""
         discovery = self._pipeline.run(mode=ExecutionMode.SAFE, run_id=f"{run_id}-plan")
@@ -104,7 +106,8 @@ class EnvironmentBootstrapService:
                     run_id=action_run_id,
                     plan_override=single_plan,
                     max_retry_attempts=max_retry_attempts,
-                    max_replans=0,
+                    max_replans=max_replans,
+                    agent_planning_service=agent_planning_service,
                 )
                 last_result = pending
                 if not pending.is_pending_approval or not pending.approval_requests:
@@ -131,7 +134,8 @@ class EnvironmentBootstrapService:
                     run_id=action_run_id,
                     plan_override=single_plan,
                     max_retry_attempts=max_retry_attempts,
-                    max_replans=0,
+                    max_replans=max_replans,
+                    agent_planning_service=agent_planning_service,
                 )
             else:
                 result = self._pipeline.run(
@@ -139,7 +143,8 @@ class EnvironmentBootstrapService:
                     run_id=action_run_id,
                     plan_override=single_plan,
                     max_retry_attempts=max_retry_attempts,
-                    max_replans=0,
+                    max_replans=max_replans,
+                    agent_planning_service=agent_planning_service,
                 )
 
             last_result = result

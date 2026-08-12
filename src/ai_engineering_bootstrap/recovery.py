@@ -56,13 +56,17 @@ class RetryPolicy:
                 message="",
                 is_retryable=False,
                 requires_replan=False,
+                details=dict(result.details),
             )
 
         msg = result.message.lower()
-        details = result.details if isinstance(result.details, dict) else {}
-        replan_hint = bool(details.get("replan_recommended"))
+        details = result.details
 
-        if "policy" in msg or "denied" in msg:
+        if details.get("replan_recommended") is True:
+            f_type = FailureType.PERMANENT
+            retryable = False
+            replan = True
+        elif "policy" in msg or "denied" in msg:
             f_type = FailureType.POLICY_DENIED
             retryable = False
             replan = False
@@ -92,8 +96,8 @@ class RetryPolicy:
             failure_type=f_type,
             message=result.message,
             is_retryable=retryable,
-            requires_replan=replan or replan_hint,
-            details=details,
+            requires_replan=replan,
+            details=dict(result.details),
         )
 
     def decide(self, failure: FailureRecord, current_attempt: int) -> RecoveryDecision:

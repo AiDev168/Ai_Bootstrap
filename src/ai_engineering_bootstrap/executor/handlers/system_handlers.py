@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -176,13 +177,54 @@ class InstallCursorRealHandler(_UbuntuAptHandler):
         self._downloader = downloader or self._download
 
     @staticmethod
-    def _download(url: str, destination: Path) -> None:
-        with (
-            urllib.request.urlopen(url, timeout=60) as response,
-            destination.open("wb") as handle,
-        ):
+    def _open_url(url: str, timeout: float):
+        request = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/151.0 Safari/537.36"
+                ),
+                "Accept": "application/json,application/octet-stream,*/*",
+            },
+        )
+        return urllib.request.urlopen(request, timeout=timeout)
+
+    @classmethod
+    def _download(cls, url: str, destination: Path) -> None:
+        with cls._open_url(url, 60) as response, destination.open("wb") as handle:
             while chunk := response.read(1024 * 1024):
                 handle.write(chunk)
+
+    @classmethod
+    def _fetch_metadata(cls, url: str) -> dict[str, object]:
+        with cls._open_url(url, 30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        if not isinstance(data, dict):
+            raise TypeError("Cursor download metadata is not a JSON object.")
+        return data
+
+    @staticmethod
+    def _approved_deb_url(value: object) -> str | None:
+        if not isinstance(value, str) or not value.startswith("https://"):
+            return None
+        parsed = urllib.parse.urlparse(value)
+        if parsed.netloc != "downloads.cursor.com":
+            return None
+        if not parsed.path.lower().endswith(".deb"):
+            return None
+        return value
+
+
+    def _resolve_download_url(self, metadata_url: str) -> str:
+        metadata = self._fetch_metadata(metadata_url)
+        for key in ("debUrl", "downloadUrl"):
+            resolved = self._approved_deb_url(metadata.get(key))
+            if resolved:
+                return resolved
+        raise RuntimeError(
+            "Cursor metadata did not provide an approved official DEB package or official Cursor download endpoint."
+        )
 
     @staticmethod
     def _cursor_platform() -> str:
@@ -190,28 +232,6 @@ class InstallCursorRealHandler(_UbuntuAptHandler):
         if machine in {"aarch64", "arm64"}:
             return "linux-arm64"
         return "linux-x64"
-
-    @staticmethod
-    def _resolve_download_url(api_url: str) -> str:
-        try:
-            with urllib.request.urlopen(api_url, timeout=60) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except (OSError, urllib.error.URLError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-            raise RuntimeError(f"Cursor download metadata request failed: {exc}") from exc
-
-        download_url = payload.get("downloadUrl")
-        if not isinstance(download_url, str) or not download_url:
-            raise RuntimeError("Cursor download metadata did not contain a downloadUrl.")
-
-        if not download_url.startswith("https://downloads.cursor.com/"):
-            raise RuntimeError(
-                "Cursor download URL is not an approved official Cursor download endpoint."
-            )
-
-        if "/deb/" not in download_url or ".deb" not in download_url.rsplit("/", 1)[-1]:
-            raise RuntimeError("Cursor download metadata did not provide an official DEB package.")
-
-        return download_url
 
     def execute(
         self, action: ExecutionPlanAction, context: ExecutionContext
@@ -226,23 +246,23 @@ class InstallCursorRealHandler(_UbuntuAptHandler):
         error = self._platform_error(action)
         if error:
             return error
-        url = str(
+        metadata_url = str(
             action.context.get(
                 "download_url",
                 self.API_URL.format(platform=self._cursor_platform()),
             )
         )
-        if not url.startswith("https://www.cursor.com/api/download?"):
+        if not metadata_url.startswith("https://www.cursor.com/api/download?"):
             return self._result(
                 action,
                 ExecutionStatus.FAILED,
-                "Cursor download URL is not an approved official Cursor endpoint.",
+                "Cursor metadata URL is not an approved official Cursor endpoint.",
             )
         try:
-            package_url = self._resolve_download_url(url)
+            deb_url = self._resolve_download_url(metadata_url)
             with tempfile.TemporaryDirectory(prefix="cursor-bootstrap-") as temp_dir:
                 deb = Path(temp_dir) / "cursor.deb"
-                self._downloader(package_url, deb)
+                self._downloader(deb_url, deb)
                 if not deb.is_file() or deb.stat().st_size == 0:
                     return self._result(
                         action,
@@ -252,7 +272,14 @@ class InstallCursorRealHandler(_UbuntuAptHandler):
                 result = self._run(
                     ("sudo", "apt-get", "install", "-y", str(deb)), 900
                 )
-        except (OSError, subprocess.SubprocessError, urllib.error.URLError, RuntimeError) as exc:
+        except RuntimeError as exc:
+            return self._result(
+                action,
+                ExecutionStatus.FAILED,
+                f"Cursor installation failed: {exc}",
+                replan_recommended=True,
+            )
+        except (OSError, subprocess.SubprocessError, urllib.error.URLError) as exc:
             return self._result(
                 action, ExecutionStatus.FAILED, f"Cursor installation failed: {exc}"
             )
