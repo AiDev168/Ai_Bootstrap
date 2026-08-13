@@ -37,6 +37,22 @@ from .installation_strategies import (
     InstallationResult,
     get_current_platform,
 )
+from .session_models import (
+    EnvironmentSession,
+    SessionStatus,
+    AgentDecision,
+    SessionEvent,
+    ActionApprovalState,
+    ExecutionEvidence,
+    RecoveryRecord,
+)
+from .session_store import (
+    SessionStore,
+    InMemorySessionStore,
+    JSONSessionStore,
+    get_session_store,
+    set_session_store,
+)
 
 __all__ = [
     # Models
@@ -73,4 +89,18 @@ __all__ = [
     "ArtifactMetadata",
     "InstallationResult",
     "get_current_platform",
+    # Session
+    "EnvironmentSession",
+    "SessionStatus",
+    "AgentDecision",
+    "SessionEvent",
+    "ActionApprovalState",
+    "ExecutionEvidence",
+    "RecoveryRecord",
+    # Session Store
+    "SessionStore",
+    "InMemorySessionStore",
+    "JSONSessionStore",
+    "get_session_store",
+    "set_session_store",
 ]
