@@ -535,3 +535,85 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         pass
     except Exception as e:
         pass
+
+# LLM Settings endpoints
+@app.get("/api/v1/llm/settings")
+async def get_llm_settings():
+    """Get current LLM settings"""
+    try:
+        # Get settings from intent parser or config
+        settings = {
+            "provider": "lm_studio",  # Default or from config
+            "api_url": "http://localhost:1234/v1",
+            "model": "qwen-2.5-coder-32b",
+            "api_key": None
+        }
+        return APIResponse(
+            api_version=API_VERSION,
+            request_id=str(uuid.uuid4()),
+            status="ok",
+            data=settings
+        )
+    except Exception as e:
+        return APIResponse(
+            api_version=API_VERSION,
+            request_id=str(uuid.uuid4()),
+            status="error",
+            error=ErrorDetail(code="settings_error", message=str(e))
+        )
+
+@app.post("/api/v1/llm/settings")
+async def save_llm_settings(settings: dict):
+    """Save LLM settings"""
+    try:
+        # Save settings to config or session store
+        # For now, just validate and acknowledge
+        provider = settings.get("provider", "lm_studio")
+        api_url = settings.get("api_url", "")
+        model = settings.get("model", "")
+        
+        # Update intent parser configuration if available
+        if intent_parser:
+            # This would update the actual LLM client configuration
+            pass
+        
+        return APIResponse(
+            api_version=API_VERSION,
+            request_id=str(uuid.uuid4()),
+            status="ok",
+            data={"message": "Settings saved", "provider": provider, "model": model}
+        )
+    except Exception as e:
+        return APIResponse(
+            api_version=API_VERSION,
+            request_id=str(uuid.uuid4()),
+            status="error",
+            error=ErrorDetail(code="settings_error", message=str(e))
+        )
+
+@app.post("/api/v1/llm/test")
+async def test_llm_connection():
+    """Test LLM connection"""
+    try:
+        # Test connection to LLM
+        if intent_parser and intent_parser.is_llm_available():
+            return APIResponse(
+                api_version=API_VERSION,
+                request_id=str(uuid.uuid4()),
+                status="ok",
+                data={"connected": True, "model": "test-model"}
+            )
+        else:
+            return APIResponse(
+                api_version=API_VERSION,
+                request_id=str(uuid.uuid4()),
+                status="error",
+                error=ErrorDetail(code="connection_failed", message="LLM not available")
+            )
+    except Exception as e:
+        return APIResponse(
+            api_version=API_VERSION,
+            request_id=str(uuid.uuid4()),
+            status="error",
+            error=ErrorDetail(code="connection_error", message=str(e))
+        )

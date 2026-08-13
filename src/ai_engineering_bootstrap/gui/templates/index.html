@@ -85,6 +85,7 @@
         <div class="tabs">
             <button class="tab active" onclick="showTab('dashboard')">Dashboard</button>
             <button class="tab" onclick="showTab('session')">Session Details</button>
+            <button class="tab" onclick="showTab('llm-settings')">LLM Settings</button>
         </div>
 
         <!-- Dashboard Tab -->
@@ -407,6 +408,173 @@
         loadHealth();
         loadSessions();
         setInterval(loadHealth, 30000);
+    </script>
+
+    <!-- LLM Settings Tab -->
+    <div id="llm-settings" class="tab-content">
+        <div class="card">
+            <h2>LLM Configuration</h2>
+            <form id="llm-settings-form" onsubmit="saveLLMSettings(event)">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">LLM Provider</label>
+                    <select id="llm-provider" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 1em;">
+                        <option value="lm_studio">LM Studio</option>
+                        <option value="ollama">Ollama</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">API URL</label>
+                    <input type="text" id="llm-api-url" placeholder="http://localhost:1234/v1" 
+                           style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 1em;">
+                    <small style="color: #7f8c8d;">Example: http://localhost:1234/v1 for LM Studio</small>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">Model Name</label>
+                    <input type="text" id="llm-model" placeholder="qwen-2.5-coder-32b" 
+                           style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 1em;">
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">API Key (Optional)</label>
+                    <input type="password" id="llm-api-key" placeholder="sk-..." 
+                           style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 1em;">
+                </div>
+                
+                <button type="submit" class="btn-success">Save LLM Settings</button>
+                <button type="button" onclick="testLLMConnection()" style="margin-left: 10px;">Test Connection</button>
+            </form>
+            
+            <div id="llm-test-result" style="margin-top: 20px;" class="hidden"></div>
+        </div>
+        
+        <div class="card">
+            <h2>Current LLM Status</h2>
+            <div id="llm-status-grid" class="health-grid">
+                <div class="loading">Loading LLM status...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // LLM Settings functions
+        async function loadLLMSettings() {
+            try {
+                const response = await fetch('/api/v1/llm/settings');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.data) {
+                        document.getElementById('llm-provider').value = data.data.provider || 'lm_studio';
+                        document.getElementById('llm-api-url').value = data.data.api_url || '';
+                        document.getElementById('llm-model').value = data.data.model || '';
+                        document.getElementById('llm-api-key').value = data.data.api_key || '';
+                    }
+                }
+            } catch (e) {
+                console.log('Could not load LLM settings:', e);
+            }
+        }
+        
+        async function saveLLMSettings(event) {
+            event.preventDefault();
+            
+            const settings = {
+                provider: document.getElementById('llm-provider').value,
+                api_url: document.getElementById('llm-api-url').value,
+                model: document.getElementById('llm-model').value,
+                api_key: document.getElementById('llm-api-key').value
+            };
+            
+            try {
+                const response = await fetch('/api/v1/llm/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+                
+                const data = await response.json();
+                if (data.status === 'ok') {
+                    showSuccess('LLM settings saved successfully!');
+                    loadLLMStatus();
+                } else {
+                    showError(data.error?.message || 'Failed to save settings');
+                }
+            } catch (e) {
+                showError('Failed to save settings: ' + e.message);
+            }
+        }
+        
+        async function testLLMConnection() {
+            const resultDiv = document.getElementById('llm-test-result');
+            resultDiv.className = 'loading';
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = 'Testing connection...';
+            
+            try {
+                const response = await fetch('/api/v1/llm/test', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = '✅ LLM connection successful!<br>' + 
+                                         (data.data?.model ? `Model: ${data.data.model}` : '');
+                } else {
+                    resultDiv.className = 'error';
+                    resultDiv.innerHTML = '❌ LLM connection failed<br>' + 
+                                         (data.error?.message || 'Unknown error');
+                }
+            } catch (e) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = '❌ Connection error: ' + e.message;
+            }
+        }
+        
+        async function loadLLMStatus() {
+            try {
+                const response = await fetch('/api/v1/health');
+                const data = await response.json();
+                
+                const grid = document.getElementById('llm-status-grid');
+                if (data.data) {
+                    grid.innerHTML = `
+                        <div class="health-item">
+                            <label>LLM Available</label>
+                            <div class="value ${data.data.llm_available ? 'status-healthy' : 'status-unhealthy'}">
+                                ${data.data.llm_available ? 'Yes ✅' : 'No ❌'}
+                            </div>
+                        </div>
+                        <div class="health-item">
+                            <label>Provider</label>
+                            <div class="value">${data.data.llm_provider || 'Not configured'}</div>
+                        </div>
+                        <div class="health-item">
+                            <label>Model</label>
+                            <div class="value">${data.data.llm_model || 'Not configured'}</div>
+                        </div>
+                        <div class="health-item">
+                            <label>API URL</label>
+                            <div class="value" style="font-size: 0.9em;">${data.data.llm_api_url || 'Not configured'}</div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.log('Could not load LLM status:', e);
+            }
+        }
+        
+        // Load LLM settings when tab is shown
+        const originalShowTab = showTab;
+        showTab = function(tabName) {
+            originalShowTab(tabName);
+            if (tabName === 'llm-settings') {
+                loadLLMSettings();
+                loadLLMStatus();
+            }
+        };
     </script>
 </body>
 </html>
