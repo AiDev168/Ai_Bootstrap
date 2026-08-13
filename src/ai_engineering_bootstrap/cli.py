@@ -113,13 +113,16 @@ def _render_table(report: AuditReport) -> None:
 
 @app.command()
 def audit(
-    output_format: Literal["table", "json"] = typer.Option(
+    output_format: str = typer.Option(
         "table",
         "--format",
         help="Output format.",
     ),
 ) -> None:
     """Run a read-only audit of the local engineering environment."""
+    if output_format not in ("table", "json"):
+        typer.echo(f"Error: Invalid format '{output_format}'. Use 'table' or 'json'.", err=True)
+        raise typer.Exit(code=1)
     report = default_audit_service().run()
     if output_format == "json":
         exit_code = 0 if report.readiness.development_ready else 1
