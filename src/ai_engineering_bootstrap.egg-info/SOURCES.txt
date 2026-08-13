@@ -36,6 +36,7 @@ src/ai_engineering_bootstrap/audit/models.py
 src/ai_engineering_bootstrap/audit/recommendations.py
 src/ai_engineering_bootstrap/audit/service.py
 src/ai_engineering_bootstrap/backend/__init__.py
+src/ai_engineering_bootstrap/backend/api.py
 src/ai_engineering_bootstrap/backend/server.py
 src/ai_engineering_bootstrap/backend/service.py
 src/ai_engineering_bootstrap/bootstrap/__init__.py
