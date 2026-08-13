@@ -8,6 +8,7 @@ from typing import Any
 
 from ai_engineering_bootstrap.agent.provider import LLMProvider, ProviderConfig
 from ai_engineering_bootstrap.environment.models import EnvironmentRequest
+from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 
 
 @dataclass
@@ -51,22 +52,29 @@ class ParsedIntent:
 class IntentParser:
     """Parse natural language into structured environment requests."""
 
-    def __init__(self, provider: LLMProvider | None = None) -> None:
+    def __init__(self, provider: LLMProvider | None = None, tool_catalog: ToolCatalog | None = None) -> None:
         self.provider = provider
-        self._known_tools = {
-            "python",
-            "git",
-            "cursor",
-            "docker",
-            "ruff",
-            "black",
-            "pytest",
-            "github-cli",
-            "nodejs",
-            "npm",
-            "uv",
-            "poetry",
-        }
+        self.tool_catalog = tool_catalog
+        self._known_tools = set()
+        if tool_catalog:
+            for tool in tool_catalog.list_tools():
+                self._known_tools.add(tool.tool_id)
+        else:
+            # Fallback to default known tools
+            self._known_tools = {
+                "python",
+                "git",
+                "cursor",
+                "docker",
+                "ruff",
+                "black",
+                "pytest",
+                "github-cli",
+                "nodejs",
+                "npm",
+                "uv",
+                "poetry",
+            }
         self._known_frameworks = {
             "fastapi",
             "flask",

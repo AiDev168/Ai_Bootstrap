@@ -19,9 +19,10 @@ from ai_engineering_bootstrap.environment.models import (
 )
 from ai_engineering_bootstrap.environment.session_store import SessionStore
 from ai_engineering_bootstrap.environment.reconciler import EnvironmentReconciler
+from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser
 from ai_engineering_bootstrap.agent.strategy_planner import StrategyPlanner
-from ai_engineering_bootstrap.audit import AuditService
+from ai_engineering_bootstrap.audit import default_audit_service
 
 
 # Pydantic Models for API
@@ -63,11 +64,12 @@ app.add_middleware(
 )
 
 # Initialize services
+tool_catalog = ToolCatalog()
 session_store = SessionStore()
 reconciler = EnvironmentReconciler()
-intent_parser = IntentParser()
-strategy_planner = StrategyPlanner()
-audit_service = AuditService()
+intent_parser = IntentParser(tool_catalog=tool_catalog)
+strategy_planner = StrategyPlanner(tool_catalog=tool_catalog)
+audit_service = default_audit_service()
 
 
 def make_response(request_id: str, status: str, data: Optional[Dict] = None, error: Optional[Dict] = None) -> dict:
