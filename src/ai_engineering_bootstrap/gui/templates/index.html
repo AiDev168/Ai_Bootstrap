@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Engineering Bootstrap - Environment Orchestrator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        .slide-enter-active, .slide-leave-active { transition: all 0.3s ease; }
+        .slide-enter-from, .slide-leave-to { transform: translateX(30px); opacity: 0; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; }
+        .card { @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6; }
+        .btn-primary { @apply bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors; }
+        .btn-success { @apply bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors; }
+        .btn-danger { @apply bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors; }
+        .btn-secondary { @apply bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium transition-colors; }
+        .status-badge { @apply px-3 py-1 rounded-full text-xs font-semibold; }
+        .status-healthy { @apply bg-green-100 text-green-800; }
+        .status-unhealthy { @apply bg-red-100 text-red-800; }
+        .status-pending { @apply bg-yellow-100 text-yellow-800; }
+        .status-running { @apply bg-blue-100 text-blue-800; }
+        .status-completed { @apply bg-green-100 text-green-800; }
+        .status-failed { @apply bg-red-100 text-red-800; }
+        .tool-tag { @apply inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-gray-100 text-gray-700 mr-2 mb-2; }
+        .action-card { @apply border-l-4 pl-4 py-3 mb-4 bg-gray-50 rounded-r-lg; }
+        .action-approved { @apply border-green-500 bg-green-50; }
+        .action-rejected { @apply border-red-500 bg-red-50; }
+        .action-skipped { @apply border-gray-400 bg-gray-100; }
+        .action-pending { @apply border-yellow-500 bg-yellow-50; }
+        .timeline-item { @apply flex items-start mb-4; }
+        .timeline-dot { @apply w-3 h-3 rounded-full mt-1 mr-3 flex-shrink-0; }
+        .dot-audit { @apply bg-blue-500; }
+        .dot-plan { @apply bg-purple-500; }
+        .dot-approve { @apply bg-yellow-500; }
+        .dot-execute { @apply bg-green-500; }
+        .dot-verify { @apply bg-teal-500; }
+        .dot-complete { @apply bg-green-600; }
+        .dot-fail { @apply bg-red-500; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="app" class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Header -->
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">AI Engineering Bootstrap</h1>
+            <p class="text-gray-600 text-lg">Environment Orchestrator</p>
+        </header>
+
+        <!-- System Health -->
+        <section class="card mb-8">
+            <h2 class="text-xl font-semibold mb-4">System Health</h2>
+            <div v-if="loadingHealth" class="text-gray-500">Loading...</div>
+            <div v-else-if="healthError" class="text-red-600">{{ healthError }}</div>
+            <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="flex items-center">
+                    <span class="font-medium mr-2">Service:</span>
+                    <span :class="['status-badge', health.data.status === 'healthy' ? 'status-healthy' : 'status-unhealthy']">
+                        {{ health.data.status }}
+                    </span>
+                </div>
+                <div class="flex items-center">
+                    <span class="font-medium mr-2">LLM Available:</span>
+                    <span :class="['status-badge', health.data.llm_available ? 'status-healthy' : 'status-pending']">
+                        {{ health.data.llm_available ? 'Yes' : 'No' }}
+                    </span>
+                </div>
+                <div class="flex items-center">
+                    <span class="font-medium mr-2">API Version:</span>
+                    <span class="text-gray-700">{{ health.data.service }}</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Create Environment Request -->
+        <section class="card mb-8">
+            <h2 class="text-xl font-semibold mb-4">Create Environment Request</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Describe your environment goal
+                    </label>
+                    <textarea 
+                        v-model="environmentGoal"
+                        placeholder="e.g., Prepare this machine for Python AI development with Cursor, Docker, and Ruff"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        rows="4"
+                    ></textarea>
+                </div>
+                <button @click="createSession" :disabled="creating || !environmentGoal.trim()" class="btn-primary">
+                    {{ creating ? 'Creating...' : 'Create Session' }}
+                </button>
+                <div v-if="createError" class="text-red-600 mt-2">{{ createError }}</div>
+                <div v-if="createdSessionId" class="text-green-600 mt-2">
+                    Session created: <strong>{{ createdSessionId }}</strong>
+                    <button @click="viewSession(createdSessionId)" class="ml-4 text-blue-600 underline">View Details</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Active Sessions -->
+        <section class="card">
+            <h2 class="text-xl font-semibold mb-4">Active Sessions</h2>
+            <div v-if="loadingSessions" class="text-gray-500">Loading sessions...</div>
+            <div v-else-if="sessionsError" class="text-red-600">{{ sessionsError }}</div>
+            <div v-else-if="sessions.length === 0" class="text-gray-500">No active sessions</div>
+            <div v-else class="space-y-4">
+                <div v-for="session in sessions" :key="session.session_id" class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h3 class="font-semibold text-lg">{{ session.request.natural_language_goal || 'Untitled Session' }}</h3>
+                            <p class="text-sm text-gray-500">ID: {{ session.session_id }}</p>
+                        </div>
+                        <span :class="['status-badge', getStatusClass(session.status)]">
+                            {{ session.status }}
+                        </span>
+                    </div>
+                    <div class="flex items-center space-x-4 mt-3">
+                        <button @click="viewSession(session.session_id)" class="text-blue-600 hover:underline text-sm font-medium">View Details</button>
+                        <button v-if="session.status === 'AWAITING_APPROVAL'" @click="startSession(session.session_id)" class="text-green-600 hover:underline text-sm font-medium">Start Execution</button>
+                        <span class="text-sm text-gray-500">Created: {{ new Date(session.created_at).toLocaleString() }}</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Session Detail View (Modal) -->
+        <div v-if="currentSession" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
+                    <h2 class="text-2xl font-bold">Session Details</h2>
+                    <button @click="closeSession" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                
+                <div class="p-6">
+                    <!-- Session Info -->
+                    <div class="mb-6">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="text-lg font-semibold">{{ currentSession.request.natural_language_goal }}</h3>
+                            <span :class="['status-badge', getStatusClass(currentSession.status)]">{{ currentSession.status }}</span>
+                        </div>
+                        <p class="text-sm text-gray-500">Session ID: {{ currentSession.session_id }}</p>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="border-b border-gray-200 mb-6">
+                        <nav class="-mb-px flex space-x-8">
+                            <button @click="activeTab = 'delta'" :class="['pb-4 px-1 border-b-2 font-medium text-sm', activeTab === 'delta' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">Environment Delta</button>
+                            <button @click="activeTab = 'plan'" :class="['pb-4 px-1 border-b-2 font-medium text-sm', activeTab === 'plan' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">Execution Plan</button>
+                            <button @click="activeTab = 'timeline'" :class="['pb-4 px-1 border-b-2 font-medium text-sm', activeTab === 'timeline' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">Timeline</button>
+                            <button @click="activeTab = 'agent'" :class="['pb-4 px-1 border-b-2 font-medium text-sm', activeTab === 'agent' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700']">Agent Insights</button>
+                        </nav>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <transition name="fade" mode="out-in">
+                        <!-- Delta Tab -->
+                        <div v-if="activeTab === 'delta'" key="delta">
+                            <h4 class="font-semibold mb-4">Environment Changes Required</h4>
+                            <div v-if="loadingDelta" class="text-gray-500">Loading delta...</div>
+                            <div v-else-if="deltaError" class="text-red-600">{{ deltaError }}</div>
+                            <div v-else-if="!sessionDelta || sessionDelta.tool_deltas.length === 0" class="text-gray-500">No changes required</div>
+                            <div v-else class="space-y-4">
+                                <div v-for="delta in sessionDelta.tool_deltas" :key="delta.tool_id" class="action-card" :class="getActionClass(delta.action)">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <h5 class="font-semibold">{{ getToolName(delta.tool_id) }}</h5>
+                                            <p class="text-sm text-gray-600">{{ getActionDescription(delta.action) }}</p>
+                                            <p v-if="delta.actual_version || delta.desired_version" class="text-xs text-gray-500 mt-1">
+                                                <span v-if="delta.actual_version">Current: {{ delta.actual_version }}</span>
+                                                <span v-if="delta.actual_version && delta.desired_version"> → </span>
+                                                <span v-if="delta.desired_version">Target: {{ delta.desired_version }}</span>
+                                            </p>
+                                        </div>
+                                        <span :class="['status-badge', getActionClass(delta.action)]">{{ delta.action }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Plan Tab -->
+                        <div v-if="activeTab === 'plan'" key="plan">
+                            <h4 class="font-semibold mb-4">Execution Plan</h4>
+                            <div v-if="loadingPlan" class="text-gray-500">Loading plan...</div>
+                            <div v-else-if="planError" class="text-red-600">{{ planError }}</div>
+                            <div v-else-if="!executionPlan || executionPlan.actions.length === 0" class="text-gray-500">No actions planned</div>
+                            <div v-else class="space-y-4">
+                                <div v-for="action in executionPlan.actions" :key="action.action_id" class="action-card" :class="getActionClass(action.status)">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h5 class="font-semibold">{{ action.capability }}</h5>
+                                            <p class="text-sm text-gray-600">{{ action.description }}</p>
+                                            <div class="mt-2 text-xs text-gray-500 space-y-1">
+                                                <p><strong>Strategy:</strong> {{ action.strategy || 'default' }}</p>
+                                                <p><strong>Risk:</strong> {{ action.risk_level || 'low' }}</p>
+                                                <p><strong>Privilege:</strong> {{ action.privilege_level || 'user' }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            <span :class="['status-badge', getActionClass(action.status)]">{{ action.status || 'PENDING' }}</span>
+                                        </div>
+                                    </div>
+                                    <div v-if="action.status === 'PENDING'" class="flex space-x-2">
+                                        <button @click="approveAction(action.action_id, 'APPROVE')" class="btn-success text-sm">Approve</button>
+                                        <button @click="approveAction(action.action_id, 'SKIP')" class="btn-secondary text-sm">Skip</button>
+                                        <button @click="approveAction(action.action_id, 'REJECT')" class="btn-danger text-sm">Reject</button>
+                                    </div>
+                                    <div v-else-if="action.status === 'COMPLETED'" class="text-green-600 text-sm">✓ Completed successfully</div>
+                                    <div v-else-if="action.status === 'FAILED'" class="text-red-600 text-sm">✗ Failed: {{ action.error_message || 'Unknown error' }}</div>
+                                    <div v-else-if="action.status === 'SKIPPED'" class="text-gray-600 text-sm">⊘ Skipped by user</div>
+                                    <div v-else-if="action.status === 'REJECTED'" class="text-red-600 text-sm">✗ Rejected by user</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Timeline Tab -->
+                        <div v-if="activeTab === 'timeline'" key="timeline">
+                            <h4 class="font-semibold mb-4">Execution Timeline</h4>
+                            <div v-if="loadingEvents" class="text-gray-500">Loading events...</div>
+                            <div v-else-if="eventsError" class="text-red-600">{{ eventsError }}</div>
+                            <div v-else-if="!sessionEvents || sessionEvents.events.length === 0" class="text-gray-500">No events yet</div>
+                            <div v-else class="space-y-4">
+                                <div v-for="(event, index) in sessionEvents.events" :key="index" class="timeline-item">
+                                    <div :class="['timeline-dot', getDotClass(event.event_type)]"></div>
+                                    <div>
+                                        <p class="font-medium">{{ formatEventType(event.event_type) }}</p>
+                                        <p class="text-sm text-gray-600">{{ event.message || event.details }}</p>
+                                        <p class="text-xs text-gray-400">{{ new Date(event.timestamp).toLocaleString() }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Agent Tab -->
+                        <div v-if="activeTab === 'agent'" key="agent">
+                            <h4 class="font-semibold mb-4">Agent Insights</h4>
+                            <div v-if="loadingAgent" class="text-gray-500">Loading agent decisions...</div>
+                            <div v-else-if="agentError" class="text-red-600">{{ agentError }}</div>
+                            <div v-else-if="!agentDecisions || agentDecisions.decisions.length === 0" class="text-gray-500">No agent decisions yet</div>
+                            <div v-else class="space-y-4">
+                                <div v-for="decision in agentDecisions.decisions" :key="decision.decision_id" class="border border-gray-200 rounded-lg p-4 bg-blue-50">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <h5 class="font-semibold">{{ decision.decision_type }}</h5>
+                                        <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">Confidence: {{ (decision.confidence * 100).toFixed(0) }}%</span>
+                                    </div>
+                                    <p class="text-sm text-gray-700 mb-2">{{ decision.reasoning_summary }}</p>
+                                    <div class="text-xs text-gray-500 space-y-1">
+                                        <p><strong>Provider:</strong> {{ decision.provider || 'N/A' }}</p>
+                                        <p><strong>Model:</strong> {{ decision.model || 'N/A' }}</p>
+                                        <p><strong>Capabilities:</strong> {{ decision.selected_capabilities?.join(', ') || 'N/A' }}</p>
+                                        <p><strong>Strategy:</strong> {{ decision.selected_strategy || 'N/A' }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </transition>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    API_BASE: 'http://localhost:8000/api/v1',
+                    health: { data: { status: 'unknown', llm_available: false, service: 'unknown' } },
+                    loadingHealth: true,
+                    healthError: null,
+                    environmentGoal: '',
+                    creating: false,
+                    createError: null,
+                    createdSessionId: null,
+                    sessions: [],
+                    loadingSessions: true,
+                    sessionsError: null,
+                    currentSession: null,
+                    activeTab: 'delta',
+                    sessionDelta: null,
+                    loadingDelta: false,
+                    deltaError: null,
+                    executionPlan: null,
+                    loadingPlan: false,
+                    planError: null,
+                    sessionEvents: null,
+                    loadingEvents: false,
+                    eventsError: null,
+                    agentDecisions: null,
+                    loadingAgent: false,
+                    agentError: null
+                };
+            },
+            async mounted() {
+                await this.loadHealth();
+                await this.loadSessions();
+                setInterval(() => this.loadSessions(), 5000);
+            },
+            methods: {
+                async loadHealth() {
+                    try {
+                        const res = await fetch(`${this.API_BASE}/health`);
+                        if (!res.ok) throw new Error('Failed to load health');
+                        this.health = await res.json();
+                        this.healthError = null;
+                    } catch (e) {
+                        this.healthError = e.message;
+                    } finally {
+                        this.loadingHealth = false;
+                    }
+                },
+                async createSession() {
+                    this.creating = true;
+                    this.createError = null;
+                    this.createdSessionId = null;
+                    try {
+                        const res = await fetch(`${this.API_BASE}/sessions`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                project_path: '/tmp/project',
+                                natural_language_goal: this.environmentGoal,
+                                required_tools: [],
+                                optional_tools: [],
+                                project_dependencies: []
+                            })
+                        });
+                        if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.error?.message || 'Failed to create session');
+                        }
+                        const result = await res.json();
+                        this.createdSessionId = result.data.session_id;
+                        await this.loadSessions();
+                    } catch (e) {
+                        this.createError = e.message;
+                    } finally {
+                        this.creating = false;
+                    }
+                },
+                async loadSessions() {
+                    try {
+                        const res = await fetch(`${this.API_BASE}/sessions`);
+                        if (!res.ok) throw new Error('Failed to load sessions');
+                        const result = await res.json();
+                        this.sessions = result.data.sessions || [];
+                        this.sessionsError = null;
+                    } catch (e) {
+                        this.sessionsError = e.message;
+                    } finally {
+                        this.loadingSessions = false;
+                    }
+                },
+                async viewSession(sessionId) {
+                    this.currentSession = this.sessions.find(s => s.session_id === sessionId);
+                    if (!this.currentSession) return;
+                    this.activeTab = 'delta';
+                    await this.loadDelta(sessionId);
+                    await this.loadPlan(sessionId);
+                    await this.loadEvents(sessionId);
+                    await this.loadAgent(sessionId);
+                },
+                closeSession() {
+                    this.currentSession = null;
+                },
+                async startSession(sessionId) {
+                    try {
+                        const res = await fetch(`${this.API_BASE}/sessions/${sessionId}/start`, { method: 'POST' });
+                        if (!res.ok) throw new Error('Failed to start session');
+                        await this.loadSessions();
+                        alert('Session started successfully');
+                    } catch (e) {
+                        alert('Error: ' + e.message);
+                    }
+                },
+                async loadDelta(sessionId) {
+                    this.loadingDelta = true;
+                    this.deltaError = null;
+                    try {
+                        const res = await fetch(`${this.API_BASE}/sessions/${sessionId}/state`);
+                        if (!res.ok) throw new Error('Failed to load delta');
+                        this.sessionDelta = await res.json();
+                    } catch (e) {
+                        this.deltaError = e.message;
+                    } finally {
+                        this.loadingDelta = false;
+                    }
+                },
+                async loadPlan(sessionId) {
+                    this.loadingPlan = true;
+                    this.planError = null;
+                    try {
+                        const res = await fetch(`${this.API_BASE}/sessions/${sessionId}/plan`);
+                        if (!res.ok) throw new Error('Failed to load plan');
+                        this.executionPlan = await res.json();
+                    } catch (e) {
+                        this.planError = e.message;
+                    } finally {
+                        this.loadingPlan = false;
+                    }
+                },
+                async loadEvents(sessionId) {
+                    this.loadingEvents = true;
+                    this.eventsError = null;
+                    try {
+                        const res = await fetch(`${this.API_BASE}/sessions/${sessionId}/events`);
+                        if (!res.ok) throw new Error('Failed to load events');
+                        this.sessionEvents = await res.json();
+                    } catch (e) {
+                        this.eventsError = e.message;
+                    } finally {
+                        this.loadingEvents = false;
+                    }
+                },
+                async loadAgent(sessionId) {
+                    this.loadingAgent = true;
+                    this.agentError = null;
+                    try {
+                        const res = await fetch(`${this.API_BASE}/sessions/${sessionId}/agent-decisions`);
+                        if (!res.ok) throw new Error('Failed to load agent decisions');
+                        this.agentDecisions = await res.json();
+                    } catch (e) {
+                        this.agentError = e.message;
+                    } finally {
+                        this.loadingAgent = false;
+                    }
+                },
+                async approveAction(actionId, decision) {
+                    if (!this.currentSession) return;
+                    try {
+                        const res = await fetch(`${this.API_BASE}/sessions/${this.currentSession.session_id}/actions/${actionId}/${decision.toLowerCase()}`, { method: 'POST' });
+                        if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.error?.message || 'Failed to approve action');
+                        }
+                        alert(`Action ${decision} successfully`);
+                        await this.loadPlan(this.currentSession.session_id);
+                        await this.loadSessions();
+                    } catch (e) {
+                        alert('Error: ' + e.message);
+                    }
+                },
+                getStatusClass(status) {
+                    const map = {
+                        'CREATED': 'status-pending',
+                        'AUDITING': 'status-running',
+                        'PLANNING': 'status-running',
+                        'AWAITING_APPROVAL': 'status-pending',
+                        'EXECUTING': 'status-running',
+                        'VERIFYING': 'status-running',
+                        'COMPLETED': 'status-completed',
+                        'FAILED': 'status-failed',
+                        'CANCELLED': 'status-failed'
+                    };
+                    return map[status] || 'status-pending';
+                },
+                getActionClass(action) {
+                    const map = {
+                        'INSTALL': 'action-pending',
+                        'UPGRADE': 'action-pending',
+                        'CONFIGURE': 'action-pending',
+                        'NONE': 'action-skipped',
+                        'APPROVED': 'action-approved',
+                        'COMPLETED': 'action-approved',
+                        'REJECTED': 'action-rejected',
+                        'SKIPPED': 'action-skipped',
+                        'FAILED': 'action-rejected'
+                    };
+                    return map[action] || 'action-pending';
+                },
+                getDotClass(eventType) {
+                    const map = {
+                        'AUDIT': 'dot-audit',
+                        'PLAN': 'dot-plan',
+                        'APPROVAL': 'dot-approve',
+                        'EXECUTION': 'dot-execute',
+                        'VERIFICATION': 'dot-verify',
+                        'COMPLETED': 'dot-complete',
+                        'FAILED': 'dot-fail'
+                    };
+                    return map[eventType] || 'dot-audit';
+                },
+                formatEventType(type) {
+                    return type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+                },
+                getToolName(toolId) {
+                    const names = {
+                        'python': 'Python',
+                        'git': 'Git',
+                        'cursor': 'Cursor IDE',
+                        'docker': 'Docker',
+                        'ruff': 'Ruff',
+                        'pytest': 'Pytest',
+                        'black': 'Black',
+                        'nodejs': 'Node.js',
+                        'github-cli': 'GitHub CLI'
+                    };
+                    return names[toolId] || toolId;
+                },
+                getActionDescription(action) {
+                    const desc = {
+                        'INSTALL': 'Install this tool',
+                        'UPGRADE': 'Upgrade to newer version',
+                        'CONFIGURE': 'Configure settings',
+                        'NONE': 'Already up to date',
+                        'REMOVE': 'Remove this tool'
+                    };
+                    return desc[action] || action;
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
