@@ -28,6 +28,11 @@ from ai_engineering_bootstrap.agent.strategy_planner import StrategyPlanner
 from ai_engineering_bootstrap.audit import default_audit_service
 
 
+# Helper function for error responses
+def make_error(code: str, message: str) -> Dict[str, str]:
+    return {"code": code, "message": message}
+
+
 # Get the directory where this file is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 GUI_TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'gui', 'templates')
@@ -562,7 +567,7 @@ async def get_llm_settings():
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
             status="error",
-            error=ErrorDetail(code="settings_error", message=str(e))
+            error=make_error("settings_error", str(e))
         )
 
 @app.post("/api/v1/llm/settings")
@@ -591,7 +596,7 @@ async def save_llm_settings(settings: dict):
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
             status="error",
-            error=ErrorDetail(code="settings_error", message=str(e))
+            error=make_error("settings_error", str(e))
         )
 
 @app.post("/api/v1/llm/test")
@@ -611,12 +616,12 @@ async def test_llm_connection():
                 api_version=API_VERSION,
                 request_id=str(uuid.uuid4()),
                 status="error",
-                error=ErrorDetail(code="connection_failed", message="LLM not available")
+                error=make_error("connection_failed", "LLM not available")
             )
     except Exception as e:
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
             status="error",
-            error=ErrorDetail(code="connection_error", message=str(e))
+            error=make_error("connection_error", str(e))
         )
