@@ -55,6 +55,9 @@ class APIResponse(BaseModel):
     error: Optional[Dict[str, Any]] = None
 
 
+# API Version constant
+API_VERSION = "v1"
+
 # FastAPI Application
 app = FastAPI(
     title="AI Engineering Bootstrap API",

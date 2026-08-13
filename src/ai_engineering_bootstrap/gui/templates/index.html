@@ -132,7 +132,13 @@
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             event.target.classList.add('active');
             document.getElementById(tabName).classList.add('active');
-            if (tabName === 'dashboard') loadSessions();
+            if (tabName === 'dashboard') {
+                loadSessions();
+                loadHealth();
+            } else if (tabName === 'llm-settings') {
+                loadLLMSettings();
+                loadLLMStatus();
+            }
         }
 
         // Show messages
