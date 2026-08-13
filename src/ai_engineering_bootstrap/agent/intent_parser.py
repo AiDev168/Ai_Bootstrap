@@ -89,6 +89,10 @@ class IntentParser:
             "angular",
         }
 
+    def is_llm_available(self) -> bool:
+        """Check if LLM provider is available."""
+        return self.provider is not None
+
     def parse(self, natural_language: str) -> ParsedIntent:
         """
         Parse natural language goal into structured intent.
