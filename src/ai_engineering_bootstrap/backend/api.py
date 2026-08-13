@@ -4,12 +4,15 @@ AI Engineering Bootstrap - Backend API Service
 Provides REST API v1 endpoints for environment orchestration.
 """
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
+import os
 
 from ai_engineering_bootstrap.environment.models import (
     EnvironmentRequest,
@@ -23,6 +26,11 @@ from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser
 from ai_engineering_bootstrap.agent.strategy_planner import StrategyPlanner
 from ai_engineering_bootstrap.audit import default_audit_service
+
+
+# Get the directory where this file is located
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+GUI_TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'gui', 'templates')
 
 
 # Pydantic Models for API
@@ -63,6 +71,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Serve static files (CSS, JS) if needed
+# app.mount("/static", StaticFiles(directory=os.path.join(GUI_TEMPLATE_DIR, "static")), name="static")
+
 # Initialize services
 tool_catalog = ToolCatalog()
 session_store = SessionStore()
@@ -70,6 +81,15 @@ reconciler = EnvironmentReconciler()
 intent_parser = IntentParser(tool_catalog=tool_catalog)
 strategy_planner = StrategyPlanner(tool_catalog=tool_catalog)
 audit_service = default_audit_service()
+
+
+@app.get("/")
+async def serve_gui():
+    """Serve the main GUI HTML page."""
+    import os
+    template_path = os.path.join(GUI_TEMPLATE_DIR, "index.html")
+    with open(template_path, 'r') as f:
+        return HTMLResponse(content=f.read())
 
 
 def make_response(request_id: str, status: str, data: Optional[Dict] = None, error: Optional[Dict] = None) -> dict:
