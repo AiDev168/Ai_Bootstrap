@@ -19,6 +19,7 @@ from ai_engineering_bootstrap.environment.models import (
     DesiredEnvironmentState,
     ActualEnvironmentState,
     EnvironmentDelta,
+    ToolStatus,
 )
 from ai_engineering_bootstrap.environment.session_store import SessionStore
 from ai_engineering_bootstrap.environment.reconciler import EnvironmentReconciler
@@ -26,6 +27,7 @@ from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser
 from ai_engineering_bootstrap.agent.strategy_planner import StrategyPlanner
 from ai_engineering_bootstrap.audit import default_audit_service
+from datetime import datetime, timezone
 
 
 # Helper function for error responses
@@ -147,7 +149,43 @@ async def get_environment_state():
     """Get current environment state."""
     request_id = str(uuid.uuid4())
     try:
-        actual_state = audit_service.get_environment_state()
+        audit = default_audit_service()
+        report = audit.run()
+        
+        # Build ActualEnvironmentState from audit report
+        tools = {}
+        python_packages = {}
+        system_info = {}
+        
+        for check in report.checks:
+            if check.category.value == 'Tools':
+                tool_id = check.name.lower()
+                if check.status.value == 'passed':
+                    tools[tool_id] = ToolStatus(
+                        tool_id=tool_id,
+                        status='installed',
+                        version=check.details.split()[1] if 'version' in check.details.lower() else None,
+                        health='healthy'
+                    )
+                else:
+                    tools[tool_id] = ToolStatus(
+                        tool_id=tool_id,
+                        status='missing',
+                        health='unknown'
+                    )
+            elif check.category.value == 'Python':
+                python_packages['python'] = check.details
+            elif check.category.value == 'Platform':
+                system_info[check.name] = check.details
+        
+        actual_state = ActualEnvironmentState(
+            tools=tools,
+            python_packages=python_packages,
+            system_info=system_info,
+            probe_timestamp=datetime.now(timezone.utc).isoformat(),
+            probe_evidence={check.name: check.facts for check in report.checks}
+        )
+        
         return make_response(
             request_id=request_id,
             status="ok",
@@ -226,10 +264,45 @@ async def create_session(input_data: EnvironmentRequestInput):
         )
         
         # Get actual state
-        actual_state = audit_service.get_environment_state()
+        audit = default_audit_service()
+        report = audit.run()
+        
+        # Build ActualEnvironmentState from audit report
+        tools = {}
+        python_packages = {}
+        system_info = {}
+        
+        for check in report.checks:
+            if check.category.value == 'Tools':
+                tool_id = check.name.lower()
+                if check.status.value == 'passed':
+                    tools[tool_id] = ToolStatus(
+                        tool_id=tool_id,
+                        status='installed',
+                        version=check.details.split()[1] if 'version' in check.details.lower() else None,
+                        health='healthy'
+                    )
+                else:
+                    tools[tool_id] = ToolStatus(
+                        tool_id=tool_id,
+                        status='missing',
+                        health='unknown'
+                    )
+            elif check.category.value == 'Python':
+                python_packages['python'] = check.details
+            elif check.category.value == 'Platform':
+                system_info[check.name] = check.details
+        
+        actual_state = ActualEnvironmentState(
+            tools=tools,
+            python_packages=python_packages,
+            system_info=system_info,
+            probe_timestamp=datetime.now(timezone.utc).isoformat(),
+            probe_evidence={check.name: check.facts for check in report.checks}
+        )
         
         # Create desired state
-        desired_state = DesiredEnvironmentState.from_request(environment_request)
+        desired_state = environment_request.to_desired_state()
         
         # Reconcile
         delta = reconciler.reconcile(actual_state, desired_state)
