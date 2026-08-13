@@ -21,6 +21,17 @@ class ActionResult:
     details: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class ActionExecution:
+    """Represents an action being executed or attempted."""
+    action_id: str
+    action_type: str  # e.g., "install_tool", "download", "verify"
+    status: str  # "pending", "running", "completed", "failed"
+    result: Any = None
+    error: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
 @dataclass(frozen=True)
 class ExecutionResult:
     """Complete result of an execution run."""
