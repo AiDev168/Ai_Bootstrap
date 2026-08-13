@@ -26,6 +26,7 @@ from ai_engineering_bootstrap.environment.reconciler import EnvironmentReconcile
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser
 from ai_engineering_bootstrap.agent.strategy_planner import StrategyPlanner
+from ai_engineering_bootstrap.planner.engine import PlannerEngine
 from ai_engineering_bootstrap.audit import default_audit_service
 from datetime import datetime, timezone
 
