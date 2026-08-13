@@ -9,6 +9,7 @@ from ai_engineering_bootstrap.environment.models import (
     EnvironmentDelta,
     PackageDelta,
     ToolDelta,
+    ToolRequirement,
     ToolRequirementLevel,
     ToolStatus,
 )

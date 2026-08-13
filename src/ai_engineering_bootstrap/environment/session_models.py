@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 """
 Session models for environment orchestration.
 
@@ -7,7 +9,6 @@ the complete lifecycle of an environment bootstrap operation.
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 

@@ -32,8 +32,8 @@ for path in [
 ]:
     p = ROOT / path
     text = p.read_text(encoding='utf-8')
-    text = text.replace('from datetime import datetime\n', 'from datetime import datetime, timezone\n')
-    text = text.replace('from datetime import datetime\nfrom datetime import datetime, timezone\n', 'from datetime import datetime, timezone\n')
+    text = re.sub(r'^from datetime import .*\n', '', text, flags=re.MULTILINE)
+    text = 'from datetime import datetime, timezone\n' + text
     text = text.replace('datetime.utcnow()', 'datetime.now(timezone.utc)')
     p.write_text(text, encoding='utf-8')
 
@@ -45,7 +45,7 @@ text = text.replace('    import os\n', '', 1)
 p.write_text(text, encoding='utf-8')
 
 # Intent/recovery/planner broad catches are deliberate LLM fallback boundaries.
-for path, patterns in {
+for path in {
     'src/ai_engineering_bootstrap/agent/intent_parser.py': [
         '        except Exception:\n',
     ],
@@ -55,7 +55,7 @@ for path, patterns in {
     'src/ai_engineering_bootstrap/agent/strategy_planner.py': [
         '        except Exception:\n',
     ],
-}.items():
+}.keys():
     p = ROOT / path
     text = p.read_text(encoding='utf-8')
     text = text.replace('        except Exception:\n', '        except Exception:  # noqa: BLE001 - intentional LLM fallback boundary\n')
@@ -64,10 +64,18 @@ for path, patterns in {
 # API route boundaries deliberately convert unexpected application errors to HTTP responses.
 p = ROOT / 'src/ai_engineering_bootstrap/backend/api.py'
 text = p.read_text(encoding='utf-8')
+if 'import logging\n' not in text:
+    text = text.replace('import os\n', 'import os\nimport logging\n', 1)
+if 'logger = logging.getLogger(__name__)\n' not in text:
+    marker = 'API_VERSION = "v1"\n'
+    text = text.replace(marker, marker + '\nlogger = logging.getLogger(__name__)\n', 1)
 text = text.replace('except Exception as e:\n', 'except Exception as e:  # noqa: BLE001 - API boundary normalization\n')
 text = text.replace('except Exception:\n', 'except Exception:  # noqa: BLE001 - API/WebSocket boundary\n')
 text = text.replace('            data = await websocket.receive_text()\n', '            await websocket.receive_text()\n')
-text = text.replace('    except Exception:\n        pass\n', '    except Exception as exc:  # noqa: BLE001 - disconnected client boundary\n        return None\n')
+text = text.replace(
+    '    except Exception:  # noqa: BLE001 - API/WebSocket boundary\n        pass\n',
+    '    except Exception:  # noqa: BLE001 - API/WebSocket boundary\n        logger.exception("Unexpected WebSocket failure for session %s", session_id)\n'
+)
 text = text.replace('        api_url = settings.get("api_url", "")\n', '')
 p.write_text(text, encoding='utf-8')
 
@@ -88,8 +96,9 @@ p.write_text(text, encoding='utf-8')
 # Reconciler typing and nested conditional.
 p = ROOT / 'src/ai_engineering_bootstrap/environment/reconciler.py'
 text = p.read_text(encoding='utf-8')
-if 'ToolRequirement' not in text.split('class EnvironmentReconciler', 1)[0]:
-    text = text.replace('from ai_engineering_bootstrap.environment.models import (', 'from ai_engineering_bootstrap.environment.models import (\n    ToolRequirement,')
+import_block = 'from ai_engineering_bootstrap.environment.models import ('
+if '    ToolRequirement,\n' not in text.split(')', 1)[0]:
+    text = text.replace(import_block, import_block + '\n    ToolRequirement,', 1)
 text = text.replace('            elif pkg_req.version_constraint:\n                if not self._version_satisfies(actual_version, pkg_req.version_constraint):', '            elif pkg_req.version_constraint and not self._version_satisfies(actual_version, pkg_req.version_constraint):')
 p.write_text(text, encoding='utf-8')
 

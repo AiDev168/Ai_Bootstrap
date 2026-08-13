@@ -1,12 +1,14 @@
+from datetime import datetime, timezone
+
 """
 AI Engineering Bootstrap - Backend API Service
 
 Provides REST API v1 endpoints for environment orchestration.
 """
 
+import logging
 import os
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -61,6 +63,8 @@ class APIResponse(BaseModel):
 
 # API Version constant
 API_VERSION = "v1"
+
+logger = logging.getLogger(__name__)
 
 # FastAPI Application
 app = FastAPI(
@@ -119,7 +123,7 @@ async def health_check():
         data={
             "service": "ai-engineering-bootstrap",
             "status": "healthy",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "llm_available": intent_parser.is_llm_available(),
         }
     )
@@ -465,7 +469,7 @@ async def start_session(session_id: str):
         
         session.status = "EXECUTING"
         session_store.update_session(session)
-        session_store.append_event(session_id, {"type": "session_started", "timestamp": datetime.now(timezone.utc).isoformat()})
+        session_store.append_event(session_id, {"type": "session_started", "timestamp": datetime.now(UTC).isoformat()})
         
         return make_response(
             request_id=request_id,
@@ -493,7 +497,7 @@ async def approve_action(session_id: str, action_id: str, input_data: ActionAppr
         session_store.append_event(session_id, {
             "type": "action_approved",
             "action_id": action_id,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         })
         
         return make_response(
@@ -521,7 +525,7 @@ async def reject_action(session_id: str, action_id: str):
         session_store.append_event(session_id, {
             "type": "action_rejected",
             "action_id": action_id,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         })
         
         return make_response(
@@ -549,7 +553,7 @@ async def skip_action(session_id: str, action_id: str):
         session_store.append_event(session_id, {
             "type": "action_skipped",
             "action_id": action_id,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         })
         
         return make_response(
@@ -574,7 +578,7 @@ async def cancel_session(session_id: str):
         
         session.status = "CANCELLED"
         session_store.update_session(session)
-        session_store.append_event(session_id, {"type": "session_cancelled", "timestamp": datetime.now(timezone.utc).isoformat()})
+        session_store.append_event(session_id, {"type": "session_cancelled", "timestamp": datetime.now(UTC).isoformat()})
         
         return make_response(
             request_id=request_id,
@@ -613,7 +617,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         pass
     except Exception:  # noqa: BLE001 - API/WebSocket boundary
-        pass
+        logger.exception("Unexpected WebSocket failure for session %s", session_id)
 
 # LLM Settings endpoints
 @app.get("/api/v1/llm/settings")

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 """
 Session store abstraction for environment sessions.
 
@@ -5,7 +7,6 @@ Provides a simple in-memory store with optional JSON persistence for MVP.
 """
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 
 from .session_models import EnvironmentSession, SessionStatus
