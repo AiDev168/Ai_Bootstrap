@@ -58,6 +58,27 @@ class EnvironmentRequest:
     platform_preferences: dict[str, Any] = field(default_factory=dict)
     user_preferences: dict[str, Any] = field(default_factory=dict)
 
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "request_id": self.request_id,
+            "project_id": self.project_id,
+            "project_path": str(self.project_path) if self.project_path else None,
+            "natural_language_goal": self.natural_language_goal,
+            "required_tools": self.required_tools,
+            "optional_tools": self.optional_tools,
+            "languages": self.languages,
+            "frameworks": self.frameworks,
+            "project_dependencies": [
+                {"name": p.name, "version_constraint": p.version_constraint, "extras": p.extras}
+                for p in self.project_dependencies
+            ],
+            "configurations": self.configurations,
+            "constraints": self.constraints,
+            "platform_preferences": self.platform_preferences,
+            "user_preferences": self.user_preferences,
+        }
+
     def to_desired_state(self) -> DesiredEnvironmentState:
         """Convert this request into a structured desired state."""
         tools = {
