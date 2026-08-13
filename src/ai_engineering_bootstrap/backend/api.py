@@ -136,7 +136,7 @@ async def get_tools_catalog():
     try:
         from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
         catalog = ToolCatalog()
-        tools = catalog.list_all_tools()
+        tools = catalog.list_tools()
         return make_response(
             request_id=request_id,
             status="ok",
@@ -207,17 +207,19 @@ async def create_session(input_data: EnvironmentRequestInput):
         delta = reconciler.reconcile(actual_state, desired_state)
         
         # Create session
-        session = session_store.create_session(
+        from ai_engineering_bootstrap.environment.session_models import EnvironmentSession
+        session = EnvironmentSession(
             request=environment_request,
             actual_state=actual_state,
             desired_state=desired_state,
             delta=delta,
         )
+        session_store.create(session)
         
         return make_response(
             request_id=request_id,
             status="ok",
-            data={"session_id": session.session_id, "session": session}
+            data={"session_id": session.session_id, "status": session.status.value}
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -228,11 +230,20 @@ async def list_sessions():
     """List all sessions."""
     request_id = str(uuid.uuid4())
     try:
-        sessions = session_store.list_sessions()
+        store = SessionStore()
+        sessions = store.list_all()
         return make_response(
             request_id=request_id,
             status="ok",
-            data={"sessions": sessions}
+            data={"sessions": [
+                {
+                    "session_id": s.session_id,
+                    "status": s.status.value,
+                    "created_at": s.created_at.isoformat(),
+                    "updated_at": s.updated_at.isoformat(),
+                }
+                for s in sessions
+            ]}
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -14,6 +14,8 @@ from .models import (
     DeltaAction,
 )
 from .reconciler import EnvironmentReconciler
+from .session_models import SessionStatus, EnvironmentSession, SessionEvent, AgentDecision
+from .session_store import SessionStore
 from .tool_catalog import (
     ToolCatalog,
     ToolDefinition,
@@ -51,6 +53,12 @@ __all__ = [
     "ToolDelta",
     "PackageDelta",
     "DeltaAction",
+    # Session
+    "SessionStatus",
+    "EnvironmentSession",
+    "SessionEvent",
+    "AgentDecision",
+    "SessionStore",
     # Reconciliation
     "EnvironmentReconciler",
     # Tool Catalog

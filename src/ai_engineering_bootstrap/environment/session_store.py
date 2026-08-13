@@ -40,6 +40,10 @@ class SessionStore:
         """List all sessions, optionally filtered by status."""
         raise NotImplementedError
     
+    def list_all(self) -> list[EnvironmentSession]:
+        """List all sessions (alias for list_sessions)."""
+        return self.list_sessions()
+    
     def delete(self, session_id: str) -> bool:
         """Delete a session."""
         raise NotImplementedError
@@ -254,3 +258,48 @@ def set_session_store(store: SessionStore) -> None:
     """Set the default session store instance."""
     global _default_store
     _default_store = store
+
+
+class SessionStore:
+    """
+    Concrete session store class that uses the default store.
+    
+    This is a convenience wrapper around get_session_store() for easier use in service code.
+    """
+    
+    def __init__(self):
+        self._store = get_session_store()
+    
+    def create(self, request) -> EnvironmentSession:
+        """Create a new session from a request."""
+        from .session_models import EnvironmentSession
+        session = EnvironmentSession(request=request)
+        return self._store.create(session)
+    
+    def get(self, session_id: str) -> Optional[EnvironmentSession]:
+        """Get a session by ID."""
+        return self._store.get(session_id)
+    
+    def update(self, session_id: str, updates: dict) -> EnvironmentSession:
+        """Update an existing session with the given fields."""
+        session = self._store.get(session_id)
+        if not session:
+            raise ValueError(f"Session {session_id} does not exist")
+        
+        for key, value in updates.items():
+            if hasattr(session, key):
+                setattr(session, key, value)
+        
+        return self._store.update(session)
+    
+    def append_event(self, session_id: str, event_data: dict) -> EnvironmentSession:
+        """Append an event to a session's timeline."""
+        return self._store.append_event(session_id, event_data)
+    
+    def list_all(self) -> list[EnvironmentSession]:
+        """List all sessions."""
+        return self._store.list_sessions()
+    
+    def delete(self, session_id: str) -> bool:
+        """Delete a session."""
+        return self._store.delete(session_id)
