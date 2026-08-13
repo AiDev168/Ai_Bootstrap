@@ -108,7 +108,7 @@ class IntentParser:
 
         try:
             return self._llm_parse(natural_language)
-        except Exception:
+        except Exception:  # noqa: BLE001 - intentional LLM fallback boundary
             # Fallback to deterministic on any LLM failure
             return self._deterministic_parse(natural_language)
 

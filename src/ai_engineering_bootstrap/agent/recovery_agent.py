@@ -91,7 +91,7 @@ class FailureDiagnoser:
 
         try:
             return self._llm_diagnose(execution, error_message, retry_count)
-        except Exception:
+        except Exception:  # noqa: BLE001 - intentional LLM fallback boundary
             # Fallback to deterministic on any LLM failure
             return self._deterministic_diagnose(execution, error_message, retry_count)
 

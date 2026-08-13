@@ -74,7 +74,7 @@ class StrategyPlanner:
             return self._deterministic_plan(install_deltas, platform, architecture)
         try:
             return self._llm_plan(install_deltas, platform, architecture)
-        except Exception:
+        except Exception:  # noqa: BLE001 - intentional LLM fallback boundary
             return self._deterministic_plan(install_deltas, platform, architecture)
 
     def _llm_plan(self, deltas: list[Any], platform: str | None, architecture: str | None) -> StrategyPlan:

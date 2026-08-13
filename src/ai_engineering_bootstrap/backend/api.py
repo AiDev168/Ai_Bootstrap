@@ -91,9 +91,8 @@ audit_service = default_audit_service()
 
 
 @app.get("/")
-async def serve_gui():
+def serve_gui():
     """Serve the main GUI HTML page."""
-    import os
     template_path = os.path.join(GUI_TEMPLATE_DIR, "index.html")
     with open(template_path, 'r') as f:
         return HTMLResponse(content=f.read())
@@ -120,7 +119,7 @@ async def health_check():
         data={
             "service": "ai-engineering-bootstrap",
             "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "llm_available": intent_parser.is_llm_available(),
         }
     )
@@ -137,7 +136,7 @@ async def get_audit():
             status="ok",
             data={"audit": audit_result}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -188,7 +187,7 @@ async def get_environment_state():
             status="ok",
             data={"actual_state": actual_state}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -205,7 +204,7 @@ async def get_tools_catalog():
             status="ok",
             data={"tools": tools}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -238,7 +237,7 @@ async def create_environment_request(input_data: EnvironmentRequestInput):
             status="ok",
             data={"request": environment_request}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -321,7 +320,7 @@ async def create_session(input_data: EnvironmentRequestInput):
             status="ok",
             data={"session_id": session.session_id, "status": session.status.value}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -345,7 +344,7 @@ async def list_sessions():
                 for s in sessions
             ]}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -364,7 +363,7 @@ async def get_session(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -387,7 +386,7 @@ async def get_session_state(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -413,7 +412,7 @@ async def get_session_plan(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -432,7 +431,7 @@ async def get_session_events(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -451,7 +450,7 @@ async def get_agent_decisions(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -466,7 +465,7 @@ async def start_session(session_id: str):
         
         session.status = "EXECUTING"
         session_store.update_session(session)
-        session_store.append_event(session_id, {"type": "session_started", "timestamp": datetime.utcnow().isoformat()})
+        session_store.append_event(session_id, {"type": "session_started", "timestamp": datetime.now(timezone.utc).isoformat()})
         
         return make_response(
             request_id=request_id,
@@ -475,7 +474,7 @@ async def start_session(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -494,7 +493,7 @@ async def approve_action(session_id: str, action_id: str, input_data: ActionAppr
         session_store.append_event(session_id, {
             "type": "action_approved",
             "action_id": action_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         
         return make_response(
@@ -504,7 +503,7 @@ async def approve_action(session_id: str, action_id: str, input_data: ActionAppr
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -522,7 +521,7 @@ async def reject_action(session_id: str, action_id: str):
         session_store.append_event(session_id, {
             "type": "action_rejected",
             "action_id": action_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         
         return make_response(
@@ -532,7 +531,7 @@ async def reject_action(session_id: str, action_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -550,7 +549,7 @@ async def skip_action(session_id: str, action_id: str):
         session_store.append_event(session_id, {
             "type": "action_skipped",
             "action_id": action_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         
         return make_response(
@@ -560,7 +559,7 @@ async def skip_action(session_id: str, action_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -575,7 +574,7 @@ async def cancel_session(session_id: str):
         
         session.status = "CANCELLED"
         session_store.update_session(session)
-        session_store.append_event(session_id, {"type": "session_cancelled", "timestamp": datetime.utcnow().isoformat()})
+        session_store.append_event(session_id, {"type": "session_cancelled", "timestamp": datetime.now(timezone.utc).isoformat()})
         
         return make_response(
             request_id=request_id,
@@ -584,7 +583,7 @@ async def cancel_session(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -608,12 +607,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 })
             
             # Wait for client message
-            data = await websocket.receive_text()
+            await websocket.receive_text()
             # Handle client messages if needed
             
     except WebSocketDisconnect:
         pass
-    except Exception:
+    except Exception:  # noqa: BLE001 - API/WebSocket boundary
         pass
 
 # LLM Settings endpoints
@@ -634,7 +633,7 @@ async def get_llm_settings():
             status="ok",
             data=settings
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
@@ -649,7 +648,6 @@ async def save_llm_settings(settings: dict):
         # Save settings to config or session store
         # For now, just validate and acknowledge
         provider = settings.get("provider", "lm_studio")
-        api_url = settings.get("api_url", "")
         model = settings.get("model", "")
         
         # Update intent parser configuration if available
@@ -663,7 +661,7 @@ async def save_llm_settings(settings: dict):
             status="ok",
             data={"message": "Settings saved", "provider": provider, "model": model}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
@@ -690,7 +688,7 @@ async def test_llm_connection():
                 status="error",
                 error=make_error("connection_failed", "LLM not available")
             )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),

@@ -5,7 +5,7 @@ Provides a simple in-memory store with optional JSON persistence for MVP.
 """
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .session_models import EnvironmentSession, SessionStatus
@@ -65,7 +65,7 @@ class InMemorySessionStore(SessionStore):
     def update(self, session: EnvironmentSession) -> EnvironmentSession:
         if session.session_id not in self._sessions:
             raise ValueError(f"Session {session.session_id} does not exist")
-        session.updated_at = datetime.utcnow()
+        session.updated_at = datetime.now(UTC)
         self._sessions[session.session_id] = session
         return session
     
@@ -82,7 +82,7 @@ class InMemorySessionStore(SessionStore):
             details=event_data.get("details", {}),
         )
         session.events.append(event)
-        session.updated_at = datetime.utcnow()
+        session.updated_at = datetime.now(UTC)
         self.update(session)
         return session
     
@@ -163,8 +163,8 @@ class JSONSessionStore(SessionStore):
             session_id=data["session_id"],
             status=SessionStatus(data["status"]),
             current_action=data.get("current_action"),
-            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.utcnow(),
-            updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.utcnow(),
+            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(UTC),
+            updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC),
         )
         
         if data.get("completed_at"):
@@ -195,7 +195,7 @@ class JSONSessionStore(SessionStore):
         if session.session_id not in self._index:
             raise ValueError(f"Session {session.session_id} does not exist")
         
-        session.updated_at = datetime.utcnow()
+        session.updated_at = datetime.now(UTC)
         file_path = self._get_session_file(session.session_id)
         with open(file_path, "w") as f:
             json.dump(session.to_dict(), f, indent=2, default=str)
@@ -221,8 +221,7 @@ class JSONSessionStore(SessionStore):
         sessions = []
         for session_id in self._index:
             session = self.get(session_id)
-            if session:
-                if status_filter is None or session.status == status_filter:
+            if session and (status_filter is None or session.status == status_filter):
                     sessions.append(session)
         
         sessions.sort(key=lambda s: s.updated_at, reverse=True)

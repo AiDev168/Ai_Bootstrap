@@ -180,8 +180,7 @@ class DebInstallStrategy(InstallationStrategyBase):
                     },
                 )
                 
-                with urllib.request.urlopen(request, timeout=300) as response:
-                    with open(deb_path, "wb") as f:
+                with urllib.request.urlopen(request, timeout=300) as response, open(deb_path, "wb") as f:
                         while chunk := response.read(1024 * 1024):
                             f.write(chunk)
                 

@@ -7,7 +7,7 @@ the complete lifecycle of an environment bootstrap operation.
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -200,7 +200,7 @@ class EnvironmentSession:
             details=details or {},
         )
         self.events.append(event)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
         return event
     
     def add_agent_decision(self, decision: AgentDecision) -> None:
@@ -209,7 +209,7 @@ class EnvironmentSession:
         if self.request:
             decision.request_id = self.request.request_id
         self.agent_decisions.append(decision)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
     
     def get_approval_state(self, action_id: str) -> ActionApprovalState | None:
         """Get the approval state for an action."""
@@ -223,21 +223,21 @@ class EnvironmentSession:
         state = self.approval_states[action_id]
         state.status = status
         if status == "approved":
-            state.approved_at = datetime.utcnow()
+            state.approved_at = datetime.now(UTC)
         elif status == "rejected":
             state.rejection_reason = rejection_reason
         
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
     
     def add_execution_evidence(self, evidence: ExecutionEvidence) -> None:
         """Add execution evidence."""
         self.execution_history.append(evidence)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
     
     def add_recovery_record(self, record: RecoveryRecord) -> None:
         """Add a recovery record."""
         self.recovery_history.append(record)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
     
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
