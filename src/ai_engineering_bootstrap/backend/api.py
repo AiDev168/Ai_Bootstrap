@@ -4,35 +4,31 @@ AI Engineering Bootstrap - Backend API Service
 Provides REST API v1 endpoints for environment orchestration.
 """
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+import os
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-import uuid
-import os
+from pydantic import BaseModel
 
-from ai_engineering_bootstrap.environment.models import (
-    EnvironmentRequest,
-    DesiredEnvironmentState,
-    ActualEnvironmentState,
-    EnvironmentDelta,
-    ToolStatus,
-)
-from ai_engineering_bootstrap.environment.session_store import SessionStore
-from ai_engineering_bootstrap.environment.reconciler import EnvironmentReconciler
-from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser
 from ai_engineering_bootstrap.agent.strategy_planner import StrategyPlanner
-from ai_engineering_bootstrap.planner.engine import PlannerEngine
 from ai_engineering_bootstrap.audit import default_audit_service
-from datetime import datetime, timezone
+from ai_engineering_bootstrap.environment.models import (
+    ActualEnvironmentState,
+    EnvironmentRequest,
+    ToolStatus,
+)
+from ai_engineering_bootstrap.environment.reconciler import EnvironmentReconciler
+from ai_engineering_bootstrap.environment.session_store import SessionStore
+from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 
 
 # Helper function for error responses
-def make_error(code: str, message: str) -> Dict[str, str]:
+def make_error(code: str, message: str) -> dict[str, str]:
     return {"code": code, "message": message}
 
 
@@ -45,10 +41,10 @@ GUI_TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'gui', 'templates')
 class EnvironmentRequestInput(BaseModel):
     project_path: str
     natural_language_goal: str
-    required_tools: List[str] = []
-    optional_tools: List[str] = []
-    project_dependencies: List[str] = []
-    constraints: Dict[str, Any] = {}
+    required_tools: list[str] = []
+    optional_tools: list[str] = []
+    project_dependencies: list[str] = []
+    constraints: dict[str, Any] = {}
 
 
 class ActionApprovalInput(BaseModel):
@@ -59,8 +55,8 @@ class APIResponse(BaseModel):
     api_version: str = "v1"
     request_id: str
     status: str
-    data: Optional[Dict[str, Any]] = None
-    error: Optional[Dict[str, Any]] = None
+    data: dict[str, Any] | None = None
+    error: dict[str, Any] | None = None
 
 
 # API Version constant
@@ -103,7 +99,7 @@ async def serve_gui():
         return HTMLResponse(content=f.read())
 
 
-def make_response(request_id: str, status: str, data: Optional[Dict] = None, error: Optional[Dict] = None) -> dict:
+def make_response(request_id: str, status: str, data: dict | None = None, error: dict | None = None) -> dict:
     """Create standardized API response."""
     return APIResponse(
         api_version="v1",
@@ -183,7 +179,7 @@ async def get_environment_state():
             tools=tools,
             python_packages=python_packages,
             system_info=system_info,
-            probe_timestamp=datetime.now(timezone.utc).isoformat(),
+            probe_timestamp=datetime.now(UTC).isoformat(),
             probe_evidence={check.name: check.facts for check in report.checks}
         )
         
@@ -298,7 +294,7 @@ async def create_session(input_data: EnvironmentRequestInput):
             tools=tools,
             python_packages=python_packages,
             system_info=system_info,
-            probe_timestamp=datetime.now(timezone.utc).isoformat(),
+            probe_timestamp=datetime.now(UTC).isoformat(),
             probe_evidence={check.name: check.facts for check in report.checks}
         )
         
@@ -309,7 +305,9 @@ async def create_session(input_data: EnvironmentRequestInput):
         delta = reconciler.reconcile(actual_state, desired_state)
         
         # Create session
-        from ai_engineering_bootstrap.environment.session_models import EnvironmentSession
+        from ai_engineering_bootstrap.environment.session_models import (
+            EnvironmentSession,
+        )
         session = EnvironmentSession(
             request=environment_request,
             actual_state=actual_state,
@@ -615,7 +613,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             
     except WebSocketDisconnect:
         pass
-    except Exception as e:
+    except Exception:
         pass
 
 # LLM Settings endpoints

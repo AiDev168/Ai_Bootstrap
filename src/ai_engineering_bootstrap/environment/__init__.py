@@ -1,43 +1,48 @@
 """Environment models for AI Engineering Bootstrap."""
 
+from .installation_strategies import (
+    ArtifactMetadata,
+    BinaryInstallStrategy,
+    DebInstallStrategy,
+    InstallationResult,
+    InstallationStrategyBase,
+    PipInstallStrategy,
+    StrategyFactory,
+    get_current_platform,
+)
 from .models import (
-    EnvironmentRequest,
-    DesiredEnvironmentState,
     ActualEnvironmentState,
+    DeltaAction,
+    DesiredEnvironmentState,
+    EnvironmentDelta,
+    EnvironmentRequest,
+    PackageDelta,
+    PythonPackageRequirement,
+    ToolDelta,
     ToolRequirement,
     ToolRequirementLevel,
     ToolStatus,
-    PythonPackageRequirement,
-    EnvironmentDelta,
-    ToolDelta,
-    PackageDelta,
-    DeltaAction,
 )
 from .reconciler import EnvironmentReconciler
-from .session_models import SessionStatus, EnvironmentSession, SessionEvent, AgentDecision
+from .session_models import (
+    AgentDecision,
+    EnvironmentSession,
+    SessionEvent,
+    SessionStatus,
+)
 from .session_store import SessionStore
 from .tool_catalog import (
-    ToolCatalog,
-    ToolDefinition,
-    Platform,
     Architecture,
     ArtifactFormat,
-    PrivilegeLevel,
-    RiskLevel,
-    InstallationStrategy,
-    ProbeDefinition,
-    get_tool_catalog,
     DuplicateToolError,
-)
-from .installation_strategies import (
-    InstallationStrategyBase,
-    DebInstallStrategy,
-    PipInstallStrategy,
-    BinaryInstallStrategy,
-    StrategyFactory,
-    ArtifactMetadata,
-    InstallationResult,
-    get_current_platform,
+    InstallationStrategy,
+    Platform,
+    PrivilegeLevel,
+    ProbeDefinition,
+    RiskLevel,
+    ToolCatalog,
+    ToolDefinition,
+    get_tool_catalog,
 )
 
 __all__ = [

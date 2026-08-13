@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any
 
 from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.executor.models import ActionExecution
@@ -359,7 +358,7 @@ Respond with JSON array of actions:
 
 __all__ = [
     "FailureDiagnoser",
-    "RecoveryAgent",
     "FailureDiagnosis",
+    "RecoveryAgent",
     "RecoveryProposal",
 ]

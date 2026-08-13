@@ -198,15 +198,15 @@ class EnvironmentDelta:
 
 
 __all__ = [
-    "EnvironmentRequest",
-    "DesiredEnvironmentState",
     "ActualEnvironmentState",
+    "DeltaAction",
+    "DesiredEnvironmentState",
+    "EnvironmentDelta",
+    "EnvironmentRequest",
+    "PackageDelta",
+    "PythonPackageRequirement",
+    "ToolDelta",
     "ToolRequirement",
     "ToolRequirementLevel",
     "ToolStatus",
-    "PythonPackageRequirement",
-    "EnvironmentDelta",
-    "ToolDelta",
-    "PackageDelta",
-    "DeltaAction",
 ]

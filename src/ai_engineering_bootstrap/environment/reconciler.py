@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from ai_engineering_bootstrap.environment.models import (
     ActualEnvironmentState,
-    DesiredEnvironmentState,
     DeltaAction,
+    DesiredEnvironmentState,
     EnvironmentDelta,
     PackageDelta,
     ToolDelta,

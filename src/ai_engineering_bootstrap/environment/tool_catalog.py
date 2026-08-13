@@ -709,15 +709,15 @@ def get_tool_catalog() -> ToolCatalog:
 
 
 __all__ = [
-    "Platform",
     "Architecture",
     "ArtifactFormat",
-    "PrivilegeLevel",
-    "RiskLevel",
-    "InstallationStrategy",
-    "ProbeDefinition",
-    "ToolDefinition",
-    "ToolCatalog",
     "DuplicateToolError",
+    "InstallationStrategy",
+    "Platform",
+    "PrivilegeLevel",
+    "ProbeDefinition",
+    "RiskLevel",
+    "ToolCatalog",
+    "ToolDefinition",
     "get_tool_catalog",
 ]

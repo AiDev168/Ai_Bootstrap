@@ -5,10 +5,8 @@ Provides a simple in-memory store with optional JSON persistence for MVP.
 """
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from .session_models import EnvironmentSession, SessionStatus
 
@@ -24,7 +22,7 @@ class SessionStore:
         """Create a new session."""
         raise NotImplementedError
     
-    def get(self, session_id: str) -> Optional[EnvironmentSession]:
+    def get(self, session_id: str) -> EnvironmentSession | None:
         """Get a session by ID."""
         raise NotImplementedError
     
@@ -36,7 +34,7 @@ class SessionStore:
         """Append an event to a session's timeline."""
         raise NotImplementedError
     
-    def list_sessions(self, status_filter: Optional[SessionStatus] = None) -> list[EnvironmentSession]:
+    def list_sessions(self, status_filter: SessionStatus | None = None) -> list[EnvironmentSession]:
         """List all sessions, optionally filtered by status."""
         raise NotImplementedError
     
@@ -61,7 +59,7 @@ class InMemorySessionStore(SessionStore):
         self._sessions[session.session_id] = session
         return session
     
-    def get(self, session_id: str) -> Optional[EnvironmentSession]:
+    def get(self, session_id: str) -> EnvironmentSession | None:
         return self._sessions.get(session_id)
     
     def update(self, session: EnvironmentSession) -> EnvironmentSession:
@@ -88,7 +86,7 @@ class InMemorySessionStore(SessionStore):
         self.update(session)
         return session
     
-    def list_sessions(self, status_filter: Optional[SessionStatus] = None) -> list[EnvironmentSession]:
+    def list_sessions(self, status_filter: SessionStatus | None = None) -> list[EnvironmentSession]:
         sessions = list(self._sessions.values())
         if status_filter:
             sessions = [s for s in sessions if s.status == status_filter]
@@ -142,7 +140,7 @@ class JSONSessionStore(SessionStore):
         self._save_index()
         return session
     
-    def get(self, session_id: str) -> Optional[EnvironmentSession]:
+    def get(self, session_id: str) -> EnvironmentSession | None:
         if session_id not in self._index:
             return None
         
@@ -157,8 +155,9 @@ class JSONSessionStore(SessionStore):
     
     def _dict_to_session(self, data: dict) -> EnvironmentSession:
         """Convert a dictionary back to an EnvironmentSession."""
-        from .models import EnvironmentRequest, DesiredEnvironmentState, ActualEnvironmentState, EnvironmentDelta
-        from ..planner.models import ExecutionPlan
+        from .models import (
+            EnvironmentRequest,
+        )
         
         session = EnvironmentSession(
             session_id=data["session_id"],
@@ -218,7 +217,7 @@ class JSONSessionStore(SessionStore):
         session.events.append(event)
         return self.update(session)
     
-    def list_sessions(self, status_filter: Optional[SessionStatus] = None) -> list[EnvironmentSession]:
+    def list_sessions(self, status_filter: SessionStatus | None = None) -> list[EnvironmentSession]:
         sessions = []
         for session_id in self._index:
             session = self.get(session_id)
@@ -243,7 +242,7 @@ class JSONSessionStore(SessionStore):
 
 
 # Global default store instance (in-memory for MVP)
-_default_store: Optional[SessionStore] = None
+_default_store: SessionStore | None = None
 
 
 def get_session_store() -> SessionStore:
@@ -276,7 +275,7 @@ class SessionStore:
         session = EnvironmentSession(request=request)
         return self._store.create(session)
     
-    def get(self, session_id: str) -> Optional[EnvironmentSession]:
+    def get(self, session_id: str) -> EnvironmentSession | None:
         """Get a session by ID."""
         return self._store.get(session_id)
     

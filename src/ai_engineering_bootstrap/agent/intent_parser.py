@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any
 
-from ai_engineering_bootstrap.agent.provider import LLMProvider, ProviderConfig
+from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.environment.models import EnvironmentRequest
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 

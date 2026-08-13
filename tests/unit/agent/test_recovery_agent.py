@@ -1,7 +1,7 @@
 """Tests for failure diagnosis and recovery agent."""
 
-import pytest
 
+from ai_engineering_bootstrap.agent.provider import MockProvider
 from ai_engineering_bootstrap.agent.recovery_agent import (
     FailureDiagnoser,
     FailureDiagnosis,
@@ -9,7 +9,6 @@ from ai_engineering_bootstrap.agent.recovery_agent import (
     RecoveryProposal,
 )
 from ai_engineering_bootstrap.executor.models import ActionExecution
-from ai_engineering_bootstrap.agent.provider import MockProvider
 
 
 class TestFailureDiagnosis:

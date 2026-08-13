@@ -1,7 +1,7 @@
 """Tests for strategy planner."""
 
-import pytest
 
+from ai_engineering_bootstrap.agent.provider import MockProvider
 from ai_engineering_bootstrap.agent.strategy_planner import (
     StrategyDecision,
     StrategyPlan,
@@ -14,7 +14,6 @@ from ai_engineering_bootstrap.environment.models import (
     ToolStatus,
 )
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
-from ai_engineering_bootstrap.agent.provider import MockProvider
 
 
 class TestStrategyDecision:
