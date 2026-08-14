@@ -50,7 +50,13 @@ class BackendRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
         try:
             if path == "/api/v1/health":
-                self._write_json({"status": "ok", "version": ApplicationBackend.VERSION})
+                self._write_json(self._result(self.backend.health()))
+                return
+            if path == "/api/v1/llm/settings":
+                self._write_json(self._result(self.backend.get_llm_settings()))
+                return
+            if path == "/api/v1/llm/test":
+                self._write_json(self._result(self.backend.test_llm_connection()))
                 return
             if path == "/api/v1/audit":
                 self._write_json(self._result(self.backend.audit()))
@@ -97,6 +103,9 @@ class BackendRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path
         query = parse_qs(parsed.query)
         try:
+            if path == "/api/v1/llm/settings":
+                self._write_json(self._result(self.backend.update_llm_settings(self._read_json())))
+                return
             if path == "/api/v1/run-safe":
                 self._write_json(self._result(self.backend.run_safe()))
                 return
