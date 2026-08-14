@@ -98,12 +98,7 @@ class LLMSettingsService:
         api_key = str(payload.get("api_key", "")).strip()
         if not api_key and current.get("api_key") and payload.get("preserve_api_key", True):
             api_key = current["api_key"]
-        return {
-            "provider": provider,
-            "model": model,
-            "base_url": base_url,
-            "api_key": api_key,
-        }
+        return {"provider": provider, "model": model, "base_url": base_url, "api_key": api_key}
 
     @staticmethod
     def _settings_from_values(values: dict[str, str]) -> LLMSettings:
@@ -126,7 +121,6 @@ class LLMSettingsService:
         return self._settings_from_values(self.store.load())
 
     def provider_config(self) -> ProviderConfig:
-        """Return runtime provider configuration with secret available only in memory."""
         values = self.store.load()
         settings = self._settings_from_values(values)
         return ProviderConfig(
@@ -159,7 +153,7 @@ class LLMSettingsService:
         if not settings.base_url:
             return {"ok": False, "provider": settings.provider, "models": [], "message": "LLM base URL is not configured."}
         headers = {"Accept": "application/json"}
-        if settings.provider == "remote_api" and values.get("api_key"):
+        if values.get("api_key"):
             headers["Authorization"] = f"Bearer {values['api_key']}"
         url = settings.base_url.rstrip("/") + "/models"
         request = urllib.request.Request(url, headers=headers)
@@ -185,7 +179,7 @@ class LLMSettingsService:
         if not settings.base_url:
             return {"ok": False, "provider": settings.provider, "message": "LLM base URL is not configured."}
         headers = {"Accept": "application/json"}
-        if settings.provider == "remote_api" and values.get("api_key"):
+        if values.get("api_key"):
             headers["Authorization"] = f"Bearer {values['api_key']}"
         url = settings.base_url.rstrip("/") + "/models"
         request = urllib.request.Request(url, headers=headers)
