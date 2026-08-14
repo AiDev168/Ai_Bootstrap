@@ -36,6 +36,6 @@ def test_dashboard_has_request_console_live_refresh_and_llm_settings() -> None:
         "mock",
         "in_process",
         "function viewSession",
-        "Promise.all([loadSessionPart",
+        "Promise.allSettled",
     ):
         assert text in html
