@@ -10,6 +10,7 @@ from ai_engineering_bootstrap.agent.provider import build_provider
 from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService
 from ai_engineering_bootstrap.backend.runtime_session_service import RuntimeSessionService
+from ai_engineering_bootstrap.backend.session_service import EnvironmentSessionService
 from ai_engineering_bootstrap.backend.strategy_planner_runtime import RuntimeStrategyPlanner
 from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
 from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
@@ -142,7 +143,7 @@ class ApplicationBackend:
 
     VERSION = "v1"
 
-    def __init__(self, session_service: RuntimeSessionService | None = None) -> None:
+    def __init__(self, session_service: EnvironmentSessionService | None = None) -> None:
         self._llm_settings = LLMSettingsService()
         self._session_service = session_service or RuntimeSessionService(
             repository=InMemorySessionRepository(),
@@ -161,55 +162,21 @@ class ApplicationBackend:
         return IntentParser(provider=provider, tool_catalog=ToolCatalog())
 
     def health(self) -> BackendResult:
-        """Return backend health and safe LLM status."""
         settings = self._llm_settings.get()
-        return BackendResult(
-            {
-                "status": "ok",
-                "version": self.VERSION,
-                "llm_available": settings.enabled,
-                "llm": {
-                    "provider": settings.provider,
-                    "model": settings.model,
-                    "base_url": settings.base_url,
-                    "api_key_configured": settings.api_key_configured,
-                    "enabled": settings.enabled,
-                },
-            }
-        )
+        return BackendResult({"status": "ok", "version": self.VERSION, "llm_available": settings.enabled, "llm": {"provider": settings.provider, "model": settings.model, "base_url": settings.base_url, "api_key_configured": settings.api_key_configured, "enabled": settings.enabled}})
 
     def get_llm_settings(self) -> BackendResult:
-        """Return safe LLM configuration metadata."""
         settings = self._llm_settings.get()
-        return BackendResult(
-            {
-                "provider": settings.provider,
-                "model": settings.model,
-                "base_url": settings.base_url,
-                "api_key_configured": settings.api_key_configured,
-                "enabled": settings.enabled,
-            }
-        )
+        return BackendResult({"provider": settings.provider, "model": settings.model, "base_url": settings.base_url, "api_key_configured": settings.api_key_configured, "enabled": settings.enabled})
 
     def update_llm_settings(self, payload: dict[str, Any]) -> BackendResult:
-        """Update persistent LLM configuration."""
         settings = self._llm_settings.update(payload)
-        return BackendResult(
-            {
-                "provider": settings.provider,
-                "model": settings.model,
-                "base_url": settings.base_url,
-                "api_key_configured": settings.api_key_configured,
-                "enabled": settings.enabled,
-            }
-        )
+        return BackendResult({"provider": settings.provider, "model": settings.model, "base_url": settings.base_url, "api_key_configured": settings.api_key_configured, "enabled": settings.enabled})
 
     def test_llm_connection(self, payload: dict[str, Any] | None = None) -> BackendResult:
-        """Probe persisted settings or unsaved GUI values without saving them."""
         return BackendResult(self._llm_settings.test_connection(payload))
 
     def list_llm_models(self, payload: dict[str, Any] | None = None) -> BackendResult:
-        """List models using persisted settings or unsaved GUI values."""
         return BackendResult(self._llm_settings.models(payload))
 
     def audit(self) -> BackendResult:
@@ -221,42 +188,17 @@ class ApplicationBackend:
 
     def engineering(self) -> BackendResult:
         report = EngineeringEnvironmentService().run()
-        return BackendResult(
-            {
-                "project_root": str(report.project_root),
-                "ready": report.is_ready,
-                "required_tools_ready": report.required_tools_ready,
-                "cursor_rules_present": report.cursor_rules_present,
-                "cursor_available": report.cursor_available,
-                "tools": [
-                    {
-                        "name": tool.name,
-                        "required": tool.required,
-                        "available": tool.available,
-                        "path": tool.path,
-                    }
-                    for tool in report.tools
-                ],
-            }
-        )
+        return BackendResult({"project_root": str(report.project_root), "ready": report.is_ready, "required_tools_ready": report.required_tools_ready, "cursor_rules_present": report.cursor_rules_present, "cursor_available": report.cursor_available, "tools": [{"name": tool.name, "required": tool.required, "available": tool.available, "path": tool.path} for tool in report.tools]})
 
     def run_safe(self) -> BackendResult:
         result = PipelineEngine().run(mode=ExecutionMode.SAFE, run_id="backend-safe-run")
         return BackendResult(_pipeline_dict(result))
 
     def run_real_requires_cli(self) -> BackendResult:
-        return BackendResult(
-            {
-                "allowed": False,
-                "message": "REAL execution requires explicit interactive approval through the CLI.",
-            }
-        )
+        return BackendResult({"allowed": False, "message": "REAL execution requires explicit interactive approval through the CLI."})
 
     def bootstrap_safe(self) -> BackendResult:
-        result = EnvironmentBootstrapService().run(
-            mode=ExecutionMode.SAFE,
-            run_id="backend-bootstrap-safe",
-        )
+        result = EnvironmentBootstrapService().run(mode=ExecutionMode.SAFE, run_id="backend-bootstrap-safe")
         return BackendResult(_pipeline_dict(result.pipeline_result))
 
     def create_session(self, request: EnvironmentRequest) -> BackendResult:
@@ -267,17 +209,7 @@ class ApplicationBackend:
 
     def get_session(self, session_id: str) -> BackendResult:
         session = self._session_service.get(session_id)
-        return BackendResult(
-            {
-                "session_id": session.session_id,
-                "status": session.status.value,
-                "current_action": session.current_action,
-                "request": self._session_service._request_dict(session.request),
-                "approval_states": {key: value.to_dict() for key, value in session.approval_states.items()},
-                "created_at": session.created_at.isoformat(),
-                "updated_at": session.updated_at.isoformat(),
-            }
-        )
+        return BackendResult({"session_id": session.session_id, "status": session.status.value, "current_action": session.current_action, "request": self._session_service._request_dict(session.request), "approval_states": {key: value.to_dict() for key, value in session.approval_states.items()}, "created_at": session.created_at.isoformat(), "updated_at": session.updated_at.isoformat()})
 
     def get_session_state(self, session_id: str) -> BackendResult:
         return BackendResult(self._session_service.state(session_id).data)
@@ -295,7 +227,9 @@ class ApplicationBackend:
         return BackendResult(self._session_service.skip(session_id, action_id).data)
 
     def start_session(self, session_id: str, mode: ExecutionMode = ExecutionMode.SAFE) -> BackendResult:
-        return BackendResult(self._session_service.start_async(session_id, mode).data)
+        start_async = getattr(self._session_service, "start_async", None)
+        result = start_async(session_id, mode) if callable(start_async) else self._session_service.start(session_id, mode)
+        return BackendResult(result.data)
 
     def cancel_session(self, session_id: str) -> BackendResult:
         return BackendResult(self._session_service.cancel(session_id).data)
