@@ -12,23 +12,22 @@ from ai_engineering_bootstrap.executor.mode import ExecutionMode
 
 
 class ActionRegistry:
-    """Thread-safe registry mapping canonical action IDs to handlers.
-
-    Execution plans may expose instance-specific action IDs such as
-    ``install_python_package:ruff`` so that approval and evidence are independent.
-    The registry resolves those IDs back to the canonical executor action.
-    """
+    """Thread-safe registry mapping action instances to canonical handlers."""
 
     def __init__(self) -> None:
         self._safe_handlers: dict[str, ActionHandler] = {}
         self._real_handlers: dict[str, ActionHandler] = {}
         self._load_defaults()
 
-    @staticmethod
-    def canonical_action_id(action_id: str) -> str:
-        """Map an instance action ID to the registered executor action ID."""
-        if action_id.startswith("install_python_package:"):
-            return "install_python_package"
+    def canonical_action_id(self, action_id: str) -> str:
+        """Map a per-action instance ID to its canonical registered action ID."""
+        if action_id in self._safe_handlers or action_id in self._real_handlers:
+            return action_id
+        prefix, separator, _subject = action_id.partition(":")
+        if separator and (
+            prefix in self._safe_handlers or prefix in self._real_handlers
+        ):
+            return prefix
         return action_id
 
     def _load_defaults(self) -> None:
