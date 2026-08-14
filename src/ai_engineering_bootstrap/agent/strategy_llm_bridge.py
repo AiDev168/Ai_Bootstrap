@@ -59,12 +59,12 @@ def _decode_http_json(raw: bytes) -> dict[str, Any]:
     text = raw.decode("utf-8")
     try:
         data = json.loads(text)
-    except json.JSONDecodeError as error:
+    except json.JSONDecodeError:
         marker = '"content":"'
         start = text.find(marker)
         end = text.rfind('"}]}')
         if start < 0 or end <= start + len(marker):
-            raise error
+            raise
         inner = text[start + len(marker) : end]
         parsed = json.loads(inner)
         if not isinstance(parsed, dict):
