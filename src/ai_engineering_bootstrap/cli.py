@@ -23,12 +23,19 @@ from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.exceptions import BootstrapError
 from ai_engineering_bootstrap.executor import ExecutorEngine
 from ai_engineering_bootstrap.executor.capability import default_capability_registry
-from ai_engineering_bootstrap.generation import default_project_generator, default_template_catalog
+from ai_engineering_bootstrap.generation import (
+    default_project_generator,
+    default_template_catalog,
+)
 from ai_engineering_bootstrap.models import GenerationRequest
 from ai_engineering_bootstrap.pipeline import PipelineEngine
 from ai_engineering_bootstrap.planner import PlannerEngine
 
-app = typer.Typer(name="ai-bootstrap", help="Audit an AI engineering environment.", no_args_is_help=True)
+app = typer.Typer(
+    name="ai-bootstrap",
+    help="Audit an AI engineering environment.",
+    no_args_is_help=True,
+)
 console = Console()
 
 
@@ -98,10 +105,14 @@ def _render_table(report: AuditReport) -> None:
 
 
 @app.command()
-def audit(output_format: str = typer.Option("table", "--format", help="Output format.")) -> None:
+def audit(
+    output_format: str = typer.Option("table", "--format", help="Output format."),
+) -> None:
     """Run a read-only audit of the local engineering environment."""
     if output_format not in ("table", "json"):
-        typer.echo(f"Error: Invalid format '{output_format}'. Use 'table' or 'json'.", err=True)
+        typer.echo(
+            f"Error: Invalid format '{output_format}'. Use 'table' or 'json'.", err=True
+        )
         raise typer.Exit(code=1)
     report = default_audit_service().run()
     if output_format == "json":
@@ -167,7 +178,9 @@ def doctor() -> None:
                 if check.status == CheckStatus.FAILED
                 else "[yellow]WARN[/yellow]"
             )
-            recommendations = "\n".join(f"• {item}" for item in check.recommendations) or "—"
+            recommendations = (
+                "\n".join(f"• {item}" for item in check.recommendations) or "—"
+            )
             table.add_row(check.name, status, check.details or "—", recommendations)
         console.print(table)
     console.print(f"\n[bold]Health Score: {report.readiness.health_score}/100[/bold]")
@@ -179,16 +192,28 @@ def engineering() -> None:
     report = EngineeringEnvironmentService().run()
     console.print(f"[bold]Project:[/bold] {report.project_root}")
     console.print(f"[bold]Ready:[/bold] {'YES' if report.is_ready else 'NO'}")
-    console.print(f"[bold]Required tools:[/bold] {'OK' if report.required_tools_ready else 'MISSING'}")
-    rules = "[green]PRESENT[/green]" if report.cursor_rules_present else "[yellow]NOT DETECTED[/yellow]"
-    cursor = "[green]AVAILABLE[/green]" if report.cursor_available else "[yellow]NOT DETECTED[/yellow]"
+    console.print(
+        f"[bold]Required tools:[/bold] {'OK' if report.required_tools_ready else 'MISSING'}"
+    )
+    rules = (
+        "[green]PRESENT[/green]"
+        if report.cursor_rules_present
+        else "[yellow]NOT DETECTED[/yellow]"
+    )
+    cursor = (
+        "[green]AVAILABLE[/green]"
+        if report.cursor_available
+        else "[yellow]NOT DETECTED[/yellow]"
+    )
     console.print(f"• Cursor rules: {rules}")
     console.print(f"• Cursor CLI: {cursor}")
     console.print()
     if report.is_ready:
         console.print("[green bold]✓ Engineering environment is ready.[/green bold]")
     else:
-        console.print("[yellow bold]⚠ Engineering environment needs attention.[/yellow bold]")
+        console.print(
+            "[yellow bold]⚠ Engineering environment needs attention.[/yellow bold]"
+        )
 
 
 @app.command()
@@ -202,7 +227,9 @@ def plan() -> None:
     console.print("[bold]Execution Plan:[/bold]\n")
     for i, action in enumerate(plan.actions, 1):
         console.print(f"{i}. [cyan]{action.description}[/cyan]")
-        console.print(f"   [dim]ID: {action.action_id} | Priority: {action.priority}[/dim]")
+        console.print(
+            f"   [dim]ID: {action.action_id} | Priority: {action.priority}[/dim]"
+        )
         console.print()
 
 
@@ -215,11 +242,21 @@ def execute() -> None:
         console.print("[green]✓ Environment is healthy. No actions to execute.[/green]")
         return
     console.print("[yellow bold]⚠️ SAFE MODE ACTIVE[/yellow bold]")
-    console.print("The following actions would be taken, but are currently simulated:\n")
+    console.print(
+        "The following actions would be taken, but are currently simulated:\n"
+    )
     result = ExecutorEngine().execute(plan)
     for res in result.results:
-        status_color = "green" if res.status.value == "success" else "red" if res.status.value == "failed" else "yellow"
-        console.print(f"[{status_color}]• [{res.status.value.upper()}] {res.action_id}[/{status_color}]")
+        status_color = (
+            "green"
+            if res.status.value == "success"
+            else "red"
+            if res.status.value == "failed"
+            else "yellow"
+        )
+        console.print(
+            f"[{status_color}]• [{res.status.value.upper()}] {res.action_id}[/{status_color}]"
+        )
         console.print(f"  [dim]{res.message}[/dim]")
     console.print()
     final_color = "green" if result.is_success else "red"
@@ -227,15 +264,24 @@ def execute() -> None:
 
 
 @app.command()
-def serve_gui(host: str = typer.Option("127.0.0.1", "--host"), port: int = typer.Option(8787, "--port", min=1, max=65535)) -> None:
+def serve_gui(
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8787, "--port", min=1, max=65535),
+) -> None:
     """Run the stable backend API and web GUI."""
     serve(host, port)
 
 
 @app.command()
 def run_pipeline(
-    real_execution: bool = typer.Option(False, "--real-execution", help="Enable REAL execution mode."),
-    interactive_approval: bool = typer.Option(False, "--interactive-approval", help="Prompt for required human approvals before REAL execution."),
+    real_execution: bool = typer.Option(
+        False, "--real-execution", help="Enable REAL execution mode."
+    ),
+    interactive_approval: bool = typer.Option(
+        False,
+        "--interactive-approval",
+        help="Prompt for required human approvals before REAL execution.",
+    ),
 ) -> None:
     from ai_engineering_bootstrap.executor.mode import ExecutionMode
 
@@ -251,9 +297,12 @@ def run_pipeline(
     pending_approvals = None
     if interactive_approval:
         if not real_execution:
-            typer.echo("Error: --interactive-approval requires --real-execution", err=True)
+            typer.echo(
+                "Error: --interactive-approval requires --real-execution", err=True
+            )
             raise typer.Exit(code=2)
         from ai_engineering_bootstrap.approval.provider import InMemoryApprovalProvider
+
         approval_provider = InMemoryApprovalProvider()
     if interactive_approval:
         bootstrap_result = EnvironmentBootstrapService().run(
@@ -270,16 +319,36 @@ def run_pipeline(
         if result is None:
             raise typer.Exit(code=1)
     else:
-        result = engine.run(mode=mode, approval_provider=approval_provider, pending_approvals=pending_approvals, run_id=run_id, agent_planning_service=recovery_agent)
+        result = engine.run(
+            mode=mode,
+            approval_provider=approval_provider,
+            pending_approvals=pending_approvals,
+            run_id=run_id,
+            agent_planning_service=recovery_agent,
+        )
     readiness = result.audit_report.readiness
-    console.print(f"[bold]1. Audit Complete:[/bold] Health Score {readiness.health_score}/100")
-    console.print(f"[bold]2. Plan Generated:[/bold] {len(result.original_plan.actions)} action(s).")
-    console.print(f"[bold]3. Validation:[/bold] {'PASSED' if result.validation_result.is_valid else 'FAILED'}")
+    console.print(
+        f"[bold]1. Audit Complete:[/bold] Health Score {readiness.health_score}/100"
+    )
+    console.print(
+        f"[bold]2. Plan Generated:[/bold] {len(result.original_plan.actions)} action(s)."
+    )
+    console.print(
+        f"[bold]3. Validation:[/bold] {'PASSED' if result.validation_result.is_valid else 'FAILED'}"
+    )
     if result.execution_result is not None:
         console.print("[bold]4. Execution:[/bold]")
         for item in result.execution_result.results:
-            color = "green" if item.status.value == "success" else "red" if item.status.value == "failed" else "yellow"
-            console.print(f"   • [{color}][{item.status.value.upper()}] {item.action_id}[/{color}]")
+            color = (
+                "green"
+                if item.status.value == "success"
+                else "red"
+                if item.status.value == "failed"
+                else "yellow"
+            )
+            console.print(
+                f"   • [{color}][{item.status.value.upper()}] {item.action_id}[/{color}]"
+            )
     else:
         console.print("[bold]4. Execution:[/bold] SKIPPED")
     if result.verification_result is not None:
@@ -296,13 +365,21 @@ def run_pipeline(
 
 @app.command()
 def bootstrap(
-    interactive_approval: bool = typer.Option(False, "--interactive-approval", help="Require human approval for REAL bootstrap actions."),
+    interactive_approval: bool = typer.Option(
+        False,
+        "--interactive-approval",
+        help="Require human approval for REAL bootstrap actions.",
+    ),
 ) -> None:
     """Bootstrap the environment through the canonical pipeline."""
     if interactive_approval:
         typer.echo("Error: --interactive-approval requires --real-execution", err=True)
         raise typer.Exit(code=2)
-    result = EnvironmentBootstrapService().run(mode=__import__("ai_engineering_bootstrap.executor.mode", fromlist=["ExecutionMode"]).ExecutionMode.SAFE)
+    result = EnvironmentBootstrapService().run(
+        mode=__import__(
+            "ai_engineering_bootstrap.executor.mode", fromlist=["ExecutionMode"]
+        ).ExecutionMode.SAFE
+    )
     if result.pipeline_result is None:
         raise typer.Exit(code=1)
     if result.pipeline_result.is_success:
