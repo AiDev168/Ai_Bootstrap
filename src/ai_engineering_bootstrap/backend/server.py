@@ -38,7 +38,7 @@ class BackendRequestHandler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length)
         payload = json.loads(raw.decode("utf-8"))
         if not isinstance(payload, dict):
-            raise ValueError("JSON request body must be an object")
+            raise TypeError("JSON request body must be an object")
         return payload
 
     @staticmethod

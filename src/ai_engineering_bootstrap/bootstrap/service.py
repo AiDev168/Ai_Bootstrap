@@ -38,9 +38,12 @@ class EnvironmentBootstrapResult:
     def is_success(self) -> bool:
         if not self.environment_ready:
             return False
-        if self.pipeline_result is not None and self.pipeline_result.execution_result is not None:
-            if not self.pipeline_result.execution_result.is_success:
-                return False
+        if (
+            self.pipeline_result is not None
+            and self.pipeline_result.execution_result is not None
+            and not self.pipeline_result.execution_result.is_success
+        ):
+            return False
         return all(result.is_success for result in self.action_results)
 
 

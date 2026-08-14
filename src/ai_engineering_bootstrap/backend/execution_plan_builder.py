@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from ai_engineering_bootstrap.agent.strategy_planner import StrategyPlan
 from ai_engineering_bootstrap.environment.models import DeltaAction, EnvironmentDelta
 from ai_engineering_bootstrap.executor.capability import (
@@ -14,13 +16,13 @@ from ai_engineering_bootstrap.planner.models import ExecutionPlan, ExecutionPlan
 class ExecutionPlanBuilder:
     """Translate validated strategy decisions into existing executor action IDs."""
 
-    _TOOL_ACTIONS = {
+    _TOOL_ACTIONS: ClassVar[dict[str, str]] = {
         "cursor": "install_cursor",
         "git": "install_git",
         "docker": "install_docker",
     }
 
-    _STRATEGY_ACTIONS = {
+    _STRATEGY_ACTIONS: ClassVar[dict[str, str | None]] = {
         "pip_install": "install_python_package",
         "deb_install": None,
         "apt_install": None,
@@ -104,7 +106,7 @@ class ExecutionPlanBuilder:
     def _deduplicate(actions: list[ExecutionPlanAction]) -> list[ExecutionPlanAction]:
         seen: set[tuple[str, str]] = set()
         result: list[ExecutionPlanAction] = []
-        for action in sorted(actions, key=lambda item: (item.priority, item.action_id, item.description)):
+        for action in actions:
             key = (action.action_id, str(action.context))
             if key in seen:
                 continue
