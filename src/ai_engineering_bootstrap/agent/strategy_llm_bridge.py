@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import urllib.request
 from typing import Any
 
@@ -10,10 +11,21 @@ from ai_engineering_bootstrap.agent.models import AgentDecision
 from ai_engineering_bootstrap.agent.provider import (
     InProcessProvider,
     LLMProvider,
-    LocalServerProvider,
     MockProvider,
     RemoteAPIProvider,
 )
+
+
+_MOCK_STRATEGIES = {
+    "cursor": "cursor_deb_linux",
+    "git": "git_apt",
+    "docker": "docker_apt",
+    "python": "python_apt",
+    "ruff": "ruff_pip",
+    "pytest": "pytest_pip",
+    "black": "black_pip",
+    "gh": "gh_apt",
+}
 
 
 class StrategyLLMProvider(LLMProvider):
@@ -31,7 +43,6 @@ class StrategyLLMProvider(LLMProvider):
 
     def metadata(self) -> dict[str, Any]:
         meta = dict(self.provider.metadata())
-        meta["provider_type"] = meta.get("provider_type", self.provider.__class__.__name__)
         config = getattr(self.provider, "config", None)
         if config is not None:
             meta["model"] = config.model or ""
@@ -41,7 +52,24 @@ class StrategyLLMProvider(LLMProvider):
 
 def _complete_json(provider: LLMProvider, prompt: str) -> dict[str, Any]:
     if isinstance(provider, MockProvider):
-        raise RuntimeError("Mock provider does not produce strategy decisions.")
+        strategies = []
+        for tool_id, action in re.findall(r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE):
+            strategy_id = _MOCK_STRATEGIES.get(tool_id.strip())
+            if strategy_id:
+                strategies.append(
+                    {
+                        "tool_id": tool_id.strip(),
+                        "strategy": strategy_id,
+                        "args": {},
+                        "reasoning": f"Mock provider selected catalog strategy {strategy_id}.",
+                        "confidence": 1.0,
+                        "source": "catalog",
+                    }
+                )
+        return {
+            "strategies": strategies,
+            "confidence": 1.0,
+        }
 
     if isinstance(provider, InProcessProvider):
         output = provider.model.generate(prompt)
@@ -57,7 +85,7 @@ def _complete_json(provider: LLMProvider, prompt: str) -> dict[str, Any]:
     system_prompt = (
         "You are an engineering environment strategy planner. "
         "Return ONLY valid JSON matching the requested schema. "
-        "Use only strategies present in the catalog supplied by the caller."
+        "Use only strategies present in the tool catalog."
     )
     payload = {
         "model": config.model or "default",
