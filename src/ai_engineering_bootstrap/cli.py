@@ -23,19 +23,12 @@ from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.exceptions import BootstrapError
 from ai_engineering_bootstrap.executor import ExecutorEngine
 from ai_engineering_bootstrap.executor.capability import default_capability_registry
-from ai_engineering_bootstrap.generation import (
-    default_project_generator,
-    default_template_catalog,
-)
+from ai_engineering_bootstrap.generation import default_project_generator, default_template_catalog
 from ai_engineering_bootstrap.models import GenerationRequest
 from ai_engineering_bootstrap.pipeline import PipelineEngine
 from ai_engineering_bootstrap.planner import PlannerEngine
 
-app = typer.Typer(
-    name="ai-bootstrap",
-    help="Audit an AI engineering environment.",
-    no_args_is_help=True,
-)
+app = typer.Typer(name="ai-bootstrap", help="Audit an AI engineering environment.", no_args_is_help=True)
 console = Console()
 
 
@@ -44,7 +37,6 @@ def _build_recovery_agent() -> AgentPlanningService | None:
     provider_type = os.getenv("AI_BOOTSTRAP_AGENT_PROVIDER", "").strip()
     if not provider_type:
         return None
-
     config = ProviderConfig(
         provider_type=provider_type,
         model=os.getenv("AI_BOOTSTRAP_AGENT_MODEL"),
@@ -97,7 +89,6 @@ def _render_table(report: AuditReport) -> None:
     table.add_column("Check")
     table.add_column("Status")
     table.add_column("Details")
-
     for check in report.checks:
         status_str = "OK" if check.status == CheckStatus.PASSED else "FAILED"
         if check.status == CheckStatus.WARNING:
@@ -107,18 +98,10 @@ def _render_table(report: AuditReport) -> None:
 
 
 @app.command()
-def audit(
-    output_format: str = typer.Option(
-        "table",
-        "--format",
-        help="Output format.",
-    ),
-) -> None:
+def audit(output_format: str = typer.Option("table", "--format", help="Output format.")) -> None:
     """Run a read-only audit of the local engineering environment."""
     if output_format not in ("table", "json"):
-        typer.echo(
-            f"Error: Invalid format '{output_format}'. Use 'table' or 'json'.", err=True
-        )
+        typer.echo(f"Error: Invalid format '{output_format}'. Use 'table' or 'json'.", err=True)
         raise typer.Exit(code=1)
     report = default_audit_service().run()
     if output_format == "json":
@@ -164,189 +147,100 @@ def doctor() -> None:
     """Run a read-only environment health check (Environment Doctor V3)."""
     audit_service = default_audit_service()
     report = audit_service.run()
-
     grouped_checks: dict[str, list] = {}
     for check in report.checks:
         cat = check.category.value
         if cat not in grouped_checks:
             grouped_checks[cat] = []
         grouped_checks[cat].append(check)
-
     for category, checks in grouped_checks.items():
         table = Table(title=f"[bold cyan]{category}[/bold cyan]")
         table.add_column("Check", style="cyan")
         table.add_column("Status", style="green")
         table.add_column("Details", style="white")
-
+        table.add_column("Recommendations", style="yellow")
         for check in checks:
-            status_str = "OK" if check.status == CheckStatus.PASSED else "FAILED"
-            if check.status == CheckStatus.WARNING:
-                status_str = "WARNING"
-
-            details = check.details
-            if not details:
-                details = check.facts.get("version", check.facts.get("current", ""))
-
-            table.add_row(check.name, status_str, details)
-
+            status = (
+                "[green]PASS[/green]"
+                if check.status == CheckStatus.PASSED
+                else "[red]FAIL[/red]"
+                if check.status == CheckStatus.FAILED
+                else "[yellow]WARN[/yellow]"
+            )
+            recommendations = "\n".join(f"• {item}" for item in check.recommendations) or "—"
+            table.add_row(check.name, status, check.details or "—", recommendations)
         console.print(table)
-        console.print()
-
-    r = report.readiness
-    dev_status_str = "[green]YES[/green]" if r.development_ready else "[red]NO[/red]"
-    prod_status_str = "[green]YES[/green]" if r.production_ready else "[red]NO[/red]"
-
-    console.rule("[bold]Summary[/bold]")
-    console.print(f"[bold]Development Ready :[/bold] {dev_status_str}")
-    console.print(f"[bold]Production Ready :[/bold] {prod_status_str}")
-    console.print(f"[bold]Health Score      :[/bold] {r.health_score}/100")
-    console.print(
-        f"[bold]Passed :[/bold] {r.passed_count}  [bold]Failed :[/bold] {r.failed_count}  [bold]Warnings :[/bold] {r.warning_count}"
-    )
-
-    all_recommendations = set()
-    for check in report.checks:
-        for rec in check.recommendations:
-            all_recommendations.add(rec)
-
-    console.print()
-    if all_recommendations:
-        console.print("[yellow bold]Recommended actions:[/yellow bold]")
-        for rec in sorted(all_recommendations):
-            console.print(f"• {rec}")
-    else:
-        console.print("[green bold]No Actions Required[/green bold]")
-        console.print("Environment already satisfies the project requirements.")
+    console.print(f"\n[bold]Health Score: {report.readiness.health_score}/100[/bold]")
 
 
-@app.command("engineering-bootstrap")
-def engineering_bootstrap() -> None:
-    """Inspect engineering tooling and Cursor integration."""
+@app.command()
+def engineering() -> None:
+    """Inspect engineering environment readiness."""
     report = EngineeringEnvironmentService().run()
-    console.print("[bold cyan]Engineering Environment Bootstrap[/bold cyan]\n")
-    for tool in report.tools:
-        status = "[green]AVAILABLE[/green]" if tool.available else "[red]MISSING[/red]"
-        requirement = "required" if tool.required else "optional"
-        location = f" — {tool.path}" if tool.path else ""
-        console.print(f"• {tool.name} ({requirement}): {status}{location}")
-    rules = (
-        "[green]PRESENT[/green]"
-        if report.cursor_rules_present
-        else "[red]MISSING[/red]"
-    )
-    cursor = (
-        "[green]AVAILABLE[/green]"
-        if report.cursor_available
-        else "[yellow]NOT DETECTED[/yellow]"
-    )
+    console.print(f"[bold]Project:[/bold] {report.project_root}")
+    console.print(f"[bold]Ready:[/bold] {'YES' if report.is_ready else 'NO'}")
+    console.print(f"[bold]Required tools:[/bold] {'OK' if report.required_tools_ready else 'MISSING'}")
+    rules = "[green]PRESENT[/green]" if report.cursor_rules_present else "[yellow]NOT DETECTED[/yellow]"
+    cursor = "[green]AVAILABLE[/green]" if report.cursor_available else "[yellow]NOT DETECTED[/yellow]"
     console.print(f"• Cursor rules: {rules}")
     console.print(f"• Cursor CLI: {cursor}")
     console.print()
     if report.is_ready:
         console.print("[green bold]✓ Engineering environment is ready.[/green bold]")
     else:
-        console.print(
-            "[yellow bold]⚠ Engineering environment needs attention.[/yellow bold]"
-        )
+        console.print("[yellow bold]⚠ Engineering environment needs attention.[/yellow bold]")
 
 
 @app.command()
 def plan() -> None:
     """Generate an execution plan based on the latest audit."""
-    audit_service = default_audit_service()
-    report = audit_service.run()
-    engine = PlannerEngine()
-    plan = engine.generate_plan(report)
+    report = default_audit_service().run()
+    plan = PlannerEngine().generate_plan(report)
     if not plan.is_actionable:
         console.print("[green]✓ Environment is healthy. No actions required.[/green]")
         return
-
     console.print("[bold]Execution Plan:[/bold]\n")
     for i, action in enumerate(plan.actions, 1):
         console.print(f"{i}. [cyan]{action.description}[/cyan]")
-        console.print(
-            f"   [dim]ID: {action.action_id} | Priority: {action.priority}[/dim]"
-        )
+        console.print(f"   [dim]ID: {action.action_id} | Priority: {action.priority}[/dim]")
         console.print()
 
 
 @app.command()
 def execute() -> None:
-    """
-    Execute the generated plan (SAFE MODE / DRY RUN).
-
-    WARNING: This is a foundation feature.
-    NO real system changes will be made.
-    Actions are simulated to verify the execution pipeline.
-    """
-    audit_service = default_audit_service()
-    report = audit_service.run()
-
-    # Generate plan
-    planner = PlannerEngine()
-    plan = planner.generate_plan(report)
-
+    """Execute the generated plan in SAFE mode."""
+    report = default_audit_service().run()
+    plan = PlannerEngine().generate_plan(report)
     if not plan.is_actionable:
         console.print("[green]✓ Environment is healthy. No actions to execute.[/green]")
         return
-
     console.print("[yellow bold]⚠️ SAFE MODE ACTIVE[/yellow bold]")
-    console.print("The following actions would be taken, but are currently simulated:")
-    console.print()
-
-    # Execute plan
-    executor = ExecutorEngine()
-    result = executor.execute(plan)
-
-    # Display results
+    console.print("The following actions would be taken, but are currently simulated:\n")
+    result = ExecutorEngine().execute(plan)
     for res in result.results:
-        status_color = (
-            "green"
-            if res.status.value == "success"
-            else ("red" if res.status.value == "failed" else "yellow")
-        )
-        status_str = res.status.value.upper()
-        console.print(
-            f"[{status_color}]• [{status_str}] {res.action_id}[/{status_color}]"
-        )
+        status_color = "green" if res.status.value == "success" else "red" if res.status.value == "failed" else "yellow"
+        console.print(f"[{status_color}]• [{res.status.value.upper()}] {res.action_id}[/{status_color}]")
         console.print(f"  [dim]{res.message}[/dim]")
-
     console.print()
     final_color = "green" if result.is_success else "red"
     console.print(f"[{final_color} bold]{result.summary}[/{final_color} bold]")
-    console.print(
-        "\n[dim]Note: Real system modification handlers are not yet implemented.[/dim]"
-    )
 
 
 @app.command()
-def serve_gui(
-    host: str = typer.Option("127.0.0.1", "--host"),
-    port: int = typer.Option(8787, "--port", min=1, max=65535),
-) -> None:
+def serve_gui(host: str = typer.Option("127.0.0.1", "--host"), port: int = typer.Option(8787, "--port", min=1, max=65535)) -> None:
     """Run the stable backend API and web GUI."""
     serve(host, port)
 
 
 @app.command()
 def run_pipeline(
-    real_execution: bool = typer.Option(
-        False,
-        "--real-execution",
-        help="Enable REAL execution mode.",
-    ),
-    interactive_approval: bool = typer.Option(
-        False,
-        "--interactive-approval",
-        help="Prompt for required human approvals before REAL execution.",
-    ),
+    real_execution: bool = typer.Option(False, "--real-execution", help="Enable REAL execution mode."),
+    interactive_approval: bool = typer.Option(False, "--interactive-approval", help="Prompt for required human approvals before REAL execution."),
 ) -> None:
     from ai_engineering_bootstrap.executor.mode import ExecutionMode
 
     mode = ExecutionMode.REAL if real_execution else ExecutionMode.SAFE
-    console.print(
-        f"[bold cyan]Running Full Pipeline ({mode.value.upper()} MODE)...[/bold cyan]\n"
-    )
+    console.print(f"[bold cyan]Running Full Pipeline ({mode.value.upper()} MODE)...\n")
     if mode == ExecutionMode.REAL:
         console.print("[yellow bold]⚠️ REAL EXECUTION MODE ACTIVE[/yellow bold]")
         console.print("Only pre-approved, non-destructive actions will run.\n")
@@ -357,11 +251,10 @@ def run_pipeline(
     pending_approvals = None
     if interactive_approval:
         if not real_execution:
-            raise typer.BadParameter("--interactive-approval requires --real-execution")
+            typer.echo("Error: --interactive-approval requires --real-execution", err=True)
+            raise typer.Exit(code=2)
         from ai_engineering_bootstrap.approval.provider import InMemoryApprovalProvider
-
         approval_provider = InMemoryApprovalProvider()
-
     if interactive_approval:
         bootstrap_result = EnvironmentBootstrapService().run(
             mode=mode,
@@ -377,193 +270,42 @@ def run_pipeline(
         if result is None:
             raise typer.Exit(code=1)
     else:
-        result = engine.run(
-            mode=mode,
-            approval_provider=approval_provider,
-            pending_approvals=pending_approvals,
-            run_id=run_id,
-            agent_planning_service=recovery_agent,
-        )
-    # 1. Audit
-    r = result.audit_report.readiness
-    console.print(f"[bold]1. Audit Complete:[/bold] Health Score {r.health_score}/100")
-    # 2. Plan
-    if result.original_plan.is_actionable:
-        console.print(
-            f"[bold]2. Plan Generated:[/bold] {len(result.original_plan.actions)} action(s)."
-        )
+        result = engine.run(mode=mode, approval_provider=approval_provider, pending_approvals=pending_approvals, run_id=run_id, agent_planning_service=recovery_agent)
+    readiness = result.audit_report.readiness
+    console.print(f"[bold]1. Audit Complete:[/bold] Health Score {readiness.health_score}/100")
+    console.print(f"[bold]2. Plan Generated:[/bold] {len(result.original_plan.actions)} action(s).")
+    console.print(f"[bold]3. Validation:[/bold] {'PASSED' if result.validation_result.is_valid else 'FAILED'}")
+    if result.execution_result is not None:
+        console.print("[bold]4. Execution:[/bold]")
+        for item in result.execution_result.results:
+            color = "green" if item.status.value == "success" else "red" if item.status.value == "failed" else "yellow"
+            console.print(f"   • [{color}][{item.status.value.upper()}] {item.action_id}[/{color}]")
     else:
-        console.print("[bold]2. Plan Generated:[/bold] No actions required.")
-    # 3. Validation
-    if result.validation_result.is_valid:
-        console.print("[bold]3. Validation:[/bold] [green]PASSED[/green]")
+        console.print("[bold]4. Execution:[/bold] SKIPPED")
+    if result.verification_result is not None:
+        console.print("[bold]5. Verification:[/bold]")
+        for item in result.verification_result:
+            console.print(f"   • {item.action_id}: {item.status.value}")
     else:
-        console.print("[bold]3. Validation:[/bold] [red]FAILED[/red]")
-        for err in result.validation_result.errors:
-            console.print(f"   - {err}")
-        console.print("\n[red bold]Pipeline halted.[/red bold]")
-        return
-    # 4. Execution
-    if result.execution_result:
-        if result.execution_result.is_success:
-            console.print("[bold]4. Execution:[/bold] [green]SUCCESS[/green]")
-        else:
-            console.print("[bold]4. Execution:[/bold] [red]FAILED[/red]")
-        for res in result.execution_result.results:
-            color = (
-                "green"
-                if res.status.value == "success"
-                else ("red" if res.status.value == "failed" else "yellow")
-            )
-            console.print(
-                f"   [{color}]• [{res.status.value.upper()}] {res.action_id}[/{color}]"
-            )
-            console.print(f"      [dim]{res.message}[/dim]")
-    else:
-        console.print(
-            "[bold]4. Execution:[/bold] [dim]Skipped (Validation Failed)[/dim]"
-        )
-    # 5. Verification
-    # اصلاح: استفاده از getattr برای جلوگیری از خطا در صورت عدم وجود فیلد
-    # و بررسی نام صحیح فیلد (احتمالاً verification_result به صورت مفرد یا جمع)
-    console.print()
-    # تلاش برای دریافت لیست نتایج تأیید با نام‌های محتمل
-    verification_results = getattr(result, "verification_results", None)
-    if verification_results is None:
-        verification_results = getattr(result, "verification_result", None)
-    # اگر لیست نبود و یک تک نتیجه بود، آن را به لیست تبدیل کن
-    if verification_results and not isinstance(verification_results, list):
-        verification_results = [verification_results]
-
-    if verification_results:
-        all_skipped = all(v.status.value == "skipped" for v in verification_results)
-        all_verified = all(v.status.value != "failed" for v in verification_results)
-        if all_skipped:
-            console.print("[bold]5. Verification:[/bold] [dim]SKIPPED[/dim]")
-        elif all_verified:
-            console.print("[bold]5. Verification:[/bold] [green]COMPLETED[/green]")
-        else:
-            console.print("[bold]5. Verification:[/bold] [red]ISSUES DETECTED[/red]")
-        for v in verification_results:
-            color = (
-                "green"
-                if v.status.value == "verified"
-                else ("red" if v.status.value == "failed" else "yellow")
-            )
-            console.print(
-                f"   [{color}]• [{v.status.value.upper()}] {v.action_id}[/{color}]"
-            )
-            console.print(f"      [dim]{v.message}[/dim]")
-            if hasattr(v, "observed") and v.observed:
-                console.print(f"      [dim]Observed: {v.observed}[/dim]")
-    else:
-        console.print("[bold]5. Verification:[/bold] [dim]No actions to verify[/dim]")
-    console.print()
+        console.print("[bold]5. Verification:[/bold] SKIPPED")
     if result.is_success:
-        console.print("[green bold]✓ Pipeline Completed Successfully.[/green bold]")
+        console.print("\n[green bold]✓ Pipeline Completed Successfully.[/green bold]")
     else:
-        console.print("[red bold]⚠ Pipeline Completed with Issues.[/red bold]")
-        raise typer.Exit(code=1)
+        console.print("\n[red bold]⚠ Pipeline Completed with Issues.[/red bold]")
 
 
 @app.command()
 def bootstrap(
-    real_execution: bool = typer.Option(
-        False,
-        "--real-execution",
-        help="Enable REAL execution mode.",
-    ),
-    interactive_approval: bool = typer.Option(
-        False,
-        "--interactive-approval",
-        help="Prompt separately for each required REAL action.",
-    ),
+    interactive_approval: bool = typer.Option(False, "--interactive-approval", help="Require human approval for REAL bootstrap actions."),
 ) -> None:
-    """Run the complete environment bootstrap workflow."""
-    from ai_engineering_bootstrap.executor.mode import ExecutionMode
-
-    if interactive_approval and not real_execution:
-        raise typer.BadParameter("--interactive-approval requires --real-execution")
-
-    mode = ExecutionMode.REAL if real_execution else ExecutionMode.SAFE
-    console.print(
-        f"[bold cyan]Running Environment Bootstrap ({mode.value.upper()} MODE)...[/bold cyan]\n"
-    )
-    if real_execution:
-        console.print("[yellow bold]⚠️ REAL EXECUTION MODE ACTIVE[/yellow bold]")
-        console.print("Only explicitly approved, typed actions will run.\n")
-
-    approval_provider = None
-    approval_callback = None
+    """Bootstrap the environment through the canonical pipeline."""
     if interactive_approval:
-        from ai_engineering_bootstrap.approval.provider import InMemoryApprovalProvider
-
-        approval_provider = InMemoryApprovalProvider()
-
-        def approval_callback(request: object) -> bool:
-            reason = getattr(request, "reason", "Action requires approval")
-            risk = getattr(request, "risk_level", "UNKNOWN")
-            return typer.confirm(f"Approve {reason} ({risk})?", default=False)
-
-    result = EnvironmentBootstrapService().run(
-        mode=mode,
-        approval_provider=approval_provider,
-        approval_callback=approval_callback,
-    )
-
-    console.print(
-        f"[bold]Final Audit:[/bold] Health Score "
-        f"{result.final_audit_report.readiness.health_score}/100"
-    )
-    console.print(
-        f"[bold]Environment Ready:[/bold] "
-        f"{'[green]YES[/green]' if result.environment_ready else '[red]NO[/red]'}"
-    )
-
-    missing_checks = [
-        check
-        for check in result.final_audit_report.checks
-        if check.status == CheckStatus.FAILED
-    ]
-    if missing_checks:
-        console.print("\n[bold]Missing / Failed Requirements:[/bold]")
-        for check in missing_checks:
-            requirement = str(check.facts.get("requirement", "")).strip()
-            target = (
-                requirement or str(check.facts.get("package", "")).strip() or check.name
-            )
-            console.print(
-                f"   [red]• [MISSING][/red] {target} [dim]({check.name})[/dim]"
-            )
-            if check.details:
-                console.print(f"      [dim]{check.details}[/dim]")
-
-    for execution in result.action_results:
-        for action_result in execution.results:
-            color = (
-                "green"
-                if action_result.status.value == "success"
-                else "red"
-                if action_result.status.value == "failed"
-                else "yellow"
-            )
-            target = str(action_result.details.get("package", "")).strip()
-            label = action_result.action_id
-            if action_result.action_id == "install_python_package" and target:
-                label = f"Install Python package: {target}"
-            console.print(
-                f"[{color}]• [{action_result.status.value.upper()}] {label}[/{color}]"
-            )
-            console.print(f"  [dim]{action_result.message}[/dim]")
-
-    if result.rejected_actions:
-        console.print(
-            "[yellow]Rejected actions:[/yellow] " + ", ".join(result.rejected_actions)
-        )
-
-    if not result.is_success:
+        typer.echo("Error: --interactive-approval requires --real-execution", err=True)
+        raise typer.Exit(code=2)
+    result = EnvironmentBootstrapService().run(mode=__import__("ai_engineering_bootstrap.executor.mode", fromlist=["ExecutionMode"]).ExecutionMode.SAFE)
+    if result.pipeline_result is None:
         raise typer.Exit(code=1)
-
-
-if __name__ == "__main__":
-    app()
+    if result.pipeline_result.is_success:
+        console.print("[green]Bootstrap completed successfully.[/green]")
+        return
+    raise typer.Exit(code=1)
