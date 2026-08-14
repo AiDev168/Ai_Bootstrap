@@ -37,6 +37,15 @@
         if (modelInput) modelInput.disabled = false;
     }
 
+    function selectedTools() {
+        return [...document.querySelectorAll('#create input[type="checkbox"]:checked')]
+            .filter(input => input.id !== "force-install")
+            .map(input => input.value?.trim())
+            .filter(Boolean);
+    }
+
+    window.selectedTools = selectedTools;
+
     function ensureModelTools() {
         if (!modelInput || document.getElementById("load-models-btn")) return;
         const button = document.createElement("button");
@@ -59,7 +68,7 @@
         const label = document.createElement("label");
         label.className = "check";
         label.style.marginTop = "12px";
-        label.innerHTML = '<input id="force-install" type="checkbox"> Install / repair selected tools even if currently detected';
+        label.innerHTML = '<input id="force-install" type="checkbox" value="force-install"> Install / repair selected tools even if currently detected';
         projectPath.insertAdjacentElement("afterend", label);
     }
 
@@ -115,7 +124,7 @@
             message.dataset.noWork = "1";
             message.className = "muted";
             message.style.marginTop = "10px";
-            message.textContent = "No installation actions are required. Enable Install / repair selected tools when you explicitly want an installation action.";
+            message.textContent = "No installation actions are required for the reconciled desired state.";
             execution.appendChild(message);
         }
     }
@@ -188,7 +197,7 @@
             button.textContent = "Creating…";
         }
         try {
-            const tools = typeof window.selectedTools === "function" ? window.selectedTools() : [];
+            const tools = selectedTools();
             const forceInstall = Boolean(document.getElementById("force-install")?.checked);
             const payload = {
                 natural_language_goal: goal,
