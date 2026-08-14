@@ -46,9 +46,11 @@ class EnvironmentRequest:
     natural_language_goal: str = ""
     required_tools: list[str] = field(default_factory=list)
     optional_tools: list[str] = field(default_factory=list)
+    excluded_tools: list[str] = field(default_factory=list)
     languages: list[str] = field(default_factory=list)
     frameworks: list[str] = field(default_factory=list)
     project_dependencies: list[PythonPackageRequirement] = field(default_factory=list)
+    excluded_packages: list[str] = field(default_factory=list)
     configurations: dict[str, Any] = field(default_factory=dict)
     constraints: dict[str, Any] = field(default_factory=dict)
     platform_preferences: dict[str, Any] = field(default_factory=dict)
@@ -57,6 +59,8 @@ class EnvironmentRequest:
     def to_desired_state(self) -> DesiredEnvironmentState:
         """Convert this request into a structured desired state."""
         force_install = bool(self.constraints.get("force_install", False))
+        excluded_tools = {tool.lower() for tool in self.excluded_tools}
+        excluded_packages = {package.lower() for package in self.excluded_packages}
         tools = {
             tool_id: ToolRequirement(
                 tool_id=tool_id,
@@ -64,23 +68,33 @@ class EnvironmentRequest:
                 configuration={"force_install": force_install} if force_install else {},
             )
             for tool_id in self.required_tools
+            if tool_id.lower() not in excluded_tools
         }
         for tool_id in self.optional_tools:
-            if tool_id not in tools:
+            if tool_id not in tools and tool_id.lower() not in excluded_tools:
                 tools[tool_id] = ToolRequirement(
                     tool_id=tool_id,
                     level=ToolRequirementLevel.OPTIONAL,
-                    configuration={"force_install": force_install}
-                    if force_install
-                    else {},
+                    configuration={"force_install": force_install} if force_install else {},
                 )
+
+        packages = [
+            package
+            for package in self.project_dependencies
+            if package.name.lower() not in excluded_packages
+        ]
+        constraints = dict(self.constraints)
+        if self.excluded_tools:
+            constraints["excluded_tools"] = list(self.excluded_tools)
+        if self.excluded_packages:
+            constraints["excluded_packages"] = list(self.excluded_packages)
 
         return DesiredEnvironmentState(
             tools=tools,
-            python_packages=self.project_dependencies,
+            python_packages=packages,
             configurations=self.configurations,
-            project_requirements=self.project_dependencies,
-            constraints=self.constraints,
+            project_requirements=packages,
+            constraints=constraints,
         )
 
 
@@ -199,7 +213,6 @@ __all__ = [
     "DeltaAction",
     "DesiredEnvironmentState",
     "EnvironmentDelta",
-    "EnvironmentRequest",
     "PackageDelta",
     "PythonPackageRequirement",
     "ToolDelta",
