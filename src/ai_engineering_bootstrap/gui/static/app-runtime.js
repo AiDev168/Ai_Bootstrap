@@ -11,6 +11,7 @@
     const originalLoadLlm = window.loadLlm;
     const originalSaveLlm = window.saveLlm;
     const originalTestLlm = window.testLlm;
+    const originalRenderSession = window.renderSession;
 
     function formPayload() {
         return {
@@ -31,7 +32,7 @@
     function setProviderFields() {
         const provider = providerInput?.value || "mock";
         if (baseUrlInput) baseUrlInput.disabled = provider === "mock" || provider === "in_process";
-        if (apiKeyInput) apiKeyInput.disabled = provider !== "remote_api";
+        if (apiKeyInput) apiKeyInput.disabled = false;
         if (modelInput) modelInput.disabled = false;
     }
 
@@ -89,6 +90,24 @@
         }
     }
 
+    function annotateNoWork(plan) {
+        const detail = document.getElementById("session-detail");
+        if (!detail || (plan?.plan?.actions || []).length) return;
+        detail.querySelectorAll("[data-start]").forEach(button => {
+            button.disabled = true;
+            button.title = "No actions are required for the selected desired state.";
+        });
+        const execution = detail.querySelector("[data-start]")?.closest(".card");
+        if (execution && !execution.querySelector("[data-no-work]")) {
+            const message = document.createElement("div");
+            message.dataset.noWork = "1";
+            message.className = "muted";
+            message.style.marginTop = "10px";
+            message.textContent = "No installation actions are required. The selected tools already satisfy the reconciled desired state.";
+            execution.appendChild(message);
+        }
+    }
+
     window.api = async function apiWithConnectionState(path, method = "GET", body = null) {
         try {
             const result = await originalApi(path, method, body);
@@ -141,6 +160,13 @@
         } catch (error) {
             showResult({ ok: false, message: error.message }, false);
         }
+    };
+
+    window.renderSession = function renderSessionRuntime(session, stateData, plan, events, decisions) {
+        const scrollY = window.scrollY;
+        originalRenderSession(session, stateData, plan, events, decisions);
+        annotateNoWork(plan);
+        window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
     };
 
     providerInput?.addEventListener("change", () => {
