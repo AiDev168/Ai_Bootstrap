@@ -1,0 +1,68 @@
+name: One-time semantic fix
+
+on:
+  push:
+    branches:
+      - feature/step32-final-validation
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply targeted fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"Expected block not found in {path}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          parser = Path("src/ai_engineering_bootstrap/agent/intent_parser.py")
+          text = parser.read_text(encoding="utf-8")
+
+          start = text.index("    def _deterministic_exclusions(")
+          end = text.index("\n    @staticmethod\n    def _extract_negative_packages", start)
+          new_exclusions = '''    def _deterministic_exclusions(\n        self, text: str\n    ) -> tuple[list[str], list[str]]:\n        \"\"\"Detect exclusions per semantic clause, preserving nearby positive requests.\"\"\"\n        normalized = text.lower().replace("\\u200c", " ")\n        clauses = re.split(\n            r"[\\n.;،]|\\bbut\\b|\\bاما\\b|\\bولی\\b|\\s+و\\s+",\n            normalized,\n            flags=re.IGNORECASE,\n        )\n        excluded_tools: list[str] = []\n        excluded_packages: list[str] = []\n        for clause in clauses:\n            clause = clause.strip()\n            if not clause or not _NEGATION.search(clause):\n                continue\n            for tool_id in self._known_tools:\n                aliases = _TOOL_ALIASES.get(tool_id, {tool_id})\n                if any(\n                    re.search(\n                        re.escape(alias.lower().replace("\\u200c", " ")), clause\n                    )\n                    for alias in aliases\n                ):\n                    excluded_tools.append(tool_id)\n            excluded_packages.extend(\n                self._extract_negative_packages_from_clause(clause, self._known_tools)\n            )\n        return self._merge_unique(excluded_tools, []), self._merge_unique(\n            excluded_packages, []\n        )\n\n'''
+          text = text[:start] + new_exclusions + text[end:]
+
+          start = text.index("    @staticmethod\n    def _extract_negative_packages")
+          end = text.index("\n    @staticmethod\n    def _extract_install_packages", start)
+          new_negative = '''    @staticmethod\n    def _extract_negative_packages(text: str) -> list[str]:\n        \"\"\"Extract explicitly excluded package names from negative clauses.\"\"\"\n        clauses = re.split(\n            r"[\\n.;،]|\\bbut\\b|\\bاما\\b|\\bولی\\b|\\s+و\\s+",\n            text.replace("\\u200c", " "),\n            flags=re.IGNORECASE,\n        )\n        result: list[str] = []\n        known_tools = set(_TOOL_ALIASES)\n        for clause in clauses:\n            if _NEGATION.search(clause):\n                result.extend(IntentParser._extract_negative_packages_from_clause(clause, known_tools))\n        return list(dict.fromkeys(result))\n\n    @staticmethod\n    def _extract_negative_packages_from_clause(\n        clause: str, known_tools: set[str] | object\n    ) -> list[str]:\n        \"\"\"Extract package candidates from one exclusion clause.\"\"\"\n        text = clause.replace("\\u200c", " ").strip()\n        match = re.search(\n            r"(?:don't|do\\s+not|dont|never|avoid)\\s+(?:install|reinstall|setup|set\\s+up|add)?\\s*(.+)$",\n            text,\n            flags=re.IGNORECASE,\n        )\n        if match:\n            payload = match.group(1)\n        else:\n            match = re.search(\n                r"(.+?)\\s+(?:را\\s+)?نصب\\s+نکن(?:ید|م)?$|(.+?)\\s+(?:را\\s+)?نصب\\s+نشود$",\n                text,\n                flags=re.IGNORECASE,\n            )\n            payload = next((group for group in match.groups() if group), "") if match else ""\n        result: list[str] = []\n        for token in re.split(r"\\s*(?:,|&|\\band\\b|\\bو\\b|\\+)\\s*", payload, flags=re.IGNORECASE):\n            candidate = re.sub(r"(?:را|رو)\\s*$", "", token.strip(" .;:()[]،"), flags=re.IGNORECASE).strip()\n            if not candidate or not _TOKEN.fullmatch(candidate):\n                continue\n            lower = candidate.lower()\n            if lower in known_tools:\n                continue\n            result.append(candidate)\n        return list(dict.fromkeys(result))\n\n'''
+          text = text[:start] + new_negative + text[end:]
+          parser.write_text(text, encoding="utf-8")
+
+          bridge = Path("src/ai_engineering_bootstrap/agent/strategy_llm_bridge.py")
+          bridge_text = bridge.read_text(encoding="utf-8")
+          bridge_text = bridge_text.replace('        "response_format": {"type": "json_object"},\n', '', 1)
+          bridge.write_text(bridge_text, encoding="utf-8")
+
+          test = Path("tests/unit/test_step32_installation_intent.py")
+          test_text = test.read_text(encoding="utf-8")
+          if "def test_deterministic_parser_preserves_package_install_and_tool_exclusion" not in test_text:
+              test_text += '''\n\ndef test_deterministic_parser_preserves_package_install_and_tool_exclusion() -> None:\n    parsed = IntentParser(tool_catalog=ToolCatalog()).parse(\n        "install colorama, don't install ruff"\n    )\n\n    assert "ruff" in parsed.excluded_tools\n    assert "ruff" not in parsed.required_tools\n    assert "colorama" in parsed.project_dependencies\n    assert "colorama" not in parsed.excluded_packages\n\n    desired = parsed.to_environment_request("/tmp/test-project").to_desired_state()\n    assert "ruff" not in desired.tools\n    assert [item.name for item in desired.python_packages] == ["colorama"]\n'''
+          test.write_text(test_text, encoding="utf-8")
+          PY
+
+      - name: Ruff
+        run: python -m ruff check . --fix && python -m ruff format .
+
+      - name: Commit fixes and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src tests .github/workflows/one-time-semantic-fix.yml
+          git rm .github/workflows/one-time-semantic-fix.yml
+          git commit -m "fix: preserve exclusions and local llm compatibility [skip ci]"
+          git push
