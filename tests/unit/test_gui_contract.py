@@ -1,5 +1,6 @@
 """GUI/backend contract checks for the professional dashboard foundation."""
 
+import re
 from pathlib import Path
 
 
@@ -13,14 +14,14 @@ def test_dashboard_uses_active_backend_routes() -> None:
         assert route in html
 
     session_routes = (
-        "/sessions/${sessionId}",
-        "/sessions/${sessionId}/state",
-        "/sessions/${sessionId}/plan",
-        "/sessions/${sessionId}/events",
-        "/sessions/${sessionId}/agent-decisions",
+        r"/sessions/\$\{[^}]+\}",
+        r"/sessions/\$\{[^}]+\}/state",
+        r"/sessions/\$\{[^}]+\}/plan",
+        r"/sessions/\$\{[^}]+\}/events",
+        r"/sessions/\$\{[^}]+\}/agent-decisions",
     )
     for route in session_routes:
-        assert route in html
+        assert re.search(route, html), f"Missing GUI route pattern: {route}"
 
 
 def test_dashboard_has_request_console_and_live_session_refresh() -> None:
