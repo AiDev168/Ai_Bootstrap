@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 HTML_PATH = Path(__file__).resolve().parents[2] / "src/ai_engineering_bootstrap/gui/static/index.html"
+RUNTIME_PATH = HTML_PATH.with_name("app-runtime.js")
 
 
 def test_dashboard_uses_active_backend_routes() -> None:
@@ -22,6 +23,8 @@ def test_dashboard_uses_active_backend_routes() -> None:
 
 def test_dashboard_has_request_console_live_refresh_and_llm_settings() -> None:
     html = HTML_PATH.read_text(encoding="utf-8")
+    runtime = RUNTIME_PATH.read_text(encoding="utf-8")
+    source = f"{html}\n{runtime}"
     for text in (
         "Request Console",
         "logRequest",
@@ -37,5 +40,7 @@ def test_dashboard_has_request_console_live_refresh_and_llm_settings() -> None:
         "in_process",
         "function viewSession",
         "Promise.allSettled",
+        "/llm/models",
+        "Load Models",
     ):
-        assert text in html
+        assert text in source
