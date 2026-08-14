@@ -35,7 +35,7 @@ jobs:
               target = Path(path)
               text = target.read_text(encoding="utf-8")
               if old not in text:
-                  raise SystemExit(f"Expected pattern not found in {path}")
+                  raise SystemExit(f"Expected pattern not found in {path}: {old!r}")
               target.write_text(text.replace(old, new, 1), encoding="utf-8")
 
           replace_once(
@@ -68,13 +68,18 @@ jobs:
           )
           replace_once(
               "tests/unit/test_llm_runtime_gui.py",
-              '    assert result["ok"] is True\n',
-              '    assert result["ok"] is False\n    assert "test-only" in result["message"]\n',
+              '    assert result["ok"] is True\n    assert result["provider"] == "mock"\n',
+              '    assert result["ok"] is False\n    assert result["provider"] == "mock"\n    assert "test-only" in result["message"]\n',
+          )
+          replace_once(
+              "tests/unit/test_llm_runtime_gui.py",
+              '    assert plan.reasoning_summary.startswith("LLM-selected")\n',
+              '    assert plan.reasoning_summary.startswith("Deterministic")\n',
           )
           replace_once(
               "tests/unit/test_llm_settings_persistence.py",
-              '        assert service.test_connection()["ok"] is True\n',
-              '        assert service.test_connection()["ok"] is False\n',
+              '    assert service.test_connection()["ok"] is True\n    assert service.models()["models"] == ["mock"]\n',
+              '    assert service.test_connection()["ok"] is False\n    assert "test-only" in service.test_connection()["message"]\n    assert service.models()["models"] == ["mock"]\n',
           )
           PY
       - name: Auto-format validation branch
