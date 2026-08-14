@@ -29,7 +29,17 @@ _TOOL_ALIASES = {
     "python": {"python", "python3", "پایتون"},
 }
 
-_INSTALL_VERB = r"(?:install|reinstall|setup|set\s+up|add|نصب(?:\s+کن(?:ید|م)?)?|راه[ -]?اندازی(?:\s+کن(?:ید|م)?)?|اضافه(?:\s+کن(?:ید|م)?)?)"
+_INSTALL_SIGNAL_TOKENS = (
+    "install",
+    "reinstall",
+    "setup",
+    "set up",
+    "add",
+    "نصب",
+    "راه اندازی",
+    "راه‌اندازی",
+    "اضافه",
+)
 _NEGATION = re.compile(
     r"(?:\bdon['’]?t\b|\bdo\s+not\b|\bdont\b|\bnever\b|\bavoid\b|"
     r"نصب\s+نکن(?:ید|م)?|نصب\s+نشود|نمی[‌ ]?(?:خوام|خواهم)|نیازی\s+به\s+نصب)",
@@ -139,7 +149,9 @@ class IntentParser:
             return self._llm_parse(natural_language)
         except Exception as error:  # noqa: BLE001 - semantic provider fallback boundary
             fallback = self._deterministic_parse(natural_language)
-            fallback.reasoning_summary = f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            fallback.reasoning_summary = (
+                f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            )
             fallback.confidence = min(fallback.confidence, 0.55)
             return fallback
 
@@ -338,22 +350,25 @@ User goal:
     def _deterministic_explicit_tool_mentions(
         self, text: str, excluded_tools: list[str]
     ) -> list[str]:
-        """Recognize named tools when the request contains an install/setup verb."""
-        if not re.search(_INSTALL_VERB, text, flags=re.IGNORECASE):
+        """Recognize named tools when the request contains an installation signal."""
+        lowered = text.lower().replace("\u200c", " ")
+        if not any(token in lowered for token in _INSTALL_SIGNAL_TOKENS):
             return []
-        lowered = text.lower()
         excluded = {tool.lower() for tool in excluded_tools}
         result: list[str] = []
         for tool_id in self._known_tools:
             if tool_id.lower() in excluded:
                 continue
             aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
-            if any(re.search(re.escape(alias.lower()), lowered) for alias in aliases):
+            if any(
+                re.search(re.escape(alias.lower().replace("\u200c", " ")), lowered)
+                for alias in aliases
+            ):
                 result.append(tool_id)
         return self._merge_unique(result, [])
 
     def _deterministic_exclusions(self, text: str) -> tuple[list[str], list[str]]:
-        lowered = text.lower()
+        lowered = text.lower().replace("\u200c", " ")
         excluded_tools: list[str] = []
         clauses = re.split(
             r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", lowered, flags=re.IGNORECASE
@@ -364,7 +379,10 @@ User goal:
             for tool_id in self._known_tools:
                 aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
                 if any(
-                    re.search(re.escape(alias.lower()), clause) for alias in aliases
+                    re.search(
+                        re.escape(alias.lower().replace("\u200c", " ")), clause
+                    )
+                    for alias in aliases
                 ):
                     excluded_tools.append(tool_id)
         return self._merge_unique(excluded_tools, []), self._extract_negative_packages(
@@ -375,13 +393,13 @@ User goal:
     def _extract_negative_packages(text: str) -> list[str]:
         result: list[str] = []
         clauses = re.split(
-            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", text, flags=re.IGNORECASE
+            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", text.replace("\u200c", " "), flags=re.IGNORECASE
         )
         for clause in clauses:
             if not _NEGATION.search(clause):
                 continue
             match = re.search(
-                rf"(?:don't|do\s+not|dont|never|avoid)\s+{_INSTALL_VERB}\s+(.+)$",
+                r"(?:don't|do\s+not|dont|never|avoid)\s+(?:install\s+)?(.+)$",
                 clause,
                 flags=re.IGNORECASE,
             )
@@ -412,7 +430,8 @@ User goal:
         required = {tool.lower() for tool in required_tools}
         result: list[str] = []
         pattern = rf"{_INSTALL_VERB}\s+(.+?)(?=\s+(?:on|onto|into|for|using|در|روی|برای)\s+|$)"
-        for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+        normalized = text.replace("\u200c", " ")
+        for match in re.finditer(pattern, normalized, flags=re.IGNORECASE):
             clause = re.sub(
                 r"\bpython\s+(?:package|packages)\b",
                 "",
@@ -436,7 +455,9 @@ User goal:
         return list(dict.fromkeys(result))
 
     @staticmethod
-    def _normalise_strings(value: object, allowed: set[str] | None = None) -> list[str]:
+    def _normalise_strings(
+        value: object, allowed: set[str] | None = None
+    ) -> list[str]:
         if not isinstance(value, list):
             return []
         values = [str(item).strip() for item in value if str(item).strip()]
