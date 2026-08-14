@@ -58,6 +58,9 @@ class BackendRequestHandler(BaseHTTPRequestHandler):
             if path == "/api/v1/llm/test":
                 self._write_json(self._result(self.backend.test_llm_connection()))
                 return
+            if path == "/api/v1/llm/models":
+                self._write_json(self._result(self.backend.list_llm_models()))
+                return
             if path == "/api/v1/audit":
                 self._write_json(self._result(self.backend.audit()))
                 return
