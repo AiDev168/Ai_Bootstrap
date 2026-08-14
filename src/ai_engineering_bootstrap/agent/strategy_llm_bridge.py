@@ -12,7 +12,6 @@ from ai_engineering_bootstrap.agent.provider import (
     InProcessProvider,
     LLMProvider,
     MockProvider,
-    RemoteAPIProvider,
 )
 
 
@@ -53,7 +52,7 @@ class StrategyLLMProvider(LLMProvider):
 def _complete_json(provider: LLMProvider, prompt: str) -> dict[str, Any]:
     if isinstance(provider, MockProvider):
         strategies = []
-        for tool_id, action in re.findall(r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE):
+        for tool_id, _action in re.findall(r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE):
             strategy_id = _MOCK_STRATEGIES.get(tool_id.strip())
             if strategy_id:
                 strategies.append(
@@ -66,10 +65,7 @@ def _complete_json(provider: LLMProvider, prompt: str) -> dict[str, Any]:
                         "source": "catalog",
                     }
                 )
-        return {
-            "strategies": strategies,
-            "confidence": 1.0,
-        }
+        return {"strategies": strategies, "confidence": 1.0}
 
     if isinstance(provider, InProcessProvider):
         output = provider.model.generate(prompt)
@@ -83,9 +79,9 @@ def _complete_json(provider: LLMProvider, prompt: str) -> dict[str, Any]:
         raise ValueError("Provider is missing a base URL.")
 
     system_prompt = (
-        "You are an engineering environment strategy planner. "
+        "You are an engineering environment decision engine. "
         "Return ONLY valid JSON matching the requested schema. "
-        "Use only strategies present in the tool catalog."
+        "Use only strategies present in the supplied catalog."
     )
     payload = {
         "model": config.model or "default",
@@ -99,7 +95,7 @@ def _complete_json(provider: LLMProvider, prompt: str) -> dict[str, Any]:
         "response_format": {"type": "json_object"},
     }
     headers = {"Content-Type": "application/json"}
-    if isinstance(provider, RemoteAPIProvider) and config.api_key:
+    if config.api_key:
         headers["Authorization"] = f"Bearer {config.api_key}"
 
     request = urllib.request.Request(
