@@ -59,9 +59,14 @@ class EnvironmentSessionService:
         self._plan_builder = plan_builder or ExecutionPlanBuilder()
         self._bootstrap_factory = bootstrap_factory
 
+    def _audit_report(self) -> object:
+        source = self._audit_factory()
+        run = getattr(source, "run", None)
+        return run() if callable(run) else source
+
     def create(self, request: EnvironmentRequest) -> SessionServiceResult:
         """Create a session from a desired environment request."""
-        report = self._audit_factory().run()
+        report = self._audit_report()
         actual = self._actual_state(report)
         desired = request.to_desired_state()
         delta = self._reconciler.reconcile(actual, desired)
@@ -187,34 +192,75 @@ class EnvironmentSessionService:
             self.repository.update(session)
             return SessionServiceResult({"session_id": session_id, "status": session.status.value})
 
-        required_approval = {
-            action.action_id
-            for action in session.plan.actions
-            if self._requires_approval(action.action_id)
-        }
-        approved = {
-            action_id
-            for action_id, state in session.approval_states.items()
-            if state.status == "approved"
-        }
-        if mode == ExecutionMode.REAL and not required_approval.issubset(approved):
-            pending = sorted(required_approval - approved)
-            session.status = SessionStatus.AWAITING_APPROVAL
+        if mode == ExecutionMode.REAL:
+            pending = {
+                action.action_id
+                for action in session.plan.actions
+                if self._requires_approval(action.action_id)
+                and session.approval_states.get(action.action_id, None) is None
+            }
+            rejected = {
+                action_id
+                for action_id, state in session.approval_states.items()
+                if state.status == "rejected"
+            }
+            approved = {
+                action_id
+                for action_id, state in session.approval_states.items()
+                if state.status == "approved"
+            }
+            skipped = {
+                action_id
+                for action_id, state in session.approval_states.items()
+                if state.status == "skipped"
+            }
+            pending -= rejected | skipped | approved
+            if pending:
+                session.status = SessionStatus.AWAITING_APPROVAL
+                self.repository.update(session)
+                raise ValueError(f"Approval required for actions: {', '.join(sorted(pending))}")
+            execution_actions = [
+                action
+                for action in session.plan.actions
+                if not self._requires_approval(action.action_id) or action.action_id in approved
+            ]
+            rejected_actions = sorted(rejected | skipped)
+        else:
+            approved = set()
+            execution_actions = list(session.plan.actions)
+            rejected_actions = []
+
+        if not execution_actions:
+            session.status = SessionStatus.COMPLETED
+            session.completed_at = utcnow()
+            session.add_event("session_completed", "No approved actions remained for execution.")
             self.repository.update(session)
-            raise ValueError(f"Approval required for actions: {', '.join(pending)}")
+            return SessionServiceResult(
+                {
+                    "session_id": session_id,
+                    "status": session.status.value,
+                    "environment_ready": True,
+                    "rejected_actions": rejected_actions,
+                }
+            )
 
         session.status = SessionStatus.EXECUTING
         session.add_event("session_started", f"Session execution started in {mode.value} mode.")
         self.repository.update(session)
 
         provider = InMemoryApprovalProvider() if mode == ExecutionMode.REAL else None
-        approved_ids = approved
+        approved_ids = approved if mode == ExecutionMode.REAL else set()
+        plan_for_execution = type(session.plan)(
+            is_actionable=True,
+            actions=execution_actions,
+            summary=session.plan.summary,
+        )
         result = self._bootstrap_factory().run(
             mode=mode,
             approval_provider=provider,
             approval_callback=lambda request: request.action_id in approved_ids,
             run_id=session.session_id,
-            plan_override=session.plan,
+            plan_override=plan_for_execution,
         )
 
         for execution in result.action_results:
@@ -232,7 +278,7 @@ class EnvironmentSessionService:
         session.add_event(
             "session_completed" if result.is_success else "session_failed",
             "Session execution completed." if result.is_success else "Session execution failed.",
-            {"environment_ready": result.environment_ready},
+            {"environment_ready": result.environment_ready, "rejected_actions": rejected_actions},
         )
         self.repository.update(session)
         return SessionServiceResult(
@@ -240,7 +286,7 @@ class EnvironmentSessionService:
                 "session_id": session_id,
                 "status": session.status.value,
                 "environment_ready": result.environment_ready,
-                "rejected_actions": list(result.rejected_actions),
+                "rejected_actions": rejected_actions + list(result.rejected_actions),
             }
         )
 
