@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from urllib.request import Request
 
+from ai_engineering_bootstrap.agent.intent_parser import IntentParser
 from ai_engineering_bootstrap.agent.provider import LocalServerProvider, ProviderConfig
 from ai_engineering_bootstrap.agent.strategy_llm_bridge import StrategyLLMProvider
 from ai_engineering_bootstrap.backend.llm_settings import (
@@ -15,6 +16,7 @@ from ai_engineering_bootstrap.environment.models import (
     ToolStatus,
 )
 from ai_engineering_bootstrap.environment.reconciler import EnvironmentReconciler
+from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 
 HTML_PATH = (
     Path(__file__).resolve().parents[1]
@@ -118,6 +120,26 @@ def test_local_server_strategy_passes_api_key(monkeypatch) -> None:
     assert result.confidence == 0.9
     assert calls[0].full_url == "http://192.168.1.50:1234/v1/chat/completions"
     assert calls[0].headers["Authorization"] == "Bearer lm-secret"
+
+
+def test_deterministic_parser_handles_english_exclusion_and_multiple_targets() -> None:
+    parsed = IntentParser(tool_catalog=ToolCatalog()).parse(
+        "install Ruff, pytest and Cursor but don't install Docker"
+    )
+
+    assert {"ruff", "pytest", "cursor"}.issubset(set(parsed.required_tools))
+    assert "docker" in parsed.excluded_tools
+    assert "docker" not in parsed.required_tools
+
+
+def test_deterministic_parser_handles_persian_install_request() -> None:
+    parsed = IntentParser(tool_catalog=ToolCatalog()).parse(
+        "روف و پای‌تست را نصب کن و داکر را نصب نکن"
+    )
+
+    assert {"ruff", "pytest"}.issubset(set(parsed.required_tools))
+    assert "docker" in parsed.excluded_tools
+    assert "docker" not in parsed.required_tools
 
 
 def test_gui_supports_install_intent_and_editable_api_key() -> None:
