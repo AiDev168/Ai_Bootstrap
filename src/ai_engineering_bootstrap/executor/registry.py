@@ -5,16 +5,16 @@ from __future__ import annotations
 
 from ai_engineering_bootstrap.executor.handlers.base import ActionHandler
 from ai_engineering_bootstrap.executor.handlers.real_handlers import REAL_HANDLERS
-from ai_engineering_bootstrap.executor.handlers.safe_handlers import (
-    DEFAULT_SAFE_HANDLERS,
-)
+from ai_engineering_bootstrap.executor.handlers.safe_handlers import DEFAULT_SAFE_HANDLERS
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 
 
 class ActionRegistry:
-    """
-    Thread-safe registry mapping action IDs to Safe and Real handlers.
-    Enforces allowlist principle: only registered actions can execute.
+    """Thread-safe registry mapping canonical action IDs to handlers.
+
+    Execution plans may expose instance-specific action IDs such as
+    ``install_python_package:ruff`` so that approval and evidence are independent.
+    The registry resolves those IDs back to the canonical executor action.
     """
 
     def __init__(self) -> None:
@@ -22,36 +22,36 @@ class ActionRegistry:
         self._real_handlers: dict[str, ActionHandler] = {}
         self._load_defaults()
 
+    @staticmethod
+    def canonical_action_id(action_id: str) -> str:
+        """Map an instance action ID to the registered executor action ID."""
+        if action_id.startswith("install_python_package:"):
+            return "install_python_package"
+        return action_id
+
     def _load_defaults(self) -> None:
         """Load default safe/mock and approved real handlers."""
-        for action_id, handler in DEFAULT_SAFE_HANDLERS.items():
-            self._safe_handlers[action_id] = handler
-        for action_id, handler in REAL_HANDLERS.items():
-            self._real_handlers[action_id] = handler
+        self._safe_handlers.update(DEFAULT_SAFE_HANDLERS)
+        self._real_handlers.update(REAL_HANDLERS)
 
-    def get_handler(self, action_id: str, mode: ExecutionMode) -> ActionHandler | None:
-        """
-        Retrieve handler based on execution mode.
-        - SAFE mode: returns safe handler.
-        - REAL mode: returns real handler if exists; otherwise raises KeyError.
-        """
+    def get_handler(self, action_id: str, mode: ExecutionMode) -> ActionHandler:
+        """Retrieve the handler for an action instance and execution mode."""
+        canonical_id = self.canonical_action_id(action_id)
         if mode == ExecutionMode.REAL:
-            if action_id in self._real_handlers:
-                return self._real_handlers[action_id]
-            # در مود واقعی، اگر هندلر واقعی نباشد، خطا می‌دهیم (حتی اگر سیف باشد)
-            # مگر اینکه سیاست دیگری تعریف شود. اینجا سخت‌گیرانه عمل می‌کنیم.
-            if action_id in self._safe_handlers:
+            if canonical_id in self._real_handlers:
+                return self._real_handlers[canonical_id]
+            if canonical_id in self._safe_handlers:
                 raise KeyError(
                     f"Action '{action_id}' is not approved for REAL execution (No real handler)."
                 )
             raise KeyError(f"Action '{action_id}' is not supported.")
-        # SAFE MODE
-        if action_id in self._safe_handlers:
-            return self._safe_handlers[action_id]
+
+        if canonical_id in self._safe_handlers:
+            return self._safe_handlers[canonical_id]
         raise KeyError(f"Action '{action_id}' is not supported.")
 
     def is_supported(self, action_id: str, mode: ExecutionMode) -> bool:
-        """Check support status."""
+        """Check support status for an action instance."""
         try:
             self.get_handler(action_id, mode)
             return True
@@ -60,10 +60,8 @@ class ActionRegistry:
 
     @property
     def supported_actions(self) -> list[str]:
-        """Return sorted list of all supported action IDs."""
-        return sorted(
-            set(list(self._safe_handlers.keys()) + list(self._real_handlers.keys()))
-        )
+        """Return sorted list of canonical supported action IDs."""
+        return sorted(set(self._safe_handlers) | set(self._real_handlers))
 
 
 __all__ = ["ActionRegistry"]
