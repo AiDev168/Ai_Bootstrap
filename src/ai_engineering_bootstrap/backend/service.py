@@ -11,7 +11,9 @@ from ai_engineering_bootstrap.backend.session_service import EnvironmentSessionS
 from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
 from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.environment import EnvironmentRequest
-from ai_engineering_bootstrap.environment.session_repository import InMemorySessionRepository
+from ai_engineering_bootstrap.environment.session_repository import (
+    InMemorySessionRepository,
+)
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 from ai_engineering_bootstrap.pipeline import PipelineEngine, PipelineResult
 from ai_engineering_bootstrap.planner import PlannerEngine
