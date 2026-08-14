@@ -80,10 +80,11 @@ def test_execution_plan_builder_maps_known_actions() -> None:
 
     assert plan.is_actionable
     assert [action.action_id for action in plan.actions] == [
-        "install_cursor",
+        "install_cursor:cursor",
         "install_python_package:ruff",
         "install_python_package:pytest",
     ]
+    assert len({action.action_id for action in plan.actions}) == len(plan.actions)
 
 
 def test_execution_plan_builder_fails_closed_for_unknown_strategy() -> None:
