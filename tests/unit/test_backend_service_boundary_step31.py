@@ -4,10 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai_engineering_bootstrap.agent.strategy_planner import (
-    StrategyDecision,
-    StrategyPlan,
-)
+from ai_engineering_bootstrap.agent.strategy_planner import StrategyDecision, StrategyPlan
 from ai_engineering_bootstrap.backend.execution_plan_builder import ExecutionPlanBuilder
 from ai_engineering_bootstrap.backend.service import ApplicationBackend
 from ai_engineering_bootstrap.environment.models import (
@@ -77,8 +74,8 @@ def test_execution_plan_builder_maps_known_actions() -> None:
     assert plan.is_actionable
     assert [action.action_id for action in plan.actions] == [
         "install_cursor",
-        "install_python_package",
-        "install_python_package",
+        "install_python_package:ruff",
+        "install_python_package:pytest",
     ]
 
 
