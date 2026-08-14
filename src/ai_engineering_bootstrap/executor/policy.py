@@ -124,7 +124,9 @@ class SafetyGate:
     def requires_human_approval(self, action_id: str) -> bool:
         """Return whether the canonical action requires human approval."""
         policy = self.get_policy(action_id)
-        return policy is not None and policy.approval_required == ApprovalRequirement.HUMAN
+        return (
+            policy is not None and policy.approval_required == ApprovalRequirement.HUMAN
+        )
 
     def evaluate(
         self, action_id: str, mode: ExecutionMode, is_approved: bool = False
