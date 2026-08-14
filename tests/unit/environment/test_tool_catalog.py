@@ -1,7 +1,6 @@
 """Tests for Phase 2: Tool Catalog and Installation Strategies."""
 
 import platform as platform_module
-from unittest.mock import patch
 
 import pytest
 
@@ -17,12 +16,10 @@ from ai_engineering_bootstrap.environment import (
     RiskLevel,
     StrategyFactory,
     ToolCatalog,
-    ToolDefinition,
     get_current_platform,
     get_tool_catalog,
 )
 from ai_engineering_bootstrap.environment.installation_strategies import (
-    ArtifactDiscoveryError,
     ArtifactMetadata,
     ArtifactValidationError,
     StrategyStatus,

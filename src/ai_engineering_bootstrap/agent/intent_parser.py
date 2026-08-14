@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any
 
-from ai_engineering_bootstrap.agent.provider import LLMProvider, ProviderConfig
+from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.environment.models import EnvironmentRequest
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 
@@ -109,7 +108,7 @@ class IntentParser:
 
         try:
             return self._llm_parse(natural_language)
-        except Exception:
+        except Exception:  # noqa: BLE001 - intentional LLM fallback boundary
             # Fallback to deterministic on any LLM failure
             return self._deterministic_parse(natural_language)
 

@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 """
 Session models for environment orchestration.
 
@@ -5,19 +7,18 @@ This module defines the core session data structures that track
 the complete lifecycle of an environment bootstrap operation.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Any, Optional
 import uuid
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
-from .models import (
-    EnvironmentRequest,
-    DesiredEnvironmentState,
-    ActualEnvironmentState,
-    EnvironmentDelta,
-)
 from ..planner.models import ExecutionPlan
+from .models import (
+    ActualEnvironmentState,
+    DesiredEnvironmentState,
+    EnvironmentDelta,
+    EnvironmentRequest,
+)
 
 
 class SessionStatus(str, Enum):
@@ -51,7 +52,7 @@ class AgentDecision:
     selected_capabilities: list[str] = field(default_factory=list)
     selected_strategy: dict[str, Any] = field(default_factory=dict)
     input_evidence_ids: list[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -76,7 +77,7 @@ class SessionEvent:
     """Represents an event in the session timeline."""
     
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     event_type: str = ""  # audit_started, plan_created, approval_requested, action_executed, etc.
     message: str = ""
     details: dict[str, Any] = field(default_factory=dict)
@@ -98,9 +99,9 @@ class ActionApprovalState:
     
     action_id: str = ""
     status: str = "pending"  # pending, approved, rejected, skipped
-    approved_at: Optional[datetime] = None
+    approved_at: datetime | None = None
     approved_by: str = "user"  # For MVP, always "user"
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
     
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -120,10 +121,10 @@ class ExecutionEvidence:
     action_id: str = ""
     success: bool = False
     output: str = ""
-    error: Optional[str] = None
-    verification_result: Optional[dict[str, Any]] = None
+    error: str | None = None
+    verification_result: dict[str, Any] | None = None
     artifacts: dict[str, Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -146,11 +147,11 @@ class RecoveryRecord:
     failure_action_id: str = ""
     diagnosis: str = ""
     recovery_strategy: str = ""
-    recovery_plan: Optional[ExecutionPlan] = None
+    recovery_plan: ExecutionPlan | None = None
     approved: bool = False
     executed: bool = False
     success: bool = False
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -175,24 +176,24 @@ class EnvironmentSession:
     """
     
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    request: Optional[EnvironmentRequest] = None
-    actual_state: Optional[ActualEnvironmentState] = None
-    desired_state: Optional[DesiredEnvironmentState] = None
-    delta: Optional[EnvironmentDelta] = None
-    plan: Optional[ExecutionPlan] = None
+    request: EnvironmentRequest | None = None
+    actual_state: ActualEnvironmentState | None = None
+    desired_state: DesiredEnvironmentState | None = None
+    delta: EnvironmentDelta | None = None
+    plan: ExecutionPlan | None = None
     status: SessionStatus = SessionStatus.CREATED
-    current_action: Optional[str] = None
+    current_action: str | None = None
     approval_states: dict[str, ActionApprovalState] = field(default_factory=dict)
     execution_history: list[ExecutionEvidence] = field(default_factory=list)
     verification_results: dict[str, Any] = field(default_factory=dict)
     recovery_history: list[RecoveryRecord] = field(default_factory=list)
     events: list[SessionEvent] = field(default_factory=list)
     agent_decisions: list[AgentDecision] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
-    completed_at: Optional[datetime] = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    completed_at: datetime | None = None
     
-    def add_event(self, event_type: str, message: str, details: Optional[dict[str, Any]] = None) -> SessionEvent:
+    def add_event(self, event_type: str, message: str, details: dict[str, Any] | None = None) -> SessionEvent:
         """Add an event to the session timeline."""
         event = SessionEvent(
             event_type=event_type,
@@ -200,7 +201,7 @@ class EnvironmentSession:
             details=details or {},
         )
         self.events.append(event)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
         return event
     
     def add_agent_decision(self, decision: AgentDecision) -> None:
@@ -209,13 +210,13 @@ class EnvironmentSession:
         if self.request:
             decision.request_id = self.request.request_id
         self.agent_decisions.append(decision)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
     
-    def get_approval_state(self, action_id: str) -> Optional[ActionApprovalState]:
+    def get_approval_state(self, action_id: str) -> ActionApprovalState | None:
         """Get the approval state for an action."""
         return self.approval_states.get(action_id)
     
-    def set_approval_state(self, action_id: str, status: str, rejection_reason: Optional[str] = None) -> None:
+    def set_approval_state(self, action_id: str, status: str, rejection_reason: str | None = None) -> None:
         """Set the approval state for an action."""
         if action_id not in self.approval_states:
             self.approval_states[action_id] = ActionApprovalState(action_id=action_id)
@@ -223,21 +224,21 @@ class EnvironmentSession:
         state = self.approval_states[action_id]
         state.status = status
         if status == "approved":
-            state.approved_at = datetime.utcnow()
+            state.approved_at = datetime.now(UTC)
         elif status == "rejected":
             state.rejection_reason = rejection_reason
         
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
     
     def add_execution_evidence(self, evidence: ExecutionEvidence) -> None:
         """Add execution evidence."""
         self.execution_history.append(evidence)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
     
     def add_recovery_record(self, record: RecoveryRecord) -> None:
         """Add a recovery record."""
         self.recovery_history.append(record)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
     
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""

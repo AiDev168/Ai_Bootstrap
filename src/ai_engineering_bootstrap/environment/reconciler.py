@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from ai_engineering_bootstrap.environment.models import (
     ActualEnvironmentState,
-    DesiredEnvironmentState,
     DeltaAction,
+    DesiredEnvironmentState,
     EnvironmentDelta,
     PackageDelta,
     ToolDelta,
+    ToolRequirement,
     ToolRequirementLevel,
     ToolStatus,
 )
@@ -150,8 +151,7 @@ class EnvironmentReconciler:
                         reason=f"Package '{pkg_req.name}' is not installed",
                     )
                 )
-            elif pkg_req.version_constraint:
-                if not self._version_satisfies(actual_version, pkg_req.version_constraint):
+            elif pkg_req.version_constraint and not self._version_satisfies(actual_version, pkg_req.version_constraint):
                     deltas.append(
                         PackageDelta(
                             package_name=pkg_req.name,

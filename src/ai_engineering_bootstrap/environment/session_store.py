@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 """
 Session store abstraction for environment sessions.
 
@@ -5,10 +7,7 @@ Provides a simple in-memory store with optional JSON persistence for MVP.
 """
 
 import json
-import os
-from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from .session_models import EnvironmentSession, SessionStatus
 
@@ -24,7 +23,7 @@ class SessionStore:
         """Create a new session."""
         raise NotImplementedError
     
-    def get(self, session_id: str) -> Optional[EnvironmentSession]:
+    def get(self, session_id: str) -> EnvironmentSession | None:
         """Get a session by ID."""
         raise NotImplementedError
     
@@ -36,7 +35,7 @@ class SessionStore:
         """Append an event to a session's timeline."""
         raise NotImplementedError
     
-    def list_sessions(self, status_filter: Optional[SessionStatus] = None) -> list[EnvironmentSession]:
+    def list_sessions(self, status_filter: SessionStatus | None = None) -> list[EnvironmentSession]:
         """List all sessions, optionally filtered by status."""
         raise NotImplementedError
     
@@ -61,13 +60,13 @@ class InMemorySessionStore(SessionStore):
         self._sessions[session.session_id] = session
         return session
     
-    def get(self, session_id: str) -> Optional[EnvironmentSession]:
+    def get(self, session_id: str) -> EnvironmentSession | None:
         return self._sessions.get(session_id)
     
     def update(self, session: EnvironmentSession) -> EnvironmentSession:
         if session.session_id not in self._sessions:
             raise ValueError(f"Session {session.session_id} does not exist")
-        session.updated_at = datetime.utcnow()
+        session.updated_at = datetime.now(UTC)
         self._sessions[session.session_id] = session
         return session
     
@@ -84,11 +83,11 @@ class InMemorySessionStore(SessionStore):
             details=event_data.get("details", {}),
         )
         session.events.append(event)
-        session.updated_at = datetime.utcnow()
+        session.updated_at = datetime.now(UTC)
         self.update(session)
         return session
     
-    def list_sessions(self, status_filter: Optional[SessionStatus] = None) -> list[EnvironmentSession]:
+    def list_sessions(self, status_filter: SessionStatus | None = None) -> list[EnvironmentSession]:
         sessions = list(self._sessions.values())
         if status_filter:
             sessions = [s for s in sessions if s.status == status_filter]
@@ -142,7 +141,7 @@ class JSONSessionStore(SessionStore):
         self._save_index()
         return session
     
-    def get(self, session_id: str) -> Optional[EnvironmentSession]:
+    def get(self, session_id: str) -> EnvironmentSession | None:
         if session_id not in self._index:
             return None
         
@@ -157,15 +156,16 @@ class JSONSessionStore(SessionStore):
     
     def _dict_to_session(self, data: dict) -> EnvironmentSession:
         """Convert a dictionary back to an EnvironmentSession."""
-        from .models import EnvironmentRequest, DesiredEnvironmentState, ActualEnvironmentState, EnvironmentDelta
-        from ..planner.models import ExecutionPlan
+        from .models import (
+            EnvironmentRequest,
+        )
         
         session = EnvironmentSession(
             session_id=data["session_id"],
             status=SessionStatus(data["status"]),
             current_action=data.get("current_action"),
-            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.utcnow(),
-            updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.utcnow(),
+            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(UTC),
+            updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC),
         )
         
         if data.get("completed_at"):
@@ -196,7 +196,7 @@ class JSONSessionStore(SessionStore):
         if session.session_id not in self._index:
             raise ValueError(f"Session {session.session_id} does not exist")
         
-        session.updated_at = datetime.utcnow()
+        session.updated_at = datetime.now(UTC)
         file_path = self._get_session_file(session.session_id)
         with open(file_path, "w") as f:
             json.dump(session.to_dict(), f, indent=2, default=str)
@@ -218,12 +218,11 @@ class JSONSessionStore(SessionStore):
         session.events.append(event)
         return self.update(session)
     
-    def list_sessions(self, status_filter: Optional[SessionStatus] = None) -> list[EnvironmentSession]:
+    def list_sessions(self, status_filter: SessionStatus | None = None) -> list[EnvironmentSession]:
         sessions = []
         for session_id in self._index:
             session = self.get(session_id)
-            if session:
-                if status_filter is None or session.status == status_filter:
+            if session and (status_filter is None or session.status == status_filter):
                     sessions.append(session)
         
         sessions.sort(key=lambda s: s.updated_at, reverse=True)
@@ -243,7 +242,7 @@ class JSONSessionStore(SessionStore):
 
 
 # Global default store instance (in-memory for MVP)
-_default_store: Optional[SessionStore] = None
+_default_store: SessionStore | None = None
 
 
 def get_session_store() -> SessionStore:
@@ -276,7 +275,7 @@ class SessionStore:
         session = EnvironmentSession(request=request)
         return self._store.create(session)
     
-    def get(self, session_id: str) -> Optional[EnvironmentSession]:
+    def get(self, session_id: str) -> EnvironmentSession | None:
         """Get a session by ID."""
         return self._store.get(session_id)
     

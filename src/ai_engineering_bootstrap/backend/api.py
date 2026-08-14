@@ -1,38 +1,36 @@
+from datetime import UTC, datetime
+
 """
 AI Engineering Bootstrap - Backend API Service
 
 Provides REST API v1 endpoints for environment orchestration.
 """
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+import logging
+import os
+import uuid
+from typing import Any
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-import uuid
-import os
+from pydantic import BaseModel
 
-from ai_engineering_bootstrap.environment.models import (
-    EnvironmentRequest,
-    DesiredEnvironmentState,
-    ActualEnvironmentState,
-    EnvironmentDelta,
-    ToolStatus,
-)
-from ai_engineering_bootstrap.environment.session_store import SessionStore
-from ai_engineering_bootstrap.environment.reconciler import EnvironmentReconciler
-from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser
 from ai_engineering_bootstrap.agent.strategy_planner import StrategyPlanner
-from ai_engineering_bootstrap.planner.engine import PlannerEngine
 from ai_engineering_bootstrap.audit import default_audit_service
-from datetime import datetime, timezone
+from ai_engineering_bootstrap.environment.models import (
+    ActualEnvironmentState,
+    EnvironmentRequest,
+    ToolStatus,
+)
+from ai_engineering_bootstrap.environment.reconciler import EnvironmentReconciler
+from ai_engineering_bootstrap.environment.session_store import SessionStore
+from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 
 
 # Helper function for error responses
-def make_error(code: str, message: str) -> Dict[str, str]:
+def make_error(code: str, message: str) -> dict[str, str]:
     return {"code": code, "message": message}
 
 
@@ -45,10 +43,10 @@ GUI_TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'gui', 'templates')
 class EnvironmentRequestInput(BaseModel):
     project_path: str
     natural_language_goal: str
-    required_tools: List[str] = []
-    optional_tools: List[str] = []
-    project_dependencies: List[str] = []
-    constraints: Dict[str, Any] = {}
+    required_tools: list[str] = []
+    optional_tools: list[str] = []
+    project_dependencies: list[str] = []
+    constraints: dict[str, Any] = {}
 
 
 class ActionApprovalInput(BaseModel):
@@ -59,12 +57,14 @@ class APIResponse(BaseModel):
     api_version: str = "v1"
     request_id: str
     status: str
-    data: Optional[Dict[str, Any]] = None
-    error: Optional[Dict[str, Any]] = None
+    data: dict[str, Any] | None = None
+    error: dict[str, Any] | None = None
 
 
 # API Version constant
 API_VERSION = "v1"
+
+logger = logging.getLogger(__name__)
 
 # FastAPI Application
 app = FastAPI(
@@ -95,15 +95,14 @@ audit_service = default_audit_service()
 
 
 @app.get("/")
-async def serve_gui():
+def serve_gui():
     """Serve the main GUI HTML page."""
-    import os
     template_path = os.path.join(GUI_TEMPLATE_DIR, "index.html")
     with open(template_path, 'r') as f:
         return HTMLResponse(content=f.read())
 
 
-def make_response(request_id: str, status: str, data: Optional[Dict] = None, error: Optional[Dict] = None) -> dict:
+def make_response(request_id: str, status: str, data: dict | None = None, error: dict | None = None) -> dict:
     """Create standardized API response."""
     return APIResponse(
         api_version="v1",
@@ -124,7 +123,7 @@ async def health_check():
         data={
             "service": "ai-engineering-bootstrap",
             "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "llm_available": intent_parser.is_llm_available(),
         }
     )
@@ -141,7 +140,7 @@ async def get_audit():
             status="ok",
             data={"audit": audit_result}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -183,7 +182,7 @@ async def get_environment_state():
             tools=tools,
             python_packages=python_packages,
             system_info=system_info,
-            probe_timestamp=datetime.now(timezone.utc).isoformat(),
+            probe_timestamp=datetime.now(UTC).isoformat(),
             probe_evidence={check.name: check.facts for check in report.checks}
         )
         
@@ -192,7 +191,7 @@ async def get_environment_state():
             status="ok",
             data={"actual_state": actual_state}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -209,7 +208,7 @@ async def get_tools_catalog():
             status="ok",
             data={"tools": tools}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -242,7 +241,7 @@ async def create_environment_request(input_data: EnvironmentRequestInput):
             status="ok",
             data={"request": environment_request}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -298,7 +297,7 @@ async def create_session(input_data: EnvironmentRequestInput):
             tools=tools,
             python_packages=python_packages,
             system_info=system_info,
-            probe_timestamp=datetime.now(timezone.utc).isoformat(),
+            probe_timestamp=datetime.now(UTC).isoformat(),
             probe_evidence={check.name: check.facts for check in report.checks}
         )
         
@@ -309,7 +308,9 @@ async def create_session(input_data: EnvironmentRequestInput):
         delta = reconciler.reconcile(actual_state, desired_state)
         
         # Create session
-        from ai_engineering_bootstrap.environment.session_models import EnvironmentSession
+        from ai_engineering_bootstrap.environment.session_models import (
+            EnvironmentSession,
+        )
         session = EnvironmentSession(
             request=environment_request,
             actual_state=actual_state,
@@ -323,7 +324,7 @@ async def create_session(input_data: EnvironmentRequestInput):
             status="ok",
             data={"session_id": session.session_id, "status": session.status.value}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -347,7 +348,7 @@ async def list_sessions():
                 for s in sessions
             ]}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -366,7 +367,7 @@ async def get_session(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -389,7 +390,7 @@ async def get_session_state(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -415,7 +416,7 @@ async def get_session_plan(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -434,7 +435,7 @@ async def get_session_events(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -453,7 +454,7 @@ async def get_agent_decisions(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -468,7 +469,7 @@ async def start_session(session_id: str):
         
         session.status = "EXECUTING"
         session_store.update_session(session)
-        session_store.append_event(session_id, {"type": "session_started", "timestamp": datetime.utcnow().isoformat()})
+        session_store.append_event(session_id, {"type": "session_started", "timestamp": datetime.now(UTC).isoformat()})
         
         return make_response(
             request_id=request_id,
@@ -477,7 +478,7 @@ async def start_session(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -496,7 +497,7 @@ async def approve_action(session_id: str, action_id: str, input_data: ActionAppr
         session_store.append_event(session_id, {
             "type": "action_approved",
             "action_id": action_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         })
         
         return make_response(
@@ -506,7 +507,7 @@ async def approve_action(session_id: str, action_id: str, input_data: ActionAppr
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -524,7 +525,7 @@ async def reject_action(session_id: str, action_id: str):
         session_store.append_event(session_id, {
             "type": "action_rejected",
             "action_id": action_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         })
         
         return make_response(
@@ -534,7 +535,7 @@ async def reject_action(session_id: str, action_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -552,7 +553,7 @@ async def skip_action(session_id: str, action_id: str):
         session_store.append_event(session_id, {
             "type": "action_skipped",
             "action_id": action_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         })
         
         return make_response(
@@ -562,7 +563,7 @@ async def skip_action(session_id: str, action_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -577,7 +578,7 @@ async def cancel_session(session_id: str):
         
         session.status = "CANCELLED"
         session_store.update_session(session)
-        session_store.append_event(session_id, {"type": "session_cancelled", "timestamp": datetime.utcnow().isoformat()})
+        session_store.append_event(session_id, {"type": "session_cancelled", "timestamp": datetime.now(UTC).isoformat()})
         
         return make_response(
             request_id=request_id,
@@ -586,7 +587,7 @@ async def cancel_session(session_id: str):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -610,13 +611,13 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 })
             
             # Wait for client message
-            data = await websocket.receive_text()
+            await websocket.receive_text()
             # Handle client messages if needed
             
     except WebSocketDisconnect:
         pass
-    except Exception as e:
-        pass
+    except Exception:
+        logger.exception("Unexpected WebSocket failure for session %s", session_id)
 
 # LLM Settings endpoints
 @app.get("/api/v1/llm/settings")
@@ -636,7 +637,7 @@ async def get_llm_settings():
             status="ok",
             data=settings
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
@@ -651,7 +652,6 @@ async def save_llm_settings(settings: dict):
         # Save settings to config or session store
         # For now, just validate and acknowledge
         provider = settings.get("provider", "lm_studio")
-        api_url = settings.get("api_url", "")
         model = settings.get("model", "")
         
         # Update intent parser configuration if available
@@ -665,7 +665,7 @@ async def save_llm_settings(settings: dict):
             status="ok",
             data={"message": "Settings saved", "provider": provider, "model": model}
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
@@ -692,7 +692,7 @@ async def test_llm_connection():
                 status="error",
                 error=make_error("connection_failed", "LLM not available")
             )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - API boundary normalization
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),

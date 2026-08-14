@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any
 
 from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.executor.models import ActionExecution
@@ -92,7 +91,7 @@ class FailureDiagnoser:
 
         try:
             return self._llm_diagnose(execution, error_message, retry_count)
-        except Exception:
+        except Exception:  # noqa: BLE001 - intentional LLM fallback boundary
             # Fallback to deterministic on any LLM failure
             return self._deterministic_diagnose(execution, error_message, retry_count)
 
@@ -359,7 +358,7 @@ Respond with JSON array of actions:
 
 __all__ = [
     "FailureDiagnoser",
-    "RecoveryAgent",
     "FailureDiagnosis",
+    "RecoveryAgent",
     "RecoveryProposal",
 ]

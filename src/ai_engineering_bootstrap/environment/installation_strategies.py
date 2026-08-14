@@ -28,7 +28,6 @@ from ai_engineering_bootstrap.environment.tool_catalog import (
     ArtifactFormat,
     InstallationStrategy,
     Platform,
-    PrivilegeLevel,
     ToolDefinition,
 )
 
@@ -103,22 +102,18 @@ class InstallationStrategyBase(ABC):
     @abstractmethod
     def discover_artifact(self) -> ArtifactMetadata:
         """Discover the artifact to install."""
-        pass
 
     @abstractmethod
     def validate_artifact(self, metadata: ArtifactMetadata) -> bool:
         """Validate the artifact before installation."""
-        pass
 
     @abstractmethod
     def install(self, metadata: ArtifactMetadata, dry_run: bool = False) -> InstallationResult:
         """Install the artifact."""
-        pass
 
     @abstractmethod
     def verify(self) -> bool:
         """Verify the installation was successful."""
-        pass
 
 
 class DebInstallStrategy(InstallationStrategyBase):
@@ -185,8 +180,7 @@ class DebInstallStrategy(InstallationStrategyBase):
                     },
                 )
                 
-                with urllib.request.urlopen(request, timeout=300) as response:
-                    with open(deb_path, "wb") as f:
+                with urllib.request.urlopen(request, timeout=300) as response, open(deb_path, "wb") as f:
                         while chunk := response.read(1024 * 1024):
                             f.write(chunk)
                 
@@ -507,18 +501,18 @@ def get_current_platform() -> tuple[Platform, Architecture]:
 
 
 __all__ = [
-    "StrategyStatus",
-    "ArtifactMetadata",
-    "InstallationResult",
-    "InstallationStrategyError",
     "ArtifactDiscoveryError",
+    "ArtifactMetadata",
     "ArtifactValidationError",
-    "InstallationError",
-    "VerificationError",
-    "InstallationStrategyBase",
-    "DebInstallStrategy",
-    "PipInstallStrategy",
     "BinaryInstallStrategy",
+    "DebInstallStrategy",
+    "InstallationError",
+    "InstallationResult",
+    "InstallationStrategyBase",
+    "InstallationStrategyError",
+    "PipInstallStrategy",
     "StrategyFactory",
+    "StrategyStatus",
+    "VerificationError",
     "get_current_platform",
 ]

@@ -9,8 +9,8 @@ from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
 from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.environment import (
-    EnvironmentRequest,
     EnvironmentReconciler,
+    EnvironmentRequest,
     SessionStore,
 )
 from ai_engineering_bootstrap.executor.mode import ExecutionMode

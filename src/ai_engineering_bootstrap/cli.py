@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import typer
 from rich.console import Console
