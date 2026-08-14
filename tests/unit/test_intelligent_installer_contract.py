@@ -1,9 +1,13 @@
 from types import SimpleNamespace
 
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser
-from ai_engineering_bootstrap.backend.runtime_session_service import RuntimeSessionService
+from ai_engineering_bootstrap.backend.runtime_session_service import (
+    RuntimeSessionService,
+)
 from ai_engineering_bootstrap.environment.models import EnvironmentRequest
-from ai_engineering_bootstrap.environment.session_repository import InMemorySessionRepository
+from ai_engineering_bootstrap.environment.session_repository import (
+    InMemorySessionRepository,
+)
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 from ai_engineering_bootstrap.executor.policy import SafetyGate
@@ -63,8 +67,14 @@ def test_instance_action_ids_resolve_to_distinct_canonical_handlers() -> None:
     )
 
     assert ruff_handler is pytest_handler
-    assert registry.canonical_action_id("install_python_package:ruff") == "install_python_package"
-    assert registry.canonical_action_id("install_python_package:pytest") == "install_python_package"
+    assert (
+        registry.canonical_action_id("install_python_package:ruff")
+        == "install_python_package"
+    )
+    assert (
+        registry.canonical_action_id("install_python_package:pytest")
+        == "install_python_package"
+    )
 
 
 def test_instance_action_policies_are_independently_addressable() -> None:

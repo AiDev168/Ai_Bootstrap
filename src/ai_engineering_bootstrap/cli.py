@@ -19,7 +19,6 @@ from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.audit.models import AuditReport, CheckStatus
 from ai_engineering_bootstrap.backend.server import serve
 from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
-from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.exceptions import BootstrapError
 from ai_engineering_bootstrap.executor import ExecutorEngine
 from ai_engineering_bootstrap.executor.capability import default_capability_registry
@@ -28,7 +27,6 @@ from ai_engineering_bootstrap.generation import (
     default_template_catalog,
 )
 from ai_engineering_bootstrap.models import GenerationRequest
-from ai_engineering_bootstrap.pipeline import PipelineEngine
 from ai_engineering_bootstrap.planner import PlannerEngine
 
 app = typer.Typer(
