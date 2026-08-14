@@ -23,10 +23,7 @@ def test_dashboard_uses_active_backend_routes() -> None:
         assert re.search(route, html), f"Missing GUI route pattern: {route}"
 
 
-def test_dashboard_has_request_console_and_live_session_refresh() -> None:
+def test_dashboard_has_request_console_live_refresh_and_llm_settings() -> None:
     html = HTML_PATH.read_text(encoding="utf-8")
-    assert "Request Console" in html
-    assert "startPolling" in html
-    assert "logRequest" in html
-    assert "Approve" in html
-    assert "Start Real" in html
+    for text in ("Request Console", "startPolling", "logRequest", "Approve", "Start Real", "LLM Connection", "/llm/settings", "/llm/test"):
+        assert text in html
