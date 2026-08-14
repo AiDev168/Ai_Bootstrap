@@ -38,11 +38,7 @@ class PythonPackageRequirement:
 
 @dataclass
 class EnvironmentRequest:
-    """
-    User request to prepare an engineering environment.
-
-    This is the primary input model that captures what the user wants.
-    """
+    """User request to prepare an engineering environment."""
 
     request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     project_id: str | None = None
@@ -60,13 +56,22 @@ class EnvironmentRequest:
 
     def to_desired_state(self) -> DesiredEnvironmentState:
         """Convert this request into a structured desired state."""
+        force_install = bool(self.constraints.get("force_install", False))
         tools = {
-            tool_id: ToolRequirement(tool_id=tool_id, level=ToolRequirementLevel.REQUIRED)
+            tool_id: ToolRequirement(
+                tool_id=tool_id,
+                level=ToolRequirementLevel.REQUIRED,
+                configuration={"force_install": force_install} if force_install else {},
+            )
             for tool_id in self.required_tools
         }
         for tool_id in self.optional_tools:
             if tool_id not in tools:
-                tools[tool_id] = ToolRequirement(tool_id=tool_id, level=ToolRequirementLevel.OPTIONAL)
+                tools[tool_id] = ToolRequirement(
+                    tool_id=tool_id,
+                    level=ToolRequirementLevel.OPTIONAL,
+                    configuration={"force_install": force_install} if force_install else {},
+                )
 
         return DesiredEnvironmentState(
             tools=tools,
@@ -79,11 +84,7 @@ class EnvironmentRequest:
 
 @dataclass(frozen=True)
 class DesiredEnvironmentState:
-    """
-    Structured target state for an engineering environment.
-
-    This represents what we want the environment to look like after completion.
-    """
+    """Structured target state for an engineering environment."""
 
     tools: dict[str, ToolRequirement] = field(default_factory=dict)
     python_packages: list[PythonPackageRequirement] = field(default_factory=list)
@@ -97,23 +98,19 @@ class ToolStatus:
     """Observed status of a single tool in the actual environment."""
 
     tool_id: str
-    status: str  # "installed", "missing", "error"
+    status: str
     version: str | None = None
     location: str | None = None
-    health: str = "unknown"  # "healthy", "degraded", "broken", "unknown"
+    health: str = "unknown"
     probe_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class ActualEnvironmentState:
-    """
-    Observed current state of the engineering environment.
-
-    This comes from real audit/probe systems, not from LLM inference.
-    """
+    """Observed current state of the engineering environment."""
 
     tools: dict[str, ToolStatus] = field(default_factory=dict)
-    python_packages: dict[str, str] = field(default_factory=dict)  # name -> version
+    python_packages: dict[str, str] = field(default_factory=dict)
     system_info: dict[str, Any] = field(default_factory=dict)
     probe_timestamp: str = ""
     probe_evidence: dict[str, Any] = field(default_factory=dict)
@@ -154,11 +151,7 @@ class PackageDelta:
 
 @dataclass(frozen=True)
 class EnvironmentDelta:
-    """
-    Computed difference between actual and desired environment states.
-
-    This is calculated deterministically, not by LLM.
-    """
+    """Computed difference between actual and desired environment states."""
 
     tool_deltas: list[ToolDelta] = field(default_factory=list)
     package_deltas: list[PackageDelta] = field(default_factory=list)
@@ -175,9 +168,10 @@ class EnvironmentDelta:
 
     @property
     def required_actions_count(self) -> int:
-        """Count of required (non-optional) actions."""
+        """Count of required non-optional actions."""
         count = sum(
-            1 for d in self.tool_deltas
+            1
+            for d in self.tool_deltas
             if d.action != DeltaAction.NONE
             and d.desired_requirement
             and d.desired_requirement.level == ToolRequirementLevel.REQUIRED
@@ -190,7 +184,8 @@ class EnvironmentDelta:
     def optional_actions_count(self) -> int:
         """Count of optional actions."""
         return sum(
-            1 for d in self.tool_deltas
+            1
+            for d in self.tool_deltas
             if d.action != DeltaAction.NONE
             and d.desired_requirement
             and d.desired_requirement.level == ToolRequirementLevel.OPTIONAL

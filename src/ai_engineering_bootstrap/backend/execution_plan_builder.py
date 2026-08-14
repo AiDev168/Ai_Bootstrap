@@ -40,19 +40,22 @@ class ExecutionPlanBuilder:
         for decision in strategy_plan.decisions:
             action_id = self._resolve_action_id(decision.tool_id, decision.strategy_name)
             self._require_capability(action_id)
+            context = {
+                "tool_id": decision.tool_id,
+                "strategy": decision.strategy_name,
+                "strategy_args": dict(decision.strategy_args),
+                "artifact_url": decision.artifact_url,
+                "version": decision.version,
+                "source": decision.source,
+            }
+            if action_id == "install_python_package":
+                context.update(self._pip_context(decision.tool_id, decision.strategy_args, decision.version))
             actions.append(
                 ExecutionPlanAction(
                     action_id=action_id,
                     description=f"Prepare {decision.tool_id} using {decision.strategy_name}",
                     priority=self._priority(decision.risk_level),
-                    context={
-                        "tool_id": decision.tool_id,
-                        "strategy": decision.strategy_name,
-                        "strategy_args": dict(decision.strategy_args),
-                        "artifact_url": decision.artifact_url,
-                        "version": decision.version,
-                        "source": decision.source,
-                    },
+                    context=context,
                 )
             )
 
@@ -61,12 +64,17 @@ class ExecutionPlanBuilder:
                 continue
             action_id = "install_python_package"
             self._require_capability(action_id)
+            requirement = package_delta.package_name
+            if package_delta.desired_version:
+                requirement = f"{requirement}{package_delta.desired_version}"
             actions.append(
                 ExecutionPlanAction(
                     action_id=action_id,
                     description=f"Install Python package {package_delta.package_name}",
                     priority=2,
                     context={
+                        "package": package_delta.package_name,
+                        "requirement": requirement,
                         "package_name": package_delta.package_name,
                         "version_constraint": package_delta.desired_version,
                         "actual_version": package_delta.actual_version,
@@ -97,6 +105,14 @@ class ExecutionPlanBuilder:
     def _require_capability(self, action_id: str) -> None:
         if not self._capabilities.find_by_action(action_id):
             raise ValueError(f"Executor action '{action_id}' is not registered in the capability catalog.")
+
+    @staticmethod
+    def _pip_context(tool_id: str, strategy_args: dict, version: str | None) -> dict[str, str]:
+        package = str(strategy_args.get("package_name") or strategy_args.get("package") or tool_id).strip()
+        requirement = str(strategy_args.get("requirement") or package).strip()
+        if version and requirement == package:
+            requirement = f"{package}{version}"
+        return {"package": package, "requirement": requirement}
 
     @staticmethod
     def _priority(risk_level: str) -> int:

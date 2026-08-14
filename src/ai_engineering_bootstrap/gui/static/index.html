@@ -2,456 +2,56 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Engineering Bootstrap - Environment Orchestrator</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Engineering Bootstrap</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#0b1020;color:#e8ecf4}
-body{margin:0;background:linear-gradient(135deg,#0b1020,#131a2d);min-height:100vh}
-main{max-width:1400px;margin:0 auto;padding:28px}
-h1{margin:0 0 8px;font-size:28px}.muted{color:#95a1b5}
-.tabs{display:flex;gap:8px;margin:20px 0;border-bottom:1px solid #26324d;padding-bottom:0}
-.tab{padding:10px 20px;background:transparent;border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;cursor:pointer;color:#95a1b5}
-.tab:hover{background:#151d32;color:#e8ecf4}
-.tab.active{background:#151d32;border-color:#26324d;color:#5c7cfa;font-weight:600}
-.tab-content{display:none}
-.tab-content.active{display:block}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:20px 0}
-.card{background:#151d32;border:1px solid #26324d;border-radius:16px;padding:18px;box-shadow:0 12px 30px #0003}
-.value{font-size:30px;font-weight:700;margin-top:10px}
-.ok{color:#61d095}.bad{color:#ff7d87}.warn{color:#f7c66b}
-button{background:#5c7cfa;color:white;border:0;border-radius:10px;padding:11px 18px;cursor:pointer;margin:6px 8px 6px 0;font-size:14px;font-weight:500;transition:all 0.2s}
-button:hover{filter:brightness(1.1);transform:translateY(-1px)}
-button.secondary{background:#26324d}
-button.success{background:#61d095;color:#0b1020}
-button.danger{background:#ff7d87;color:#0b1020}
-button:disabled{opacity:0.5;cursor:not-allowed;transform:none}
-pre{white-space:pre-wrap;background:#0a0f1d;padding:14px;border-radius:10px;overflow:auto;max-height:500px;font-size:13px}
-table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{padding:12px;border-bottom:1px solid #28344e;text-align:left;font-size:14px}
-th{color:#95a1b5;font-weight:500}
-input,textarea,select{background:#0a0f1d;border:1px solid #26324d;border-radius:8px;padding:12px;color:#e8ecf4;font-size:14px;width:100%;box-sizing:border-box;margin:8px 0}
-input:focus,textarea:focus,select:focus{outline:none;border-color:#5c7cfa}
-label{display:block;margin:16px 0 8px;color:#95a1b5;font-size:13px;font-weight:500}
-.badge{display:inline-block;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;margin-left:8px}
-.badge.ok{background:#61d09522;color:#61d095}
-.badge.bad{background:#ff7d8722;color:#ff7d87}
-.badge.warn{background:#f7c66b22;color:#f7c66b}
-.timeline{position:relative;padding-left:30px}
-.timeline::before{content:'';position:absolute;left:10px;top:0;bottom:0;width:2px;background:#26324d}
-.timeline-item{position:relative;padding:8px 0 8px 20px}
-.timeline-item::before{content:'';position:absolute;left:-24px;top:14px;width:12px;height:12px;border-radius:50%;background:#5c7cfa;border:3px solid #151d32}
-.timeline-item.done::before{background:#61d095}
-.timeline-item.error::before{background:#ff7d87}
-.action-card{background:#0a0f1d;border:1px solid #26324d;border-radius:12px;padding:16px;margin:12px 0}
-.action-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.action-title{font-weight:600;font-size:15px}
-.action-meta{font-size:12px;color:#95a1b5}
-.stat-value{font-size:36px;font-weight:700}
-.stat-label{color:#95a1b5;font-size:13px;margin-top:4px}
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#07101d;color:#e8eef7}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(135deg,#07101d,#101b30 55%,#0d1525)}main{max-width:1500px;margin:auto;padding:24px}h1{margin:0 0 6px;font-size:28px}.muted,.small{color:#91a0b6}.small{font-size:12px}.header,.toolbar,.actions{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.conn{padding:8px 12px;border:1px solid #263450;border-radius:999px;background:#0c1525;font-size:12px}.ok{color:#62d49b}.bad{color:#ff7f8b}.warn{color:#f5c76b}.tabs{display:flex;gap:6px;margin:22px 0 16px;border-bottom:1px solid #263450;overflow:auto}.tab{border:0;background:transparent;color:#91a0b6;padding:11px 16px;cursor:pointer;border-radius:10px 10px 0 0}.tab.active{background:#17233a;color:#8fa8ff;font-weight:700}.panel{display:none}.panel.active{display:block}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{background:#111c30;border:1px solid #263450;border-radius:16px;padding:18px;box-shadow:0 14px 40px #0004}.metric{font-size:30px;font-weight:800;margin-top:8px}.badge{display:inline-block;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:700}.badge.ok{background:#62d49b1f}.badge.bad{background:#ff7f8b1f}.badge.warn{background:#f5c76b1f}.badge.neutral{background:#8fa8ff1f;color:#8fa8ff}button{border:0;border-radius:10px;padding:10px 14px;cursor:pointer;background:#5d7cff;color:#fff;font-weight:650}button:hover{filter:brightness(1.08)}button:disabled{opacity:.45;cursor:not-allowed}button.secondary{background:#263450}button.success{background:#62d49b;color:#07101d}button.warning{background:#f5c76b;color:#07101d}button.danger{background:#ff7f8b;color:#07101d}input,textarea,select{width:100%;background:#08111f;border:1px solid #2a3956;color:#e8eef7;border-radius:10px;padding:11px 12px;font:inherit}textarea{min-height:130px;resize:vertical}label{display:block;margin:12px 0 6px;font-size:13px;color:#a8b4c8}.checkgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.check{display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid #263450;border-radius:10px;background:#0c1525}.check input{width:auto}.alert{display:none;margin:14px 0;padding:12px 14px;border:1px solid #5a2d35;background:#29131a;color:#ffb1ba;border-radius:10px}.alert.show{display:block}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #24314a;text-align:left;vertical-align:top;font-size:13px}th{color:#91a0b6}.timeline{display:flex;flex-direction:column;gap:8px}.event{padding:10px 12px;border-left:3px solid #5d7cff;background:#0b1424;border-radius:8px}.action{padding:14px;border:1px solid #263450;border-radius:12px;background:#0b1424;margin-top:10px}.action-head{display:flex;justify-content:space-between;gap:10px}.console{max-height:420px;overflow:auto;display:flex;flex-direction:column;gap:8px}.request{padding:10px;border:1px solid #23324d;border-radius:10px;background:#0a1322}.request.ok{border-left:3px solid #62d49b}.request.bad{border-left:3px solid #ff7f8b}.request.busy{border-left:3px solid #f5c76b}pre{margin:0;white-space:pre-wrap;word-break:break-word;background:#08111f;border:1px solid #263450;border-radius:10px;padding:12px;max-height:420px;overflow:auto;font-size:12px}.hidden{display:none}.error-box{padding:12px;border:1px solid #5a2d35;background:#29131a;color:#ffb1ba;border-radius:10px}.success-box{padding:12px;border:1px solid #315b48;background:#10271f;color:#89e7b7;border-radius:10px}@media(max-width:1050px){.grid{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}@media(max-width:680px){main{padding:14px}.grid{grid-template-columns:1fr}.checkgrid{grid-template-columns:1fr}.tab{padding:9px 12px}}
 </style>
 </head>
 <body>
 <main>
-<h1>🤖 AI Engineering Bootstrap</h1>
-<div class="muted">Environment Orchestrator with LLM-assisted Planning</div>
-
-<div class="tabs">
-<div class="tab active" onclick="showTab('dashboard')">Dashboard</div>
-<div class="tab" onclick="showTab('session')">Create Session</div>
-<div class="tab" onclick="showTab('sessions')">Sessions</div>
-<div class="tab" onclick="showTab('settings')">LLM Settings</div>
-</div>
-
-<!-- DASHBOARD TAB -->
-<div id="dashboard" class="tab-content active">
-<div class="grid">
-<div class="card">
-<div class="stat-label">System Health</div>
-<div id="health-status" class="value">—</div>
-</div>
-<div class="card">
-<div class="stat-label">LLM Available</div>
-<div id="llm-status" class="value">—</div>
-</div>
-<div class="card">
-<div class="stat-label">Active Sessions</div>
-<div id="active-sessions" class="value">—</div>
-</div>
-<div class="card">
-<div class="stat-label">Environment Ready</div>
-<div id="env-ready" class="value">—</div>
-</div>
-</div>
-
-<div class="card">
-<h3 style="margin-top:0">Quick Actions</h3>
-<button onclick="refreshAll()">🔄 Refresh</button>
-<button onclick="showTab('session')">➕ New Session</button>
-<button onclick="runAudit()">🔍 Run Audit</button>
-</div>
-
-<div class="grid" style="margin-top:20px">
-<div class="card">
-<h3 style="margin-top:0">📊 System Audit</h3>
-<div id="audit-results">Loading...</div>
-</div>
-<div class="card">
-<h3 style="margin-top:0">🛠️ Tool Status</h3>
-<div id="tool-status">Loading...</div>
-</div>
-</div>
-</div>
-
-<!-- CREATE SESSION TAB -->
-<div id="session" class="tab-content">
-<div class="card">
-<h3 style="margin-top:0">🎯 Create Environment Request</h3>
-<label for="goal-input">Describe your environment goal:</label>
-<textarea id="goal-input" rows="4" placeholder="Example: Prepare this machine for Python AI development with Cursor, Docker, Ruff, and Pytest"></textarea>
-
-<label>Required Tools:</label>
-<div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0">
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="python" style="width:auto;margin-right:6px">Python</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="git" style="width:auto;margin-right:6px">Git</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="cursor" style="width:auto;margin-right:6px">Cursor</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="docker" style="width:auto;margin-right:6px">Docker</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="ruff" style="width:auto;margin-right:6px">Ruff</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="pytest" style="width:auto;margin-right:6px">Pytest</label>
-</div>
-
-<label>Optional Tools:</label>
-<div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0">
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="black" style="width:auto;margin-right:6px">Black</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="github-cli" style="width:auto;margin-right:6px">GitHub CLI</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="nodejs" style="width:auto;margin-right:6px">Node.js</label>
-</div>
-
-<label for="project-path">Project Path (optional):</label>
-<input type="text" id="project-path" placeholder="/path/to/your/project">
-
-<button class="success" onclick="createSession()" style="margin-top:16px">🚀 Create Session</button>
-</div>
-
-<div id="session-result" class="card" style="margin-top:20px;display:none">
-<h3 style="margin-top:0">✅ Session Created</h3>
-<div id="session-details"></div>
-<button onclick="viewSession(currentSessionId)" style="margin-top:12px">View Session Details</button>
-</div>
-</div>
-
-<!-- SESSIONS LIST TAB -->
-<div id="sessions" class="tab-content">
-<div class="card">
-<h3 style="margin-top:0">📋 Active Sessions</h3>
-<button onclick="loadSessions()">🔄 Refresh</button>
-<div id="sessions-list" style="margin-top:16px">Loading...</div>
-</div>
-</div>
-
-<!-- SESSION DETAIL VIEW (hidden by default) -->
-<div id="session-detail" class="tab-content">
-<button class="secondary" onclick="showTab('sessions')" style="margin-bottom:16px">← Back to Sessions</button>
-<div id="session-detail-content">Loading...</div>
-</div>
-
-<!-- SETTINGS TAB -->
-<div id="settings" class="tab-content">
-<div class="card">
-<h3 style="margin-top:0">⚙️ LLM Configuration</h3>
-<label for="llm-provider">Provider:</label>
-<select id="llm-provider">
-<option value="lmstudio">LM Studio</option>
-<option value="ollama">Ollama</option>
-<option value="openai">OpenAI</option>
-<option value="anthropic">Anthropic</option>
-<option value="local">Local (Disabled)</option>
-</select>
-
-<label for="llm-model">Model Name:</label>
-<input type="text" id="llm-model" placeholder="e.g., qwen2.5-coder:7b, llama3.1:8b">
-
-<label for="llm-url">API Base URL:</label>
-<input type="text" id="llm-url" placeholder="http://localhost:1234/v1">
-
-<label for="llm-api-key">API Key (if required):</label>
-<input type="password" id="llm-api-key" placeholder="sk-...">
-
-<div style="margin-top:20px">
-<button class="success" onclick="saveLlmSettings()">💾 Save Settings</button>
-<button onclick="testLlmConnection()">🧪 Test Connection</button>
-</div>
-
-<div id="llm-test-result" style="margin-top:16px"></div>
-</div>
-
-<div class="card" style="margin-top:20px">
-<h3 style="margin-top:0">ℹ️ Current Status</h3>
-<div id="current-llm-status">Loading...</div>
-</div>
-</div>
-
+<div class="header"><div><h1>AI Engineering Bootstrap</h1><div class="muted">Environment orchestration • reconciliation • approval • execution • verification</div></div><span id="server" class="conn">Server: checking…</span></div>
+<div id="alert" class="alert"></div>
+<div class="tabs"><button class="tab active" data-tab="dashboard">Dashboard</button><button class="tab" data-tab="create">New Session</button><button class="tab" data-tab="sessions">Sessions</button><button class="tab" data-tab="settings">LLM Settings</button><button class="tab" data-tab="console">Request Console</button></div>
+<section id="dashboard" class="panel active">
+<div class="grid"><div class="card"><div class="small">Backend Health</div><div id="health" class="metric">—</div></div><div class="card"><div class="small">LLM</div><div id="llm" class="metric">—</div></div><div class="card"><div class="small">Development Ready</div><div id="ready" class="metric">—</div></div><div class="card"><div class="small">Sessions</div><div id="session-count" class="metric">—</div></div></div>
+<div class="grid2" style="margin-top:14px"><div class="card"><div class="toolbar"><h3>Environment Audit</h3><button id="audit-btn" onclick="loadAudit()">Run Audit</button></div><div id="audit">Loading…</div></div><div class="card"><div class="toolbar"><h3>Engineering Tools</h3><button onclick="loadEngineering()">Refresh</button></div><div id="engineering">Loading…</div></div></div>
+<div class="card" style="margin-top:14px"><div class="toolbar"><h3>Quick Actions</h3><div class="actions"><button onclick="refreshAll()">Refresh</button><button class="secondary" onclick="openTab('create')">New Session</button></div></div><div class="muted">Every request and response is visible in Request Console.</div></div>
+</section>
+<section id="create" class="panel"><div class="grid2"><div class="card"><h3>Desired Environment</h3><label for="goal">Natural-language goal</label><textarea id="goal" placeholder="Prepare this machine for Python AI development with Cursor, Docker, Ruff and Pytest."></textarea><label>Required tools</label><div class="checkgrid"><label class="check"><input type="checkbox" value="python">Python</label><label class="check"><input type="checkbox" value="git">Git</label><label class="check"><input type="checkbox" value="cursor">Cursor</label><label class="check"><input type="checkbox" value="docker">Docker</label><label class="check"><input type="checkbox" value="ruff">Ruff</label><label class="check"><input type="checkbox" value="pytest">Pytest</label></div><label for="project-path">Project path</label><input id="project-path" placeholder="/home/user/project"><div class="actions" style="margin-top:14px"><button id="create-btn" class="success" onclick="createSession()">Create Session</button><button class="secondary" onclick="resetCreate()">Reset</button></div></div><div class="card"><h3>Lifecycle</h3><div class="timeline"><div class="event">1. Audit current environment</div><div class="event">2. Reconcile Actual vs Desired State</div><div class="event">3. Generate and validate Execution Plan</div><div class="event">4. Review / approve actions</div><div class="event">5. Execute through canonical pipeline</div><div class="event">6. Verify and record evidence</div></div></div></div></section>
+<section id="sessions" class="panel"><div class="card"><div class="toolbar"><h3>Sessions</h3><button onclick="loadSessions()">Refresh</button></div><div id="sessions-list">Loading…</div></div><div id="session-detail" class="card hidden" style="margin-top:14px"></div></section>
+<section id="settings" class="panel"><div class="grid2"><div class="card"><h3>LLM Connection</h3><label for="provider">Provider</label><select id="provider"><option value="mock">Mock / Offline Test</option><option value="local_server">LM Studio / OpenAI-compatible</option><option value="remote_api">Remote API</option><option value="in_process">In-process Model</option></select><label for="model">Model</label><input id="model" placeholder="Model ID returned by provider"><label for="base-url">Base URL</label><input id="base-url" placeholder="http://127.0.0.1:1234/v1"><label for="api-key">API key</label><input id="api-key" type="password" placeholder="Optional"><div class="actions" style="margin-top:12px"><button class="success" onclick="saveLlm()">Save Settings</button><button onclick="testLlm()">Test Connection</button></div><div id="llm-result" style="margin-top:12px"></div></div><div class="card"><h3>LLM Status</h3><div id="llm-details">Loading…</div><div class="muted" style="margin-top:12px">Mock is a local offline test provider. LM Studio and remote providers require a reachable endpoint.</div></div></div></section>
+<section id="console" class="panel"><div class="grid2"><div class="card"><div class="toolbar"><h3>Request Console</h3><button class="secondary" onclick="clearLog()">Clear</button></div><div id="request-log" class="console"><div class="muted">No requests yet.</div></div></div><div class="card"><h3>Latest Response</h3><pre id="latest">—</pre></div></div></section>
 </main>
-
 <script>
-let currentSessionId = null;
-let llmConfig = {provider:'lmstudio',model:'qwen2.5-coder:7b',baseUrl:'http://localhost:1234/v1',apiKey:''};
-
-// Tab navigation
-function showTab(tabId){
-document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
-document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
-document.getElementById(tabId).classList.add('active');
-if(tabId==='dashboard') refreshAll();
-if(tabId==='sessions') loadSessions();
-if(tabId==='settings') loadLlmSettings();
-}
-
-// Utility functions
-const api = async(path,method='GET',data=null)=>{
-const opts={method,headers:{'Content-Type':'application/json'}};
-if(data) opts.body=JSON.stringify(data);
-const res=await fetch(`/api/v1${path}`,opts);
-if(!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-return res.json();
-};
-
-function statusBadge(status){
-if(status===true||status==='passed'||status==='available'||status==='healthy') return '<span class="badge ok">OK</span>';
-if(status===false||status==='failed'||status==='missing') return '<span class="badge bad">FAILED</span>';
-return `<span class="badge warn">${status}</span>`;
-}
-
-// Dashboard refresh
-async function refreshAll(){
-try{
-const health=await api('/health');
-document.getElementById('health-status').innerHTML=statusBadge(health.data?.status);
-document.getElementById('llm-status').innerHTML=statusBadge(health.data?.llm_available);
-
-const sessions=await api('/sessions');
-document.getElementById('active-sessions').textContent=sessions.data?.length||0;
-
-const audit=await api('/audit');
-const score=audit.data?.readiness?.health_score||0;
-const ready=audit.data?.readiness?.development_ready;
-document.getElementById('env-ready').innerHTML=statusBadge(ready);
-
-// Audit results table
-let auditHtml='<table><tr><th>Check</th><th>Status</th><th>Details</th></tr>';
-(audit.data?.checks||[]).forEach(c=>{
-auditHtml+=`<tr><td>${c.name}</td><td>${statusBadge(c.status)}</td><td>${c.details||'-'}</td></tr>`;
-});
-auditHtml+='</table>';
-document.getElementById('audit-results').innerHTML=auditHtml;
-
-// Tool status
-const env=await api('/environment');
-let toolHtml='<table><tr><th>Tool</th><th>Status</th><th>Path</th></tr>';
-(env.data?.tools||[]).forEach(t=>{
-toolHtml+=`<tr><td>${t.name}</td><td>${statusBadge(t.available)}</td><td>${t.path||'-'}</td></tr>`;
-});
-toolHtml+='</table>';
-document.getElementById('tool-status').innerHTML=toolHtml;
-}catch(e){
-console.error('Refresh error:',e);
-document.getElementById('health-status').innerHTML='<span class="badge bad">Error</span>';
-}
-}
-
-async function runAudit(){
-try{
-await api('/audit',{method:'POST'});
-alert('Audit completed!');
-refreshAll();
-}catch(e){alert('Audit failed: '+e.message);}
-}
-
-// Session creation
-async function createSession(){
-const goal=document.getElementById('goal-input').value;
-const projectPath=document.getElementById('project-path').value;
-const requiredTools=[...document.querySelectorAll('#session input[type="checkbox"]:checked')].map(cb=>cb.value);
-
-if(!goal){alert('Please enter a goal');return;}
-
-try{
-const result=await api('/environment/request','POST',{
-natural_language_goal:goal,
-project_path:projectPath||null,
-required_tools:requiredTools,
-optional_tools:[]
-});
-currentSessionId=result.data?.session_id;
-document.getElementById('session-result').style.display='block';
-document.getElementById('session-details').innerHTML=`
-<p><strong>Session ID:</strong> ${currentSessionId}</p>
-<p><strong>Status:</strong> ${result.data?.status||'created'}</p>
-`;
-}catch(e){alert('Failed to create session: '+e.message);}
-}
-
-async function viewSession(sessionId){
-showTab('session-detail');
-currentSessionId=sessionId;
-try{
-const [session,state,plan]=await Promise.all([
-api(`/sessions/${sessionId}`),
-api(`/sessions/${sessionId}/state`),
-api(`/sessions/${sessionId}/plan`)
-]);
-
-let html=`
-<div class="card">
-<h3>Session ${sessionId}</h3>
-<p><strong>Status:</strong> ${session.data?.status}</p>
-<p><strong>Goal:</strong> ${session.data?.request?.natural_language_goal||'N/A'}</p>
-</div>
-`;
-
-if(state.data){
-html+='<div class="card" style="margin-top:16px"><h3>Environment Delta</h3>';
-if(state.data.delta?.tools?.length){
-html+='<table><tr><th>Tool</th><th>Action</th><th>From</th><th>To</th></tr>';
-state.data.delta.tools.forEach(d=>{
-html+=`<tr><td>${d.tool_id}</td><td><span class="badge warn">${d.action}</span></td><td>${d.actual_status||'N/A'}</td><td>${d.desired_status||'N/A'}</td></tr>`;
-});
-html+='</table>';
-}else{
-html+='<p>No changes required.</p>';
-}
-html+='</div>';
-}
-
-if(plan.data?.actions?.length){
-html+='<div class="card" style="margin-top:16px"><h3>Execution Plan</h3>';
-plan.data.actions.forEach((action,idx)=>{
-html+=`
-<div class="action-card">
-<div class="action-header">
-<span class="action-title">${idx+1}. ${action.action_id}</span>
-<span class="action-meta">${action.priority||'normal'} priority</span>
-</div>
-<p>${action.description||''}</p>
-<div style="margin-top:12px">
-<button class="success" onclick="approveAction('${sessionId}','${action.action_id}')">✓ Approve</button>
-<button class="secondary" onclick="skipAction('${sessionId}','${action.action_id}')">Skip</button>
-<button class="danger" onclick="rejectAction('${sessionId}','${action.action_id}')">✗ Reject</button>
-</div>
-</div>
-`;
-});
-html+='</div>';
-}
-
-document.getElementById('session-detail-content').innerHTML=html;
-}catch(e){
-document.getElementById('session-detail-content').innerHTML=`<p class="bad">Error loading session: ${e.message}</p>`;
-}
-}
-
-async function loadSessions(){
-try{
-const result=await api('/sessions');
-const sessions=result.data||[];
-if(!sessions.length){
-document.getElementById('sessions-list').innerHTML='<p class="muted">No active sessions.</p>';
-return;
-}
-let html='<table><tr><th>Session ID</th><th>Status</th><th>Goal</th><th>Actions</th></tr>';
-sessions.forEach(s=>{
-html+=`<tr>
-<td>${s.session_id}</td>
-<td>${statusBadge(s.status)}</td>
-<td>${s.request?.natural_language_goal||'N/A'}</td>
-<td><button onclick="viewSession('${s.session_id}')">View</button></td>
-</tr>`;
-});
-html+='</table>';
-document.getElementById('sessions-list').innerHTML=html;
-}catch(e){
-document.getElementById('sessions-list').innerHTML=`<p class="bad">Error: ${e.message}</p>`;
-}
-}
-
-async function approveAction(sessionId,actionId){
-try{
-await api(`/sessions/${sessionId}/actions/${actionId}/approve`,`POST`);
-alert('Action approved! Execution started.');
-viewSession(sessionId);
-}catch(e){alert('Failed to approve: '+e.message);}
-}
-
-async function skipAction(sessionId,actionId){
-try{
-await api(`/sessions/${sessionId}/actions/${actionId}/skip`,`POST`);
-alert('Action skipped.');
-viewSession(sessionId);
-}catch(e){alert('Failed to skip: '+e.message);}
-}
-
-async function rejectAction(sessionId,actionId){
-try{
-await api(`/sessions/${sessionId}/actions/${actionId}/reject`,`POST`);
-alert('Action rejected.');
-viewSession(sessionId);
-}catch(e){alert('Failed to reject: '+e.message);}
-}
-
-// LLM Settings
-async function loadLlmSettings(){
-document.getElementById('llm-provider').value=llmConfig.provider;
-document.getElementById('llm-model').value=llmConfig.model;
-document.getElementById('llm-url').value=llmConfig.baseUrl;
-document.getElementById('llm-api-key').value=llmConfig.apiKey||'';
-
-try{
-const health=await api('/health');
-document.getElementById('current-llm-status').innerHTML=`
-<p><strong>LLM Available:</strong> ${statusBadge(health.data?.llm_available)}</p>
-<p><strong>Provider:</strong> ${llmConfig.provider}</p>
-<p><strong>Model:</strong> ${llmConfig.model}</p>
-<p><strong>Base URL:</strong> ${llmConfig.baseUrl}</p>
-`;
-}catch(e){
-document.getElementById('current-llm-status').innerHTML='<p class="bad">Unable to fetch status</p>';
-}
-}
-
-async function saveLlmSettings(){
-llmConfig.provider=document.getElementById('llm-provider').value;
-llmConfig.model=document.getElementById('llm-model').value;
-llmConfig.baseUrl=document.getElementById('llm-url').value;
-llmConfig.apiKey=document.getElementById('llm-api-key').value;
-
-// In a real implementation, this would call an API endpoint
-// For now, we store in localStorage
-localStorage.setItem('llmConfig',JSON.stringify(llmConfig));
-alert('Settings saved locally. Note: Backend integration pending.');
-loadLlmSettings();
-}
-
-async function testLlmConnection(){
-const resultDiv=document.getElementById('llm-test-result');
-resultDiv.innerHTML='<p>Testing connection...</p>';
-try{
-// Try to call a simple endpoint to test connectivity
-const response=await fetch(llmConfig.baseUrl+'/models',{
-headers: llmConfig.apiKey ? {'Authorization': `Bearer ${llmConfig.apiKey}`} : {}
-}).then(r=>r.ok?r.json():Promise.reject(new Error(`HTTP ${r.status}`)));
-resultDiv.innerHTML=`<p class="ok">✓ Connection successful! Found ${response.data?.length||0} models.</p>`;
-}catch(e){
-resultDiv.innerHTML=`<p class="bad">✗ Connection failed: ${e.message}</p>`;
-}
-}
-
-// Load saved settings on startup
-try{
-const saved=localStorage.getItem('llmConfig');
-if(saved) llmConfig=JSON.parse(saved);
-}catch(e){}
-
-// Initial refresh
+const state={sessionId:null,timer:null,requests:[]};const apiBase='/api/v1';const $=id=>document.getElementById(id);
+function badge(v){const s=String(v??'unknown').toLowerCase();const cls=v===true||['ok','passed','healthy','available','completed','ready','approved','success'].includes(s)?'ok':v===false||['failed','missing','blocked','rejected','cancelled','error'].includes(s)?'bad':'warn';return `<span class="badge ${cls}">${String(v??'unknown')}</span>`}
+function showError(m){const a=$('alert');a.textContent=m;a.classList.add('show');setTimeout(()=>a.classList.remove('show'),5000)}
+function openTab(id){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===id));if(id==='dashboard')refreshAll();if(id==='sessions')loadSessions();if(id==='settings')loadLlm()}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
+function clearLog(){state.requests=[];renderLog();$('latest').textContent='—'}
+function renderLog(){const e=$('request-log');if(!state.requests.length){e.innerHTML='<div class="muted">No requests yet.</div>';return}e.innerHTML=state.requests.map(r=>`<div class="request ${r.status>=200&&r.status<300?'ok':r.status===0?'busy':'bad'}"><strong>${r.method}</strong> ${r.path}<div class="small">${r.status||'network'} • ${r.ms}ms • ${r.time}</div></div>`).join('')}
+function logRequest(method,path,status,ms,response){state.requests.unshift({method,path,status,ms,time:new Date().toLocaleTimeString()});state.requests=state.requests.slice(0,80);renderLog();$('latest').textContent=JSON.stringify(response,null,2)}
+async function api(path,method='GET',body=null){const started=performance.now();try{const options={method,headers:{'Content-Type':'application/json'}};if(body!==null)options.body=JSON.stringify(body);const response=await fetch(apiBase+path,options);const text=await response.text();let payload=null;try{payload=text?JSON.parse(text):null}catch{payload=text}const ms=Math.round(performance.now()-started);logRequest(method,apiBase+path,response.status,ms,payload);if(!response.ok)throw new Error(payload?.error||`HTTP ${response.status}`);return payload}catch(error){const ms=Math.round(performance.now()-started);if(!state.requests.length||state.requests[0].ms!==ms){logRequest(method,apiBase+path,0,ms,{error:error.message})}throw error}}
+async function refreshHealth(){try{const x=await api('/health');$('server').className='conn ok';$('server').textContent='Server: connected';$('health').innerHTML=badge(x.status);$('llm').innerHTML=badge(x.llm_available);const l=x.llm||{};$('llm-details').innerHTML=`<p><strong>Provider:</strong> ${l.provider||'—'}</p><p><strong>Model:</strong> ${l.model||'—'}</p><p><strong>Base URL:</strong> ${l.base_url||'—'}</p><p><strong>Enabled:</strong> ${badge(l.enabled??x.llm_available)}</p><p><strong>API key:</strong> ${badge(l.api_key_configured)}</p>`}catch(e){$('server').className='conn bad';$('server').textContent='Server: offline';$('health').innerHTML=badge('error');showError(e.message)}}
+async function loadAudit(){const b=$('audit-btn');b.disabled=true;b.textContent='Auditing…';try{const x=await api('/audit');const r=x.readiness||{};$('ready').innerHTML=badge(r.development_ready);const checks=x.checks||[];$('audit').innerHTML=checks.length?`<table><tr><th>Check</th><th>Status</th><th>Details</th></tr>${checks.map(c=>`<tr><td>${c.name}</td><td>${badge(c.status)}</td><td>${c.details||'—'}</td></tr>`).join('')}</table>`:'<div class="muted">No audit checks.</div>'}catch(e){$('audit').innerHTML=`<div class="error-box">${e.message}</div>`;showError(e.message)}finally{b.disabled=false;b.textContent='Run Audit'}}
+async function loadEngineering(){try{const x=await api('/engineering');const tools=x.tools||[];$('engineering').innerHTML=tools.length?`<table><tr><th>Tool</th><th>Status</th><th>Path</th></tr>${tools.map(t=>`<tr><td>${t.name}</td><td>${badge(t.available)}</td><td>${t.path||'—'}</td></tr>`).join('')}</table>`:'<div class="muted">No tool data.</div>'}catch(e){$('engineering').innerHTML=`<div class="error-box">${e.message}</div>`;showError(e.message)}}
+async function refreshSessionsMetric(){try{const x=await api('/sessions');$('session-count').textContent=(x.sessions||[]).length}catch{$('session-count').textContent='—'}}
+async function refreshAll(){await Promise.all([refreshHealth(),loadAudit(),loadEngineering(),refreshSessionsMetric()])}
+function selectedTools(){return [...document.querySelectorAll('#create input[type=checkbox]:checked')].map(x=>x.value)}
+function resetCreate(){$('goal').value='';$('project-path').value='';document.querySelectorAll('#create input[type=checkbox]').forEach(x=>x.checked=false)}
+async function createSession(){const goal=$('goal').value.trim();if(!goal){showError('Enter an environment goal first.');return}const b=$('create-btn');b.disabled=true;b.textContent='Creating…';try{const x=await api('/sessions','POST',{natural_language_goal:goal,project_path:$('project-path').value.trim()||null,required_tools:selectedTools(),optional_tools:[],project_dependencies:[],constraints:{}});state.sessionId=x.session_id;openTab('sessions');await loadSessions();await viewSession(state.sessionId)}catch(e){showError(e.message)}finally{b.disabled=false;b.textContent='Create Session'}}
+async function loadSessions(){try{const x=await api('/sessions');const list=x.sessions||[];$('sessions-list').innerHTML=list.length?`<table><tr><th>Session</th><th>Status</th><th>Created</th><th>Action</th></tr>${list.map(s=>`<tr><td>${s.session_id}</td><td>${badge(s.status)}</td><td>${new Date(s.created_at).toLocaleString()}</td><td><button data-open="${s.session_id}">Open</button></td></tr>`).join('')}</table>`:'<div class="muted">No sessions.</div>';document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>viewSession(b.dataset.open))}catch(e){$('sessions-list').innerHTML=`<div class="error-box">${e.message}</div>`;showError(e.message)}}
+function renderSession(session,stateData,plan,events,decisions){const detail=$('session-detail');const actions=plan?.plan?.actions||[];const approvals=session.approval_states||{};const deltas=stateData?.delta?.tool_deltas||[];let html=`<div class="toolbar"><div><h3>Session ${session.session_id}</h3><div class="small">${session.request?.natural_language_goal||''}</div></div><div>${badge(session.status)}</div></div>`;if(plan?.status==='blocked'){html+=`<div class="error-box" style="margin-top:12px"><strong>Planning blocked</strong><div style="margin-top:6px">${plan.error||'Unknown planning error.'}</div></div>`}html+=`<div class="grid" style="margin-top:14px"><div class="card"><div class="small">Changes</div><div class="metric">${deltas.length}</div></div><div class="card"><div class="small">Plan Actions</div><div class="metric">${actions.length}</div></div><div class="card"><div class="small">Agent Decisions</div><div class="metric">${decisions.decisions?.length||0}</div></div><div class="card"><div class="small">Current Action</div><div class="metric" style="font-size:17px">${session.current_action||'—'}</div></div></div>`;html+=`<div class="grid2" style="margin-top:14px"><div class="card"><h3>Environment Delta</h3>${deltas.length?`<table><tr><th>Tool</th><th>Action</th><th>Actual</th><th>Reason</th></tr>${deltas.map(d=>`<tr><td>${d.tool_id}</td><td>${badge(d.action)}</td><td>${d.actual_status?.status||'missing'}</td><td>${d.reason||'—'}</td></tr>`).join('')}</table>`:'<div class="muted">No changes required.</div>'}</div><div class="card"><h3>Execution Plan</h3>${actions.length?actions.map(a=>{const approval=approvals[a.action_id]?.status||'pending';return `<div class="action"><div class="action-head"><strong>${a.action_id}</strong><span class="small">P${a.priority}</span></div><div style="margin-top:6px">${a.description}</div><div class="small" style="margin-top:6px">Approval: ${approval}</div><div class="actions" style="margin-top:10px"><button class="success" data-decision="approve" data-action="${a.action_id}">Approve</button><button class="secondary" data-decision="skip" data-action="${a.action_id}">Skip</button><button class="danger" data-decision="reject" data-action="${a.action_id}">Reject</button></div></div>`}).join(''):'<div class="muted">No executable actions.</div>'}</div></div>`;html+=`<div class="card" style="margin-top:14px"><div class="toolbar"><h3>Execution</h3><div class="actions"><button class="secondary" data-start="safe">Start Safe</button><button class="warning" data-start="real">Start Real</button><button class="danger" data-cancel="1">Cancel</button></div></div><div class="small">REAL remains subject to backend approval and Safety Gate.</div></div>`;html+=`<div class="grid2" style="margin-top:14px"><div class="card"><h3>Timeline</h3><div class="timeline">${(events.events||[]).map(e=>`<div class="event"><strong>${e.event_type}</strong><div class="small">${new Date(e.timestamp).toLocaleString()}</div><div>${e.message}</div></div>`).join('')||'<div class="muted">No events.</div>'}</div></div><div class="card"><h3>Agent Decisions</h3>${(decisions.decisions||[]).map(d=>`<div class="action"><strong>${d.decision_type}</strong> ${badge(Number(d.confidence||0).toFixed(2))}<div class="small">${d.provider||'unknown'} • ${d.model||'unknown'}</div><div style="margin-top:8px">${d.reasoning_summary||'—'}</div></div>`).join('')||'<div class="muted">No recorded agent decisions.</div>'}</div></div>`;detail.innerHTML=html;detail.classList.remove('hidden');detail.querySelectorAll('[data-decision]').forEach(b=>b.onclick=()=>actionDecision(session.session_id,b.dataset.action,b.dataset.decision));detail.querySelectorAll('[data-start]').forEach(b=>b.onclick=()=>startSession(session.session_id,b.dataset.start));detail.querySelector('[data-cancel]')?.addEventListener('click',()=>cancelSession(session.session_id));detail.scrollIntoView({behavior:'smooth',block:'start'})}
+async function viewSession(id){state.sessionId=id;openTab('sessions');if(state.timer)clearInterval(state.timer);try{const results=await Promise.allSettled([api(`/sessions/${id}`),api(`/sessions/${id}/state`),api(`/sessions/${id}/plan`),api(`/sessions/${id}/events`),api(`/sessions/${id}/agent-decisions`)]);const [sessionResult,stateResult,planResult,eventsResult,decisionResult]=results;if(sessionResult.status==='rejected')throw sessionResult.reason;const session=sessionResult.value;const stateData=stateResult.status==='fulfilled'?stateResult.value:{};const plan=planResult.status==='fulfilled'?planResult.value:{status:'blocked',error:planResult.reason?.message||'Plan unavailable'};const events=eventsResult.status==='fulfilled'?eventsResult.value:{events:[]};const decisions=decisionResult.status==='fulfilled'?decisionResult.value:{decisions:[]};renderSession(session,stateData,plan,events,decisions);startPolling(id)}catch(e){showError(`Unable to open session: ${e.message}`);$('session-detail').classList.remove('hidden');$('session-detail').innerHTML=`<div class="error-box">Open failed: ${e.message}</div>`}}
+function startPolling(id){if(state.timer)clearInterval(state.timer);state.timer=setInterval(()=>viewSessionRefresh(id),2500)}
+async function viewSessionRefresh(id){if(state.sessionId!==id)return;try{const results=await Promise.allSettled([api(`/sessions/${id}`),api(`/sessions/${id}/state`),api(`/sessions/${id}/plan`),api(`/sessions/${id}/events`),api(`/sessions/${id}/agent-decisions`)]);if(results[0].status!=='fulfilled')return;renderSession(results[0].value,results[1].status==='fulfilled'?results[1].value:{},results[2].status==='fulfilled'?results[2].value:{status:'blocked',error:'Plan unavailable'},results[3].status==='fulfilled'?results[3].value:{events:[]},results[4].status==='fulfilled'?results[4].value:{decisions:[]})}catch{}}
+async function actionDecision(id,action,decision){try{await api(`/sessions/${id}/actions/${action}/${decision}`,'POST');await viewSession(id)}catch(e){showError(e.message)}}
+async function startSession(id,mode){try{await api(`/sessions/${id}/start?mode=${mode}`,'POST');await viewSession(id)}catch(e){showError(e.message)}}
+async function cancelSession(id){if(!confirm('Cancel this session?'))return;try{await api(`/sessions/${id}/cancel`,'POST');await viewSession(id)}catch(e){showError(e.message)}}
+async function loadLlm(){try{const x=await api('/llm/settings');$('provider').value=x.provider||'local_server';$('model').value=x.model||'';$('base-url').value=x.base_url||'';$('api-key').value='';$('llm-details').innerHTML=`<p><strong>Provider:</strong> ${x.provider}</p><p><strong>Model:</strong> ${x.model||'—'}</p><p><strong>Base URL:</strong> ${x.base_url||'—'}</p><p><strong>Enabled:</strong> ${badge(x.enabled)}</p><p><strong>API key:</strong> ${badge(x.api_key_configured)}</p>`;const mock=x.provider==='mock';$('base-url').disabled=mock;$('model').disabled=mock}catch(e){$('llm-details').innerHTML=`<div class="error-box">${e.message}</div>`}}
+async function saveLlm(){try{const provider=$('provider').value;const x=await api('/llm/settings','POST',{provider,model:$('model').value.trim(),base_url:$('base-url').value.trim(),api_key:$('api-key').value});$('llm-result').innerHTML='<div class="success-box">Settings saved. New sessions will use this provider configuration.</div>';$('api-key').value='';await loadLlm();await refreshHealth()}catch(e){$('llm-result').innerHTML=`<div class="error-box">${e.message}</div>`}}
+async function testLlm(){const b=$('provider').value;try{const x=await api('/llm/test');$('llm-result').innerHTML=x.ok?`<div class="success-box">${x.message||'Connection successful.'}</div>`:`<div class="error-box">${x.message||'Connection failed.'}</div>`}catch(e){$('llm-result').innerHTML=`<div class="error-box">${e.message}</div>`}}
 refreshAll();
 </script>
 </body>

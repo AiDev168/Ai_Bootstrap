@@ -13,6 +13,8 @@ from ai_engineering_bootstrap.backend.execution_plan_builder import ExecutionPla
 from ai_engineering_bootstrap.bootstrap.service import EnvironmentBootstrapService
 from ai_engineering_bootstrap.environment.models import (
     ActualEnvironmentState,
+    DesiredEnvironmentState,
+    EnvironmentDelta,
     EnvironmentRequest,
     ToolStatus,
 )
@@ -57,9 +59,14 @@ class EnvironmentSessionService:
         self._plan_builder = plan_builder or ExecutionPlanBuilder()
         self._bootstrap_factory = bootstrap_factory
 
+    def _audit_report(self) -> object:
+        source = self._audit_factory()
+        run = getattr(source, "run", None)
+        return run() if callable(run) else source
+
     def create(self, request: EnvironmentRequest) -> SessionServiceResult:
         """Create a session from a desired environment request."""
-        report = self._audit_factory().run()
+        report = self._audit_report()
         actual = self._actual_state(report)
         desired = request.to_desired_state()
         delta = self._reconciler.reconcile(actual, desired)
@@ -75,11 +82,7 @@ class EnvironmentSessionService:
 
     def list(self) -> SessionServiceResult:
         """List sessions newest first."""
-        return SessionServiceResult(
-            {
-                "sessions": [self._summary(session) for session in self.repository.list()],
-            }
-        )
+        return SessionServiceResult({"sessions": [self._summary(session) for session in self.repository.list()]})
 
     def get(self, session_id: str) -> EnvironmentSession:
         """Return a session or raise a stable ValueError."""
@@ -93,9 +96,10 @@ class EnvironmentSessionService:
         session = self.get(session_id)
         return SessionServiceResult(
             {
-                "actual": session.actual_state.to_dict() if session.actual_state else None,
-                "desired": session.desired_state.to_dict() if session.desired_state else None,
-                "delta": session.delta.to_dict() if session.delta else None,
+                "session_id": session_id,
+                "actual": self._actual_dict(session.actual_state),
+                "desired": self._desired_dict(session.desired_state),
+                "delta": self._delta_dict(session.delta),
             }
         )
 
@@ -105,8 +109,20 @@ class EnvironmentSessionService:
         if session.plan is None:
             if session.delta is None:
                 raise ValueError(f"Session {session_id} has no reconciliation delta")
-            strategy_plan = self._strategy_planner.plan_strategies(session.delta)
-            session.plan = self._plan_builder.build(session.delta, strategy_plan)
+            try:
+                strategy_plan = self._strategy_planner.plan_strategies(session.delta)
+                session.plan = self._plan_builder.build(session.delta, strategy_plan)
+            except ValueError as error:
+                session.add_event("plan_failed", str(error), {"error_type": type(error).__name__})
+                self.repository.update(session)
+                return SessionServiceResult(
+                    {
+                        "session_id": session_id,
+                        "status": "blocked",
+                        "error": str(error),
+                        "plan": None,
+                    }
+                )
             self._record_strategy_decisions(session, strategy_plan)
             session.add_event(
                 "plan_created",
@@ -117,6 +133,7 @@ class EnvironmentSessionService:
         return SessionServiceResult(
             {
                 "session_id": session_id,
+                "status": "ready",
                 "plan": {
                     "plan_id": session.plan.plan_id,
                     "is_actionable": session.plan.is_actionable,
@@ -165,7 +182,9 @@ class EnvironmentSessionService:
         """Execute a persisted plan through the canonical bootstrap pipeline."""
         session = self.get(session_id)
         if session.plan is None:
-            self.plan(session_id)
+            planning = self.plan(session_id)
+            if planning.data.get("status") == "blocked":
+                return planning
             session = self.get(session_id)
         if session.plan is None or not session.plan.actions:
             session.status = SessionStatus.COMPLETED
@@ -173,34 +192,75 @@ class EnvironmentSessionService:
             self.repository.update(session)
             return SessionServiceResult({"session_id": session_id, "status": session.status.value})
 
-        required_approval = {
-            action.action_id
-            for action in session.plan.actions
-            if self._requires_approval(action.action_id)
-        }
-        approved = {
-            action_id
-            for action_id, state in session.approval_states.items()
-            if state.status == "approved"
-        }
-        if mode == ExecutionMode.REAL and not required_approval.issubset(approved):
-            pending = sorted(required_approval - approved)
-            session.status = SessionStatus.AWAITING_APPROVAL
+        if mode == ExecutionMode.REAL:
+            pending = {
+                action.action_id
+                for action in session.plan.actions
+                if self._requires_approval(action.action_id)
+                and session.approval_states.get(action.action_id, None) is None
+            }
+            rejected = {
+                action_id
+                for action_id, state in session.approval_states.items()
+                if state.status == "rejected"
+            }
+            approved = {
+                action_id
+                for action_id, state in session.approval_states.items()
+                if state.status == "approved"
+            }
+            skipped = {
+                action_id
+                for action_id, state in session.approval_states.items()
+                if state.status == "skipped"
+            }
+            pending -= rejected | skipped | approved
+            if pending:
+                session.status = SessionStatus.AWAITING_APPROVAL
+                self.repository.update(session)
+                raise ValueError(f"Approval required for actions: {', '.join(sorted(pending))}")
+            execution_actions = [
+                action
+                for action in session.plan.actions
+                if not self._requires_approval(action.action_id) or action.action_id in approved
+            ]
+            rejected_actions = sorted(rejected | skipped)
+        else:
+            approved = set()
+            execution_actions = list(session.plan.actions)
+            rejected_actions = []
+
+        if not execution_actions:
+            session.status = SessionStatus.COMPLETED
+            session.completed_at = utcnow()
+            session.add_event("session_completed", "No approved actions remained for execution.")
             self.repository.update(session)
-            raise ValueError(f"Approval required for actions: {', '.join(pending)}")
+            return SessionServiceResult(
+                {
+                    "session_id": session_id,
+                    "status": session.status.value,
+                    "environment_ready": True,
+                    "rejected_actions": rejected_actions,
+                }
+            )
 
         session.status = SessionStatus.EXECUTING
         session.add_event("session_started", f"Session execution started in {mode.value} mode.")
         self.repository.update(session)
 
         provider = InMemoryApprovalProvider() if mode == ExecutionMode.REAL else None
-        approved_ids = approved
+        approved_ids = approved if mode == ExecutionMode.REAL else set()
+        plan_for_execution = type(session.plan)(
+            is_actionable=True,
+            actions=execution_actions,
+            summary=session.plan.summary,
+        )
         result = self._bootstrap_factory().run(
             mode=mode,
             approval_provider=provider,
             approval_callback=lambda request: request.action_id in approved_ids,
             run_id=session.session_id,
-            plan_override=session.plan,
+            plan_override=plan_for_execution,
         )
 
         for execution in result.action_results:
@@ -218,7 +278,7 @@ class EnvironmentSessionService:
         session.add_event(
             "session_completed" if result.is_success else "session_failed",
             "Session execution completed." if result.is_success else "Session execution failed.",
-            {"environment_ready": result.environment_ready},
+            {"environment_ready": result.environment_ready, "rejected_actions": rejected_actions},
         )
         self.repository.update(session)
         return SessionServiceResult(
@@ -226,7 +286,7 @@ class EnvironmentSessionService:
                 "session_id": session_id,
                 "status": session.status.value,
                 "environment_ready": result.environment_ready,
-                "rejected_actions": list(result.rejected_actions),
+                "rejected_actions": rejected_actions + list(result.rejected_actions),
             }
         )
 
@@ -298,6 +358,116 @@ class EnvironmentSessionService:
             "status": session.status.value,
             "created_at": session.created_at.isoformat(),
             "updated_at": session.updated_at.isoformat(),
+        }
+
+    @staticmethod
+    def _request_dict(request: EnvironmentRequest | None) -> dict | None:
+        if request is None:
+            return None
+        return {
+            "request_id": request.request_id,
+            "project_id": request.project_id,
+            "project_path": str(request.project_path) if request.project_path else None,
+            "natural_language_goal": request.natural_language_goal,
+            "required_tools": list(request.required_tools),
+            "optional_tools": list(request.optional_tools),
+            "languages": list(request.languages),
+            "frameworks": list(request.frameworks),
+            "project_dependencies": [
+                {"name": item.name, "version_constraint": item.version_constraint, "extras": list(item.extras)}
+                for item in request.project_dependencies
+            ],
+            "configurations": dict(request.configurations),
+            "constraints": dict(request.constraints),
+            "platform_preferences": dict(request.platform_preferences),
+            "user_preferences": dict(request.user_preferences),
+        }
+
+    @staticmethod
+    def _actual_dict(actual: ActualEnvironmentState | None) -> dict | None:
+        if actual is None:
+            return None
+        return {
+            "tools": {
+                tool_id: {
+                    "tool_id": status.tool_id,
+                    "status": status.status,
+                    "version": status.version,
+                    "location": status.location,
+                    "health": status.health,
+                    "probe_evidence": dict(status.probe_evidence),
+                }
+                for tool_id, status in actual.tools.items()
+            },
+            "python_packages": dict(actual.python_packages),
+            "system_info": dict(actual.system_info),
+            "probe_timestamp": actual.probe_timestamp,
+            "probe_evidence": dict(actual.probe_evidence),
+        }
+
+    @staticmethod
+    def _desired_dict(desired: DesiredEnvironmentState | None) -> dict | None:
+        if desired is None:
+            return None
+        return {
+            "tools": {
+                tool_id: {
+                    "tool_id": req.tool_id,
+                    "level": req.level.value,
+                    "version_constraint": req.version_constraint,
+                    "configuration": dict(req.configuration),
+                }
+                for tool_id, req in desired.tools.items()
+            },
+            "python_packages": [
+                {"name": item.name, "version_constraint": item.version_constraint, "extras": list(item.extras)}
+                for item in desired.python_packages
+            ],
+            "configurations": dict(desired.configurations),
+            "project_requirements": [
+                {"name": item.name, "version_constraint": item.version_constraint, "extras": list(item.extras)}
+                for item in desired.project_requirements
+            ],
+            "constraints": dict(desired.constraints),
+        }
+
+    @staticmethod
+    def _delta_dict(delta: EnvironmentDelta | None) -> dict | None:
+        if delta is None:
+            return None
+        return {
+            "tool_deltas": [
+                {
+                    "tool_id": item.tool_id,
+                    "action": item.action.value,
+                    "desired_requirement": {
+                        "tool_id": item.desired_requirement.tool_id,
+                        "level": item.desired_requirement.level.value,
+                        "version_constraint": item.desired_requirement.version_constraint,
+                    }
+                    if item.desired_requirement else None,
+                    "actual_status": {
+                        "tool_id": item.actual_status.tool_id,
+                        "status": item.actual_status.status,
+                        "version": item.actual_status.version,
+                        "health": item.actual_status.health,
+                    }
+                    if item.actual_status else None,
+                    "reason": item.reason,
+                }
+                for item in delta.tool_deltas
+            ],
+            "package_deltas": [
+                {
+                    "package_name": item.package_name,
+                    "action": item.action.value,
+                    "desired_version": item.desired_version,
+                    "actual_version": item.actual_version,
+                    "reason": item.reason,
+                }
+                for item in delta.package_deltas
+            ],
+            "configuration_deltas": dict(delta.configuration_deltas),
         }
 
     @staticmethod
