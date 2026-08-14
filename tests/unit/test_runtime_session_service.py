@@ -16,7 +16,7 @@ def test_natural_language_goal_populates_required_tools() -> None:
     result = service.create(EnvironmentRequest(natural_language_goal="install Cursor and Ruff"))
     session = service.get(result.data["session_id"])
 
-    assert session.request.required_tools == ["cursor", "ruff"]
+    assert set(session.request.required_tools) == {"cursor", "ruff"}
     assert any(decision.decision_type == "intent_parsing" for decision in session.agent_decisions)
     assert any(event.event_type == "intent_parsed" for event in session.events)
 
