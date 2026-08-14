@@ -32,12 +32,10 @@ class EnvironmentBootstrapResult:
 
     @property
     def environment_ready(self) -> bool:
-        """Return the final Doctor development-readiness state."""
         return self.final_audit_report.readiness.development_ready
 
     @property
     def is_success(self) -> bool:
-        """Return true when execution and the final audit both succeed."""
         if not self.environment_ready:
             return False
         if (
@@ -52,10 +50,7 @@ class EnvironmentBootstrapResult:
 class EnvironmentBootstrapService:
     """Run the canonical bootstrap workflow without owning remediation logic."""
 
-    def __init__(
-        self,
-        pipeline: PipelineEngine | None = None,
-    ) -> None:
+    def __init__(self, pipeline: PipelineEngine | None = None) -> None:
         self._pipeline = pipeline or PipelineEngine()
 
     def run(
@@ -67,10 +62,16 @@ class EnvironmentBootstrapService:
         max_retry_attempts: int = 1,
         max_replans: int = 1,
         agent_planning_service: AgentPlanningService | None = None,
+        plan_override: ExecutionPlan | None = None,
     ) -> EnvironmentBootstrapResult:
         """Bootstrap each planned action in deterministic order."""
-        discovery = self._pipeline.run(mode=ExecutionMode.SAFE, run_id=f"{run_id}-plan")
-        plan = discovery.original_plan
+        discovery = None
+        if plan_override is None:
+            discovery = self._pipeline.run(mode=ExecutionMode.SAFE, run_id=f"{run_id}-plan")
+            plan = discovery.original_plan
+        else:
+            plan = plan_override
+
         if not plan.is_actionable:
             final_report = default_audit_service().run()
             return EnvironmentBootstrapResult(discovery, final_report)
@@ -111,7 +112,10 @@ class EnvironmentBootstrapService:
                 )
                 last_result = pending
                 if not pending.is_pending_approval or not pending.approval_requests:
-                    action_results.append(pending.execution_result or ExecutionResult(False, [], "Approval workflow failed."))
+                    action_results.append(
+                        pending.execution_result
+                        or ExecutionResult(False, [], "Approval workflow failed.")
+                    )
                     continue
 
                 request = pending.approval_requests[0]

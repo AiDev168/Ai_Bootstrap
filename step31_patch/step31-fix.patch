@@ -1,0 +1,69 @@
+diff --git a/src/ai_engineering_bootstrap/backend/execution_plan_builder.py b/src/ai_engineering_bootstrap/backend/execution_plan_builder.py
+--- a/src/ai_engineering_bootstrap/backend/execution_plan_builder.py
++++ b/src/ai_engineering_bootstrap/backend/execution_plan_builder.py
+@@ -1,31 +1,33 @@
+ """Build validated execution plans from environment strategy decisions."""
+ 
+ from __future__ import annotations
+ 
++from typing import ClassVar
++
+ from ai_engineering_bootstrap.agent.strategy_planner import StrategyPlan
+ from ai_engineering_bootstrap.environment.models import DeltaAction, EnvironmentDelta
+ from ai_engineering_bootstrap.executor.capability import (
+@@ -12,20 +14,20 @@
+ class ExecutionPlanBuilder:
+     """Translate validated strategy decisions into existing executor action IDs."""
+ 
+-    _TOOL_ACTIONS = {
++    _TOOL_ACTIONS: ClassVar[dict[str, str]] = {
+         "cursor": "install_cursor",
+         "git": "install_git",
+         "docker": "install_docker",
+     }
+ 
+-    _STRATEGY_ACTIONS = {
++    _STRATEGY_ACTIONS: ClassVar[dict[str, str | None]] = {
+         "pip_install": "install_python_package",
+         "deb_install": None,
+         "apt_install": None,
+@@ -68,10 +70,10 @@
+     @staticmethod
+     def _deduplicate(actions: list[ExecutionPlanAction]) -> list[ExecutionPlanAction]:
+         seen: set[tuple[str, str]] = set()
+         result: list[ExecutionPlanAction] = []
+-        for action in sorted(actions, key=lambda item: (item.priority, item.action_id, item.description)):
++        for action in actions:
+             key = (action.action_id, str(action.context))
+             if key in seen:
+                 continue
+             seen.add(key)
+             result.append(action)
+         return result
+diff --git a/src/ai_engineering_bootstrap/backend/server.py b/src/ai_engineering_bootstrap/backend/server.py
+--- a/src/ai_engineering_bootstrap/backend/server.py
++++ b/src/ai_engineering_bootstrap/backend/server.py
+@@ -36,7 +36,7 @@
+         raw = self.rfile.read(length)
+         payload = json.loads(raw.decode("utf-8"))
+         if not isinstance(payload, dict):
+-            raise ValueError("JSON request body must be an object")
++            raise TypeError("JSON request body must be an object")
+         return payload
+diff --git a/src/ai_engineering_bootstrap/bootstrap/service.py b/src/ai_engineering_bootstrap/bootstrap/service.py
+--- a/src/ai_engineering_bootstrap/bootstrap/service.py
++++ b/src/ai_engineering_bootstrap/bootstrap/service.py
+@@ -36,9 +36,11 @@
+     def is_success(self) -> bool:
+         if not self.environment_ready:
+             return False
+-        if self.pipeline_result is not None and self.pipeline_result.execution_result is not None:
+-            if not self.pipeline_result.execution_result.is_success:
+-                return False
++        if (
++            self.pipeline_result is not None
++            and self.pipeline_result.execution_result is not None
++            and not self.pipeline_result.execution_result.is_success
++        ):
++            return False
+         return all(result.is_success for result in self.action_results)
