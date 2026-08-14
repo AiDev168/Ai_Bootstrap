@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Callable
 from threading import Lock, Thread
@@ -12,6 +13,7 @@ from ai_engineering_bootstrap.environment.models import EnvironmentRequest, Pyth
 from ai_engineering_bootstrap.environment.session_models import AgentDecision, SessionStatus
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 
+logger = logging.getLogger(__name__)
 _PACKAGE_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*(?:\s*(?:===|==|!=|~=|>=|<=|>|<)\s*[A-Za-z0-9][A-Za-z0-9+_.!-]*)?$")
 _INSTALL_CLAUSE = re.compile(r"\b(?:install|reinstall|setup|set up|add)\s+(.+?)(?=\s+(?:on|onto|into|for|using)\s+|$)", re.IGNORECASE)
 
@@ -19,11 +21,7 @@ _INSTALL_CLAUSE = re.compile(r"\b(?:install|reinstall|setup|set up|add)\s+(.+?)(
 class RuntimeSessionService(EnvironmentSessionService):
     """Add runtime LLM intent parsing and non-blocking GUI execution."""
 
-    def __init__(
-        self,
-        intent_parser_factory: Callable[[], IntentParser] | None = None,
-        **kwargs,
-    ) -> None:
+    def __init__(self, intent_parser_factory: Callable[[], IntentParser] | None = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._intent_parser_factory = intent_parser_factory
         self._running: set[str] = set()
@@ -39,7 +37,12 @@ class RuntimeSessionService(EnvironmentSessionService):
         result = super().create(request)
         if parsed is not None:
             session = self.get(result.data["session_id"])
-            provider = "llm" if parsed.reasoning_summary.startswith("LLM") else "llm_fallback" if parsed.reasoning_summary.startswith("Deterministic fallback after LLM") else "deterministic"
+            if parsed.reasoning_summary.startswith("LLM-parsed"):
+                provider = "llm"
+            elif parsed.reasoning_summary.startswith("Deterministic fallback after LLM"):
+                provider = "llm_fallback"
+            else:
+                provider = "deterministic"
             session.add_agent_decision(
                 AgentDecision(
                     session_id=session.session_id,
@@ -96,7 +99,8 @@ class RuntimeSessionService(EnvironmentSessionService):
                 session.status = SessionStatus.FAILED
                 session.add_event("session_failed", str(error), {"error_type": type(error).__name__})
             self.repository.update(session)
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - isolated worker boundary must persist failure state
+            logger.exception("Unhandled bootstrap worker failure for session %s", session_id)
             session = self.get(session_id)
             session.status = SessionStatus.FAILED
             session.add_event("session_failed", str(error), {"error_type": type(error).__name__})
@@ -113,8 +117,10 @@ class RuntimeSessionService(EnvironmentSessionService):
         frameworks = list(dict.fromkeys([*request.frameworks, *parsed.frameworks]))
         dependencies = list(request.project_dependencies)
         existing_dependencies = {item.name.lower() for item in dependencies}
-        for name in [*parsed.project_dependencies, *RuntimeSessionService._extract_install_packages(request.natural_language_goal, required)]:
-            if name.lower() not in existing_dependencies and name.lower() not in {tool.lower() for tool in required}:
+        required_lower = {tool.lower() for tool in required}
+        extracted = RuntimeSessionService._extract_install_packages(request.natural_language_goal, required)
+        for name in [*parsed.project_dependencies, *extracted]:
+            if name.lower() not in existing_dependencies and name.lower() not in required_lower:
                 dependencies.append(PythonPackageRequirement(name=name))
                 existing_dependencies.add(name.lower())
         constraints = dict(request.constraints)
