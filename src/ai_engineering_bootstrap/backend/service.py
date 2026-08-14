@@ -209,7 +209,16 @@ class ApplicationBackend:
 
     def get_session(self, session_id: str) -> BackendResult:
         session = self._session_service.get(session_id)
-        return BackendResult({"session_id": session.session_id, "status": session.status.value, "current_action": session.current_action, "request": self._session_service._request_dict(session.request), "approval_states": {key: value.to_dict() for key, value in session.approval_states.items()}, "created_at": session.created_at.isoformat(), "updated_at": session.updated_at.isoformat()})
+        return BackendResult({
+            "session_id": session.session_id,
+            "status": session.status.value,
+            "current_action": session.current_action,
+            "request": self._session_service._request_dict(session.request),
+            "approval_states": {key: value.to_dict() for key, value in session.approval_states.items()},
+            "execution_history": [item.to_dict() for item in session.execution_history],
+            "created_at": session.created_at.isoformat(),
+            "updated_at": session.updated_at.isoformat(),
+        })
 
     def get_session_state(self, session_id: str) -> BackendResult:
         return BackendResult(self._session_service.state(session_id).data)
