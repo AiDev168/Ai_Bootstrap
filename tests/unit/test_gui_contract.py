@@ -8,22 +8,34 @@ HTML_PATH = Path(__file__).resolve().parents[2] / "src/ai_engineering_bootstrap/
 
 def test_dashboard_uses_active_backend_routes() -> None:
     html = HTML_PATH.read_text(encoding="utf-8")
-    static_routes = ("/health", "/audit", "/engineering", "/sessions")
-    for route in static_routes:
+    for route in ("/health", "/audit", "/engineering", "/sessions"):
         assert route in html
-
-    session_routes = (
+    for route in (
         r"/sessions/\$\{[^}]+\}",
         r"/sessions/\$\{[^}]+\}/state",
         r"/sessions/\$\{[^}]+\}/plan",
         r"/sessions/\$\{[^}]+\}/events",
         r"/sessions/\$\{[^}]+\}/agent-decisions",
-    )
-    for route in session_routes:
+    ):
         assert re.search(route, html), f"Missing GUI route pattern: {route}"
 
 
 def test_dashboard_has_request_console_live_refresh_and_llm_settings() -> None:
     html = HTML_PATH.read_text(encoding="utf-8")
-    for text in ("Request Console", "startPolling", "logRequest", "Approve", "Start Real", "LLM Connection", "/llm/settings", "/llm/test"):
+    for text in (
+        "Request Console",
+        "logRequest",
+        "startPolling",
+        "Approve",
+        "Start Real",
+        "LLM Connection",
+        "/llm/settings",
+        "/llm/test",
+        "local_server",
+        "remote_api",
+        "mock",
+        "in_process",
+        "function viewSession",
+        "Promise.all([loadSessionPart",
+    ):
         assert text in html
