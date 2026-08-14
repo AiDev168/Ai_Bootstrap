@@ -11,7 +11,6 @@ from ai_engineering_bootstrap.agent.strategy_llm_bridge import StrategyLLMProvid
 from ai_engineering_bootstrap.environment.models import EnvironmentRequest
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 
-
 _TOOL_ALIASES = {
     "cursor": {"cursor"},
     "git": {"git", "گیت"},
@@ -126,9 +125,7 @@ class IntentParser:
             return self._llm_parse(natural_language)
         except Exception as error:  # noqa: BLE001 - provider boundary must preserve a usable fallback
             fallback = self._deterministic_parse(natural_language)
-            fallback.reasoning_summary = (
-                f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
-            )
+            fallback.reasoning_summary = f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
             fallback.confidence = min(fallback.confidence, 0.55)
             return fallback
 
@@ -161,7 +158,9 @@ class IntentParser:
         )
         excluded_tools = self._merge_unique(
             excluded_tools,
-            self._normalise_strings(parsed.get("excluded_tools", []), self._known_tools),
+            self._normalise_strings(
+                parsed.get("excluded_tools", []), self._known_tools
+            ),
         )
         required_tools = [
             tool
@@ -208,7 +207,9 @@ class IntentParser:
 
     def _deterministic_parse(self, natural_language: str) -> ParsedIntent:
         """High-recall deterministic fallback for common English/Persian requests."""
-        excluded_tools, excluded_packages = self._deterministic_exclusions(natural_language)
+        excluded_tools, excluded_packages = self._deterministic_exclusions(
+            natural_language
+        )
         required_tools = self._deterministic_tool_mentions(
             natural_language, excluded_tools
         )
@@ -218,9 +219,7 @@ class IntentParser:
         frameworks = [
             framework for framework in self._known_frameworks if framework in text_lower
         ]
-        dependencies = self._extract_install_packages(
-            natural_language, required_tools
-        )
+        dependencies = self._extract_install_packages(natural_language, required_tools)
         dependencies = [
             package
             for package in dependencies
