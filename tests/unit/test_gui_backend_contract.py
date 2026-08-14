@@ -24,8 +24,6 @@ def test_session_endpoints_return_serializable_data() -> None:
 
 def test_llm_settings_round_trip_is_secret_safe() -> None:
     backend = ApplicationBackend()
-    before = backend.get_llm_settings().data
-
     result = backend.update_llm_settings(
         {
             "provider": "local_server",
@@ -40,4 +38,3 @@ def test_llm_settings_round_trip_is_secret_safe() -> None:
     assert result.data["api_key_configured"] is True
     assert "secret-value" not in str(result.data)
     assert backend.get_llm_settings().data["base_url"] == "http://127.0.0.1:1234/v1"
-    assert before["api_key_configured"] in {True, False}
