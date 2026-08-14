@@ -134,7 +134,7 @@ def test_deterministic_parser_handles_english_exclusion_and_multiple_targets() -
 
 def test_deterministic_parser_handles_persian_install_request() -> None:
     parsed = IntentParser(tool_catalog=ToolCatalog()).parse(
-        "روف و پای‌تست را نصب کن و داکر را نصب نکن"
+        "روف و پای تست را نصب کن و داکر را نصب نکن"
     )
 
     assert {"ruff", "pytest"}.issubset(set(parsed.required_tools))
