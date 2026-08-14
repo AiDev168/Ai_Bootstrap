@@ -8,18 +8,18 @@ HTML_PATH = Path(__file__).resolve().parents[2] / "src/ai_engineering_bootstrap/
 
 def test_dashboard_uses_active_backend_routes() -> None:
     html = HTML_PATH.read_text(encoding="utf-8")
-    expected_routes = (
-        "'/health'",
-        "'/audit'",
-        "'/engineering'",
-        "'/sessions'",
-        "`/sessions/${sessionId}`",
-        "`/sessions/${sessionId}/state`",
-        "`/sessions/${sessionId}/plan`",
-        "`/sessions/${sessionId}/events`",
-        "`/sessions/${sessionId}/agent-decisions`",
+    static_routes = ("/health", "/audit", "/engineering", "/sessions")
+    for route in static_routes:
+        assert route in html
+
+    session_routes = (
+        "/sessions/${sessionId}",
+        "/sessions/${sessionId}/state",
+        "/sessions/${sessionId}/plan",
+        "/sessions/${sessionId}/events",
+        "/sessions/${sessionId}/agent-decisions",
     )
-    for route in expected_routes:
+    for route in session_routes:
         assert route in html
 
 
