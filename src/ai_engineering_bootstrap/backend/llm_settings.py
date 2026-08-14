@@ -13,7 +13,6 @@ from typing import Any
 
 from ai_engineering_bootstrap.agent.provider import ProviderConfig
 
-
 SUPPORTED_PROVIDERS = frozenset({"local_server", "remote_api", "in_process", "mock"})
 DEFAULT_PROVIDER = "mock"
 DEFAULT_SETTINGS_FILE = Path.home() / ".config" / "ai-engineering-bootstrap" / "llm-settings.json"
@@ -80,17 +79,40 @@ class LLMSettingsStore:
 class LLMSettingsService:
     """Manage persistent provider settings without exposing secrets."""
 
+    ENV_PROVIDER = LLMSettingsStore.ENV_PROVIDER
+    ENV_MODEL = LLMSettingsStore.ENV_MODEL
+    ENV_BASE_URL = LLMSettingsStore.ENV_BASE_URL
+    ENV_API_KEY = LLMSettingsStore.ENV_API_KEY
+
     def __init__(self, store: LLMSettingsStore | None = None) -> None:
         self.store = store or LLMSettingsStore()
 
-    def get(self) -> LLMSettings:
-        values = self.store.load()
+    @staticmethod
+    def _normalize_values(payload: dict[str, Any], current: dict[str, str] | None = None) -> dict[str, str]:
+        current = current or {}
+        provider = str(payload.get("provider", DEFAULT_PROVIDER)).strip() or DEFAULT_PROVIDER
+        if provider not in SUPPORTED_PROVIDERS:
+            raise ValueError(f"Unsupported LLM provider: {provider}")
+        model = str(payload.get("model", "")).strip()
+        base_url = str(payload.get("base_url", "")).strip()
+        api_key = str(payload.get("api_key", "")).strip()
+        if not api_key and current.get("api_key") and payload.get("preserve_api_key", True):
+            api_key = current["api_key"]
+        return {
+            "provider": provider,
+            "model": model,
+            "base_url": base_url,
+            "api_key": api_key,
+        }
+
+    @staticmethod
+    def _settings_from_values(values: dict[str, str]) -> LLMSettings:
         provider = values.get("provider", DEFAULT_PROVIDER).strip() or DEFAULT_PROVIDER
+        if provider not in SUPPORTED_PROVIDERS:
+            provider = DEFAULT_PROVIDER
         model = values.get("model", "").strip()
         base_url = values.get("base_url", "").strip()
         api_key = values.get("api_key", "").strip()
-        if provider not in SUPPORTED_PROVIDERS:
-            provider = DEFAULT_PROVIDER
         enabled = provider == "mock" or (provider != "in_process" and bool(model and base_url))
         return LLMSettings(
             provider=provider,
@@ -100,10 +122,13 @@ class LLMSettingsService:
             enabled=enabled,
         )
 
+    def get(self) -> LLMSettings:
+        return self._settings_from_values(self.store.load())
+
     def provider_config(self) -> ProviderConfig:
         """Return runtime provider configuration with secret available only in memory."""
-        settings = self.get()
         values = self.store.load()
+        settings = self._settings_from_values(values)
         return ProviderConfig(
             provider_type=settings.provider,
             model=settings.model or None,
@@ -114,28 +139,19 @@ class LLMSettingsService:
         )
 
     def update(self, payload: dict[str, Any]) -> LLMSettings:
-        provider = str(payload.get("provider", DEFAULT_PROVIDER)).strip() or DEFAULT_PROVIDER
-        if provider not in SUPPORTED_PROVIDERS:
-            raise ValueError(f"Unsupported LLM provider: {provider}")
-        model = str(payload.get("model", "")).strip()
-        base_url = str(payload.get("base_url", "")).strip()
-        api_key = str(payload.get("api_key", "")).strip()
-        current = self.store.load()
-        if not api_key and current.get("api_key") and payload.get("preserve_api_key", True):
-            api_key = current["api_key"]
-        self.store.save(
-            {
-                "provider": provider,
-                "model": model,
-                "base_url": base_url,
-                "api_key": api_key,
-            }
-        )
-        return self.get()
+        values = self._normalize_values(payload, self.store.load())
+        self.store.save(values)
+        return self._settings_from_values(values)
 
-    def models(self) -> dict[str, Any]:
-        """Return model IDs exposed by the configured provider endpoint."""
-        settings = self.get()
+    def _effective_values(self, payload: dict[str, Any] | None) -> dict[str, str]:
+        if payload is None:
+            return self.store.load()
+        return self._normalize_values(payload, self.store.load())
+
+    def models(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Return model IDs for persisted settings or an unsaved form configuration."""
+        values = self._effective_values(payload)
+        settings = self._settings_from_values(values)
         if settings.provider == "mock":
             return {"ok": True, "provider": "mock", "models": ["mock"]}
         if settings.provider == "in_process":
@@ -143,15 +159,14 @@ class LLMSettingsService:
         if not settings.base_url:
             return {"ok": False, "provider": settings.provider, "models": [], "message": "LLM base URL is not configured."}
         headers = {"Accept": "application/json"}
-        values = self.store.load()
         if settings.provider == "remote_api" and values.get("api_key"):
             headers["Authorization"] = f"Bearer {values['api_key']}"
         url = settings.base_url.rstrip("/") + "/models"
         request = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=5) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-            entries = payload.get("data", []) if isinstance(payload, dict) else []
+                payload_data = json.loads(response.read().decode("utf-8"))
+            entries = payload_data.get("data", []) if isinstance(payload_data, dict) else []
             models = [str(item.get("id")) for item in entries if isinstance(item, dict) and item.get("id")]
             return {"ok": True, "provider": settings.provider, "models": models, "url": url}
         except urllib.error.HTTPError as error:
@@ -159,23 +174,24 @@ class LLMSettingsService:
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
             return {"ok": False, "provider": settings.provider, "models": [], "message": str(error), "url": url}
 
-    def test_connection(self) -> dict[str, Any]:
-        settings = self.get()
+    def test_connection(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Probe persisted settings or unsaved form values without mutating storage."""
+        values = self._effective_values(payload)
+        settings = self._settings_from_values(values)
         if settings.provider == "mock":
-            return {"ok": True, "provider": "mock", "message": "Mock provider is available."}
+            return {"ok": True, "provider": "mock", "model": settings.model, "message": "Mock provider is available."}
         if settings.provider == "in_process":
             return {"ok": False, "provider": "in_process", "message": "In-process provider requires a host model instance and cannot be tested from the GUI."}
         if not settings.base_url:
             return {"ok": False, "provider": settings.provider, "message": "LLM base URL is not configured."}
         headers = {"Accept": "application/json"}
-        values = self.store.load()
         if settings.provider == "remote_api" and values.get("api_key"):
             headers["Authorization"] = f"Bearer {values['api_key']}"
         url = settings.base_url.rstrip("/") + "/models"
         request = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=5) as response:
-                return {"ok": True, "provider": settings.provider, "status": response.status, "url": url}
+                return {"ok": True, "provider": settings.provider, "model": settings.model, "status": response.status, "url": url}
         except urllib.error.HTTPError as error:
             return {"ok": False, "provider": settings.provider, "status": error.code, "message": f"HTTP {error.code}: {error.reason}", "url": url}
         except (urllib.error.URLError, TimeoutError) as error:
