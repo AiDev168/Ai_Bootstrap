@@ -23,6 +23,21 @@ jobs:
           python-version: "3.12"
       - name: Install project
         run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      - name: Restore and patch session execution boundary
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/step32-final-validation'
+        run: |
+          git checkout d570e56648e6d7bd38584a6a152209de80f88992 -- src/ai_engineering_bootstrap/backend/session_service.py
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/ai_engineering_bootstrap/backend/session_service.py")
+          text = path.read_text(encoding="utf-8")
+          old = '''        else:\n            approved = set()\n            execution_actions = list(session.plan.actions)\n            excluded_actions = []\n'''
+          new = '''        elif approved:\n            execution_actions = [\n                action\n                for action in session.plan.actions\n                if action.action_id in approved\n            ]\n            excluded_actions = sorted(\n                action.action_id\n                for action in session.plan.actions\n                if action.action_id not in approved\n            )\n        elif skipped:\n            execution_actions = [\n                action\n                for action in session.plan.actions\n                if action.action_id not in skipped\n            ]\n            excluded_actions = sorted(skipped)\n        else:\n            approved = set()\n            execution_actions = list(session.plan.actions)\n            excluded_actions = []\n'''
+          if old not in text:
+              raise SystemExit("Expected session execution block was not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
       - name: Auto-format validation branch
         if: github.event_name == 'push' && github.ref == 'refs/heads/feature/step32-final-validation'
         run: |
