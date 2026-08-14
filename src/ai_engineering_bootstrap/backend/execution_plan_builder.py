@@ -116,10 +116,8 @@ class ExecutionPlanBuilder:
 
     @staticmethod
     def _instance_action_id(executor_action_id: str, subject: str) -> str:
-        """Return a stable per-instance action ID while preserving the executor action contract."""
-        if executor_action_id == "install_python_package":
-            return f"{executor_action_id}:{subject}"
-        return executor_action_id
+        """Return a stable per-action instance ID for approval and evidence."""
+        return f"{executor_action_id}:{subject}"
 
     def _require_capability(self, action_id: str) -> None:
         if not self._capabilities.find_by_action(action_id):
