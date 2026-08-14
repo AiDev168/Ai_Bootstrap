@@ -55,7 +55,9 @@ class RuntimeSessionService(EnvironmentSessionService):
             session = self.get(result.data["session_id"])
             if parsed.reasoning_summary.startswith("LLM-parsed"):
                 provider = "llm"
-            elif parsed.reasoning_summary.startswith("Deterministic fallback after LLM"):
+            elif parsed.reasoning_summary.startswith(
+                "Deterministic fallback after LLM"
+            ):
                 provider = "llm_fallback"
             else:
                 provider = "deterministic"
