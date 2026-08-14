@@ -8,11 +8,7 @@ import urllib.request
 from typing import Any
 
 from ai_engineering_bootstrap.agent.models import AgentDecision
-from ai_engineering_bootstrap.agent.provider import (
-    InProcessProvider,
-    LLMProvider,
-    MockProvider,
-)
+from ai_engineering_bootstrap.agent.provider import InProcessProvider, LLMProvider, MockProvider
 
 
 _MOCK_STRATEGIES = {
@@ -28,13 +24,18 @@ _MOCK_STRATEGIES = {
 
 
 class StrategyLLMProvider(LLMProvider):
-    """Adapt an existing LLM provider to the strategy-planning JSON contract."""
+    """Adapt an LLM provider to a structured JSON contract."""
 
-    def __init__(self, provider: LLMProvider) -> None:
+    def __init__(self, provider: LLMProvider, system_prompt: str | None = None) -> None:
         self.provider = provider
+        self.system_prompt = system_prompt or (
+            "You are an engineering environment decision engine. "
+            "Return ONLY valid JSON matching the requested schema. "
+            "Use only strategies present in the supplied catalog."
+        )
 
     def decide(self, context: str, available_capabilities: list[Any]) -> AgentDecision:
-        payload = _complete_json(self.provider, context)
+        payload = _complete_json(self.provider, context, self.system_prompt)
         return AgentDecision(
             reasoning_summary=json.dumps(payload, ensure_ascii=False),
             confidence=float(payload.get("confidence", 0.9)),
@@ -49,7 +50,7 @@ class StrategyLLMProvider(LLMProvider):
         return meta
 
 
-def _complete_json(provider: LLMProvider, prompt: str) -> dict[str, Any]:
+def _complete_json(provider: LLMProvider, prompt: str, system_prompt: str) -> dict[str, Any]:
     if isinstance(provider, MockProvider):
         strategies = []
         for tool_id, _action in re.findall(r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE):
@@ -65,24 +66,32 @@ def _complete_json(provider: LLMProvider, prompt: str) -> dict[str, Any]:
                         "source": "catalog",
                     }
                 )
+        if "intent parser" in system_prompt.lower():
+            tools = [tool.strip() for tool, _ in re.findall(r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE)]
+            return {
+                "natural_language_goal": prompt.split("User goal:", 1)[-1].split("/no_think", 1)[0].strip(),
+                "required_tools": [tool for tool in tools if tool in _MOCK_STRATEGIES],
+                "optional_tools": [],
+                "languages": [],
+                "frameworks": [],
+                "project_dependencies": [],
+                "constraints": [],
+                "platform_preferences": [],
+                "confidence": 1.0,
+            }
         return {"strategies": strategies, "confidence": 1.0}
 
     if isinstance(provider, InProcessProvider):
         output = provider.model.generate(prompt)
         data = json.loads(output)
         if not isinstance(data, dict):
-            raise ValueError("In-process strategy response must be a JSON object.")
+            raise TypeError("In-process JSON response must be an object.")
         return data
 
     config = getattr(provider, "config", None)
     if config is None or not config.base_url:
         raise ValueError("Provider is missing a base URL.")
 
-    system_prompt = (
-        "You are an engineering environment decision engine. "
-        "Return ONLY valid JSON matching the requested schema. "
-        "Use only strategies present in the supplied catalog."
-    )
     payload = {
         "model": config.model or "default",
         "messages": [
@@ -97,12 +106,9 @@ def _complete_json(provider: LLMProvider, prompt: str) -> dict[str, Any]:
     headers = {"Content-Type": "application/json"}
     if config.api_key:
         headers["Authorization"] = f"Bearer {config.api_key}"
-
-    request = urllib.request.Request(
-        f"{config.base_url.rstrip('/')}/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-    )
+    base_url = config.base_url.rstrip("/")
+    endpoint = f"{base_url}/chat/completions" if base_url.endswith("/v1") else f"{base_url}/v1/chat/completions"
+    request = urllib.request.Request(endpoint, data=json.dumps(payload).encode("utf-8"), headers=headers)
     with urllib.request.urlopen(request, timeout=config.timeout) as response:
         data = json.loads(response.read().decode("utf-8"))
     choices = data.get("choices")
@@ -111,10 +117,12 @@ def _complete_json(provider: LLMProvider, prompt: str) -> dict[str, Any]:
     message = choices[0].get("message") or {}
     content = message.get("content")
     if not isinstance(content, str) or not content.strip():
-        raise ValueError("Provider returned empty strategy content.")
+        content = message.get("reasoning_content")
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("Provider returned empty JSON content.")
     parsed = json.loads(content)
     if not isinstance(parsed, dict):
-        raise ValueError("Provider strategy response must be a JSON object.")
+        raise TypeError("Provider JSON response must be an object.")
     return parsed
 
 
