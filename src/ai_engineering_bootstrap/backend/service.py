@@ -190,13 +190,13 @@ class ApplicationBackend:
             }
         )
 
-    def test_llm_connection(self) -> BackendResult:
-        """Probe the configured LLM endpoint."""
-        return BackendResult(self._llm_settings.test_connection())
+    def test_llm_connection(self, payload: dict[str, Any] | None = None) -> BackendResult:
+        """Probe persisted settings or unsaved GUI values without saving them."""
+        return BackendResult(self._llm_settings.test_connection(payload))
 
-    def list_llm_models(self) -> BackendResult:
-        """List models exposed by the configured provider."""
-        return BackendResult(self._llm_settings.models())
+    def list_llm_models(self, payload: dict[str, Any] | None = None) -> BackendResult:
+        """List models using persisted settings or unsaved GUI values."""
+        return BackendResult(self._llm_settings.models(payload))
 
     def audit(self) -> BackendResult:
         return BackendResult(_audit_dict(default_audit_service().run()))
