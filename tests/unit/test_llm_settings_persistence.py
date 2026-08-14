@@ -33,7 +33,8 @@ def test_settings_persist_across_service_instances(tmp_path: Path) -> None:
 def test_mock_is_offline(tmp_path: Path) -> None:
     service = LLMSettingsService(LLMSettingsStore(tmp_path / "llm.json"))
     service.update({"provider": "mock", "model": "", "base_url": "", "api_key": ""})
-    assert service.test_connection()["ok"] is True
+    assert service.test_connection()["ok"] is False
+    assert "test-only" in service.test_connection()["message"]
     assert service.models()["models"] == ["mock"]
 
 

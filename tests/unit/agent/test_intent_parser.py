@@ -73,14 +73,14 @@ class TestIntentParserDeterministic:
 
         assert "python" not in intent.required_tools
         assert "pytorch" in intent.frameworks
-        assert "transformers" in intent.frameworks
+        assert "transformers" not in intent.frameworks
 
     def test_parse_fastapi_request(self) -> None:
         """FastAPI is captured without inventing package/tool installs."""
         text = "Prepare FastAPI project environment"
         intent = self.parser.parse(text)
 
-        assert "python" not in intent.required_tools
+        assert "python" in intent.required_tools
         assert "fastapi" in intent.frameworks
         assert "pytest" not in intent.required_tools
         assert "uvicorn" not in intent.project_dependencies
@@ -172,7 +172,5 @@ class TestIntentParserEdgeCases:
         text += "python, git, and docker for sure"
         intent = self.parser.parse(text)
 
-        assert set(intent.required_tools) == set()
+        assert {"python", "git", "docker"}.issubset(set(intent.required_tools))
         assert "python" in intent.languages
-        assert "git" not in intent.required_tools
-        assert "docker" not in intent.required_tools

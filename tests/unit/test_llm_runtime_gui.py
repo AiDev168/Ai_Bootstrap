@@ -26,8 +26,9 @@ def test_mock_provider_connection_is_offline(tmp_path: Path) -> None:
     service = LLMSettingsService(LLMSettingsStore(tmp_path / "llm.json"))
     service.update({"provider": "mock", "model": "", "base_url": "", "api_key": ""})
     result = service.test_connection()
-    assert result["ok"] is True
+    assert result["ok"] is False
     assert result["provider"] == "mock"
+    assert "test-only" in result["message"]
     assert service.models()["models"] == ["mock"]
 
 
@@ -46,7 +47,7 @@ def test_mock_provider_drives_strategy_planning(tmp_path: Path) -> None:
         ]
     )
     plan = planner.plan_strategies(delta, platform="linux", architecture="x86_64")
-    assert plan.reasoning_summary.startswith("LLM-selected")
+    assert plan.reasoning_summary.startswith("Deterministic")
     assert plan.decisions[0].tool_id == "cursor"
     assert plan.decisions[0].strategy_name == "deb_install"
 

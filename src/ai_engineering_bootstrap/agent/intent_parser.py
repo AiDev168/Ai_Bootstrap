@@ -338,24 +338,18 @@ User goal:
     def _deterministic_explicit_tool_mentions(
         self, text: str, excluded_tools: list[str]
     ) -> list[str]:
+        """Recognize named tools when the request contains an install/setup verb."""
+        if not re.search(_INSTALL_VERB, text, flags=re.IGNORECASE):
+            return []
         lowered = text.lower()
         excluded = {tool.lower() for tool in excluded_tools}
         result: list[str] = []
-        clauses = re.split(
-            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", lowered, flags=re.IGNORECASE
-        )
-        for clause in clauses:
-            if not re.search(_INSTALL_VERB, clause, flags=re.IGNORECASE):
+        for tool_id in self._known_tools:
+            if tool_id.lower() in excluded:
                 continue
-            for tool_id in self._known_tools:
-                aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
-                if (
-                    any(
-                        re.search(re.escape(alias.lower()), clause) for alias in aliases
-                    )
-                    and tool_id.lower() not in excluded
-                ):
-                    result.append(tool_id)
+            aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
+            if any(re.search(re.escape(alias.lower()), lowered) for alias in aliases):
+                result.append(tool_id)
         return self._merge_unique(result, [])
 
     def _deterministic_exclusions(self, text: str) -> tuple[list[str], list[str]]:
