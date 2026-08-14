@@ -72,7 +72,8 @@ class ParsedIntent:
             languages=self.languages,
             frameworks=self.frameworks,
             project_dependencies=[
-                PythonPackageRequirement(name=name) for name in self.project_dependencies
+                PythonPackageRequirement(name=name)
+                for name in self.project_dependencies
             ],
             excluded_packages=self.excluded_packages,
             configurations={},
@@ -127,9 +128,7 @@ class IntentParser:
             return self._llm_parse(natural_language)
         except Exception as error:  # noqa: BLE001 - semantic provider fallback boundary
             fallback = self._deterministic_parse(natural_language)
-            fallback.reasoning_summary = (
-                f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
-            )
+            fallback.reasoning_summary = f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
             fallback.confidence = min(fallback.confidence, 0.55)
             return fallback
 
@@ -224,7 +223,9 @@ class IntentParser:
         packages = self._extract_install_packages(natural_language, required_tools)
         excluded_package_set = {package.lower() for package in excluded_packages}
         packages = [
-            package for package in packages if package.lower() not in excluded_package_set
+            package
+            for package in packages
+            if package.lower() not in excluded_package_set
         ]
 
         text_lower = natural_language.lower()
@@ -315,9 +316,12 @@ User goal:
                 continue
             for tool_id in self._known_tools:
                 aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
-                if any(
-                    re.search(re.escape(alias.lower()), clause) for alias in aliases
-                ) and tool_id.lower() not in excluded:
+                if (
+                    any(
+                        re.search(re.escape(alias.lower()), clause) for alias in aliases
+                    )
+                    and tool_id.lower() not in excluded
+                ):
                     result.append(tool_id)
         return self._merge_unique(result, [])
 
@@ -405,9 +409,7 @@ User goal:
         return list(dict.fromkeys(result))
 
     @staticmethod
-    def _normalise_strings(
-        value: object, allowed: set[str] | None = None
-    ) -> list[str]:
+    def _normalise_strings(value: object, allowed: set[str] | None = None) -> list[str]:
         if not isinstance(value, list):
             return []
         values = [str(item).strip() for item in value if str(item).strip()]
