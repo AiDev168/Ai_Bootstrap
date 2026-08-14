@@ -1,6 +1,8 @@
 from pathlib import Path
 from urllib.request import Request
 
+from ai_engineering_bootstrap.agent.provider import LocalServerProvider, ProviderConfig
+from ai_engineering_bootstrap.agent.strategy_llm_bridge import StrategyLLMProvider
 from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService, LLMSettingsStore
 from ai_engineering_bootstrap.environment.models import (
     ActualEnvironmentState,
@@ -64,6 +66,38 @@ def test_local_server_api_key_is_accepted(tmp_path, monkeypatch) -> None:
     assert calls[0].headers["Authorization"] == "Bearer lm-secret"
 
 
+def test_local_server_strategy_passes_api_key(monkeypatch) -> None:
+    calls: list[Request] = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"choices":[{"message":{"content":"{\"strategies\":[],\"confidence\":0.9}"}}]}'
+
+    def fake_urlopen(request: Request, timeout: int):
+        calls.append(request)
+        return Response()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    provider = LocalServerProvider(
+        ProviderConfig(
+            provider_type="local_server",
+            model="qwen-test",
+            base_url="http://192.168.1.50:1234/v1",
+            api_key="lm-secret",
+        )
+    )
+    result = StrategyLLMProvider(provider).decide("- ruff: install", [])
+    assert result.confidence == 0.9
+    assert calls[0].full_url == "http://192.168.1.50:1234/v1/chat/completions"
+    assert calls[0].headers["Authorization"] == "Bearer lm-secret"
+
+
 def test_gui_supports_install_intent_and_editable_api_key() -> None:
     html = HTML_PATH.resolve().read_text(encoding="utf-8")
     runtime = RUNTIME_PATH.resolve().read_text(encoding="utf-8")
@@ -71,4 +105,5 @@ def test_gui_supports_install_intent_and_editable_api_key() -> None:
     assert 'id="force-install"' not in html
     assert "apiKeyInput.disabled = false" in runtime
     assert "Install / repair selected tools" in runtime
-    assert 'constraints: forceInstall ? { force_install: true } : {}' in runtime
+    assert "constraints: forceInstall ? { force_install: true } : {}" in runtime
+    assert '.filter(input => input.id !== "force-install")' in runtime
