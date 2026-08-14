@@ -102,9 +102,7 @@ class LocalServerProvider(LLMProvider):
         except TimeoutError as error:
             raise ProviderTimeoutError("Request timed out.") from error
         except json.JSONDecodeError as error:
-            raise ProviderResponseError(
-                f"Invalid response JSON: {error}"
-            ) from error
+            raise ProviderResponseError(f"Invalid response JSON: {error}") from error
 
     def _build_payload(self, prompt: str) -> dict[str, Any]:
         system_prompt = (
@@ -177,8 +175,7 @@ class LocalServerProvider(LLMProvider):
         capabilities: list[Capability],
     ) -> str:
         cap_list = "\n".join(
-            f"- ID: {capability.capability_id}, "
-            f"Description: {capability.description}"
+            f"- ID: {capability.capability_id}, Description: {capability.description}"
             for capability in capabilities
         )
         thinking_instruction = (
@@ -200,13 +197,13 @@ class LocalServerProvider(LLMProvider):
     def _parse_response(self, data: dict[str, Any]) -> AgentDecision:
         choices = data.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise ProviderResponseError(
-                "Provider response contains no choices."
-            )
+            raise ProviderResponseError("Provider response contains no choices.")
 
         choice = choices[0]
         if not isinstance(choice, dict):
-            raise ProviderResponseError("Provider response contains invalid choice data.")
+            raise ProviderResponseError(
+                "Provider response contains invalid choice data."
+            )
 
         finish_reason = choice.get("finish_reason")
         if finish_reason == "length":
@@ -222,7 +219,9 @@ class LocalServerProvider(LLMProvider):
 
         message = choice.get("message") or {}
         if not isinstance(message, dict):
-            raise ProviderResponseError("Provider response contains invalid message data.")
+            raise ProviderResponseError(
+                "Provider response contains invalid message data."
+            )
 
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
@@ -243,7 +242,7 @@ class LocalServerProvider(LLMProvider):
     def _decision_from_content(content: str) -> AgentDecision:
         normalized = content.strip()
         if normalized.startswith("```json"):
-            normalized = normalized[len("```json"):].strip()
+            normalized = normalized[len("```json") :].strip()
         elif normalized.startswith("```"):
             normalized = normalized[3:].strip()
         if normalized.endswith("```"):
@@ -321,9 +320,7 @@ class RemoteAPIProvider(LLMProvider):
         except TimeoutError as error:
             raise ProviderTimeoutError("Request timed out.") from error
         except json.JSONDecodeError as error:
-            raise ProviderResponseError(
-                f"Invalid response: {error}"
-            ) from error
+            raise ProviderResponseError(f"Invalid response: {error}") from error
 
     def _build_prompt(
         self,
@@ -336,9 +333,7 @@ class RemoteAPIProvider(LLMProvider):
     def _parse_response(self, data: dict[str, Any]) -> AgentDecision:
         choices = data.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise ProviderResponseError(
-                "Provider response contains no choices."
-            )
+            raise ProviderResponseError("Provider response contains no choices.")
         message = choices[0].get("message") or {}
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
@@ -404,8 +399,12 @@ class InProcessProvider(LLMProvider):
             selected = decision_data.get("selected_capability_ids", [])
             if not selected and "capability_id" in decision_data:
                 selected = [decision_data["capability_id"]]
-            if not isinstance(selected, list) or not all(isinstance(item, str) for item in selected):
-                raise ProviderResponseError("selected_capability_ids must be a JSON array of strings.")
+            if not isinstance(selected, list) or not all(
+                isinstance(item, str) for item in selected
+            ):
+                raise ProviderResponseError(
+                    "selected_capability_ids must be a JSON array of strings."
+                )
             try:
                 confidence = float(decision_data.get("confidence", 0.5))
             except (TypeError, ValueError) as error:

@@ -1,12 +1,16 @@
 import json
 from types import SimpleNamespace
 
+from ai_engineering_bootstrap.agent.intent_parser import IntentParser
 from ai_engineering_bootstrap.agent.models import AgentDecision
 from ai_engineering_bootstrap.agent.provider import LLMProvider
-from ai_engineering_bootstrap.agent.intent_parser import IntentParser
-from ai_engineering_bootstrap.backend.runtime_session_service import RuntimeSessionService
+from ai_engineering_bootstrap.backend.runtime_session_service import (
+    RuntimeSessionService,
+)
 from ai_engineering_bootstrap.environment.models import EnvironmentRequest
-from ai_engineering_bootstrap.environment.session_repository import InMemorySessionRepository
+from ai_engineering_bootstrap.environment.session_repository import (
+    InMemorySessionRepository,
+)
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 
@@ -38,9 +42,13 @@ def test_natural_language_install_goal_builds_tool_and_package_actions() -> None
     service = RuntimeSessionService(
         repository=InMemorySessionRepository(),
         audit_factory=_audit_factory,
-        intent_parser_factory=lambda: IntentParser(provider=FakeIntentProvider(), tool_catalog=ToolCatalog()),
+        intent_parser_factory=lambda: IntentParser(
+            provider=FakeIntentProvider(), tool_catalog=ToolCatalog()
+        ),
     )
-    result = service.create(EnvironmentRequest(natural_language_goal="install pytest and colorama and ruff"))
+    result = service.create(
+        EnvironmentRequest(natural_language_goal="install pytest and colorama and ruff")
+    )
     session_id = result.data["session_id"]
     plan = service.plan(session_id).data["plan"]
     action_ids = [action["action_id"] for action in plan["actions"]]
@@ -52,7 +60,9 @@ def test_natural_language_install_goal_builds_tool_and_package_actions() -> None
     ]
     session = service.get(session_id)
     assert any(decision.provider == "llm" for decision in session.agent_decisions)
-    assert all(action_id.startswith("install_python_package:") for action_id in action_ids)
+    assert all(
+        action_id.startswith("install_python_package:") for action_id in action_ids
+    )
 
 
 def test_real_start_waits_for_each_action_instance_approval() -> None:
@@ -61,7 +71,11 @@ def test_real_start_waits_for_each_action_instance_approval() -> None:
         audit_factory=_audit_factory,
         intent_parser_factory=lambda: IntentParser(tool_catalog=ToolCatalog()),
     )
-    result = service.create(EnvironmentRequest(required_tools=["ruff", "pytest"], constraints={"force_install": True}))
+    result = service.create(
+        EnvironmentRequest(
+            required_tools=["ruff", "pytest"], constraints={"force_install": True}
+        )
+    )
     session_id = result.data["session_id"]
     actions = service.plan(session_id).data["plan"]["actions"]
 
@@ -72,4 +86,6 @@ def test_real_start_waits_for_each_action_instance_approval() -> None:
         assert actions[1]["action_id"] in str(error)
         assert actions[0]["action_id"] not in str(error)
     else:
-        raise AssertionError("REAL execution should wait for unapproved action instances")
+        raise AssertionError(
+            "REAL execution should wait for unapproved action instances"
+        )

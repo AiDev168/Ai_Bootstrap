@@ -12,6 +12,7 @@ from ai_engineering_bootstrap.planner.models import ExecutionPlanAction
 @dataclass(frozen=True)
 class BaseContext:
     """Minimal execution context passed to handlers."""
+
     dry_run: bool = True
     platform: str = "unknown"
     metadata: dict[str, Any] = field(default_factory=dict)

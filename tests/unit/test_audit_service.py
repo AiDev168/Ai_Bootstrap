@@ -23,12 +23,14 @@ def test_audit_service_continues_after_probe_failure() -> None:
     report = AuditService((FailingProbe(), SuccessfulProbe())).run()
 
     assert len(report.checks) == 2
-    
+
     # بررسی چک اول (که خطا داده است)
     first_check = report.checks[0]
     assert first_check.status is CheckStatus.FAILED
-    assert "unexpected failure" in first_check.details or "unexpected failure" in str(first_check.facts)
-    
+    assert "unexpected failure" in first_check.details or "unexpected failure" in str(
+        first_check.facts
+    )
+
     # بررسی چک دوم (که موفق بوده است)
     second_check = report.checks[1]
     assert second_check.name == "success"

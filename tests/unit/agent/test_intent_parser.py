@@ -1,6 +1,5 @@
 """Tests for LLM-powered intent parsing."""
 
-
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser, ParsedIntent
 from ai_engineering_bootstrap.agent.provider import MockProvider
 

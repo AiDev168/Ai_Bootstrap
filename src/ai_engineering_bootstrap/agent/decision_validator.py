@@ -62,7 +62,9 @@ class StrategyDecisionValidator:
             )
 
         strategy_args = getattr(decision, "strategy_args", {}) or {}
-        artifact_url = getattr(decision, "artifact_url", None) or strategy_args.get("artifact_url")
+        artifact_url = getattr(decision, "artifact_url", None) or strategy_args.get(
+            "artifact_url"
+        )
         if artifact_url:
             errors.extend(self._validate_source(tool, artifact_url))
 
@@ -104,8 +106,12 @@ class StrategyDecisionValidator:
             return ["Artifact source must be an HTTPS URL with a hostname."]
         hostname = parsed.hostname.lower()
         allowed = {domain.lower() for domain in tool.allowed_domains}
-        if not any(hostname == domain or hostname.endswith(f".{domain}") for domain in allowed):
-            return [f"Artifact source domain '{hostname}' is not allowlisted for '{tool.tool_id}'."]
+        if not any(
+            hostname == domain or hostname.endswith(f".{domain}") for domain in allowed
+        ):
+            return [
+                f"Artifact source domain '{hostname}' is not allowlisted for '{tool.tool_id}'."
+            ]
         return []
 
     @staticmethod

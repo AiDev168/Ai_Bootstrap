@@ -10,6 +10,7 @@ from ai_engineering_bootstrap.executor.mode import ExecutionMode
 
 class ActionRisk(str, Enum):
     """Risk levels for actions."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -18,6 +19,7 @@ class ActionRisk(str, Enum):
 
 class ApprovalRequirement(str, Enum):
     """Approval requirements for actions."""
+
     NONE = "none"
     HUMAN = "human"
 
@@ -25,6 +27,7 @@ class ApprovalRequirement(str, Enum):
 @dataclass(frozen=True)
 class ActionPolicy:
     """Policy definition for a specific action."""
+
     action_id: str
     allowed: bool
     risk: ActionRisk
@@ -50,24 +53,36 @@ class SafetyGate:
             allowed=True,
             risk=ActionRisk.LOW,
             allowed_modes=[ExecutionMode.SAFE, ExecutionMode.REAL],
-            approval_required=ApprovalRequirement.NONE
+            approval_required=ApprovalRequirement.NONE,
         )
-        
+
         self._policies["create_virtualenv"] = ActionPolicy(
-            "create_virtualenv", True, ActionRisk.MEDIUM,
-            [ExecutionMode.SAFE, ExecutionMode.REAL], ApprovalRequirement.HUMAN
+            "create_virtualenv",
+            True,
+            ActionRisk.MEDIUM,
+            [ExecutionMode.SAFE, ExecutionMode.REAL],
+            ApprovalRequirement.HUMAN,
         )
         self._policies["install_python_package"] = ActionPolicy(
-            "install_python_package", True, ActionRisk.MEDIUM,
-            [ExecutionMode.SAFE, ExecutionMode.REAL], ApprovalRequirement.HUMAN
+            "install_python_package",
+            True,
+            ActionRisk.MEDIUM,
+            [ExecutionMode.SAFE, ExecutionMode.REAL],
+            ApprovalRequirement.HUMAN,
         )
         self._policies["install_project_dependencies"] = ActionPolicy(
-            "install_project_dependencies", True, ActionRisk.MEDIUM,
-            [ExecutionMode.SAFE, ExecutionMode.REAL], ApprovalRequirement.HUMAN
+            "install_project_dependencies",
+            True,
+            ActionRisk.MEDIUM,
+            [ExecutionMode.SAFE, ExecutionMode.REAL],
+            ApprovalRequirement.HUMAN,
         )
         self._policies["fix_editable"] = ActionPolicy(
-            "fix_editable", True, ActionRisk.MEDIUM,
-            [ExecutionMode.SAFE], ApprovalRequirement.HUMAN
+            "fix_editable",
+            True,
+            ActionRisk.MEDIUM,
+            [ExecutionMode.SAFE],
+            ApprovalRequirement.HUMAN,
         )
 
         self._policies["install_git"] = ActionPolicy(
@@ -78,7 +93,10 @@ class SafetyGate:
             approval_required=ApprovalRequirement.HUMAN,
         )
 
-        for action_id, risk in (("install_docker", ActionRisk.HIGH), ("install_cursor", ActionRisk.MEDIUM)):
+        for action_id, risk in (
+            ("install_docker", ActionRisk.HIGH),
+            ("install_cursor", ActionRisk.MEDIUM),
+        ):
             self._policies[action_id] = ActionPolicy(
                 action_id=action_id,
                 allowed=True,
@@ -108,30 +126,46 @@ class SafetyGate:
     def requires_human_approval(self, action_id: str) -> bool:
         """Return whether an explicitly known action requires human approval."""
         policy = self.get_policy(action_id)
-        return policy is not None and policy.approval_required == ApprovalRequirement.HUMAN
+        return (
+            policy is not None and policy.approval_required == ApprovalRequirement.HUMAN
+        )
 
-    def evaluate(self, action_id: str, mode: ExecutionMode, is_approved: bool = False) -> tuple[bool, str]:
+    def evaluate(
+        self, action_id: str, mode: ExecutionMode, is_approved: bool = False
+    ) -> tuple[bool, str]:
         """
         Evaluate whether an action is allowed.
         Returns (allowed, reason).
         Default: DENY.
         """
         policy = self._policies.get(action_id)
-        
+
         if policy is None:
-            return False, f"Safety Gate Denied: Action '{action_id}' has no explicit policy (Default Deny)."
-        
+            return (
+                False,
+                f"Safety Gate Denied: Action '{action_id}' has no explicit policy (Default Deny).",
+            )
+
         if not policy.allowed:
-            return False, f"Safety Gate Denied: Action '{action_id}' is explicitly forbidden."
-        
+            return (
+                False,
+                f"Safety Gate Denied: Action '{action_id}' is explicitly forbidden.",
+            )
+
         if mode not in policy.allowed_modes:
-            return False, f"Safety Gate Denied: Action '{action_id}' is not allowed in {mode.value} mode."
-        
+            return (
+                False,
+                f"Safety Gate Denied: Action '{action_id}' is not allowed in {mode.value} mode.",
+            )
+
         if (
             mode == ExecutionMode.REAL
             and policy.approval_required == ApprovalRequirement.HUMAN
             and not is_approved
         ):
-            return False, f"Safety Gate Denied: Action '{action_id}' requires human approval."
-        
+            return (
+                False,
+                f"Safety Gate Denied: Action '{action_id}' requires human approval.",
+            )
+
         return True, "Allowed"

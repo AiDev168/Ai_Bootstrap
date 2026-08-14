@@ -15,7 +15,9 @@ from ai_engineering_bootstrap.agent.provider import ProviderConfig
 
 SUPPORTED_PROVIDERS = frozenset({"local_server", "remote_api", "in_process", "mock"})
 DEFAULT_PROVIDER = "mock"
-DEFAULT_SETTINGS_FILE = Path.home() / ".config" / "ai-engineering-bootstrap" / "llm-settings.json"
+DEFAULT_SETTINGS_FILE = (
+    Path.home() / ".config" / "ai-engineering-bootstrap" / "llm-settings.json"
+)
 
 
 @dataclass(frozen=True)
@@ -40,7 +42,9 @@ class LLMSettingsStore:
 
     def __init__(self, path: Path | None = None) -> None:
         configured = os.getenv(self.ENV_FILE, "").strip()
-        self.path = path or Path(configured) if configured else path or DEFAULT_SETTINGS_FILE
+        self.path = (
+            path or Path(configured) if configured else path or DEFAULT_SETTINGS_FILE
+        )
 
     def load(self) -> dict[str, str]:
         if self.path.exists():
@@ -49,7 +53,11 @@ class LLMSettingsStore:
             except (OSError, json.JSONDecodeError):
                 data = {}
             if isinstance(data, dict):
-                return {str(key): str(value) for key, value in data.items() if value is not None}
+                return {
+                    str(key): str(value)
+                    for key, value in data.items()
+                    if value is not None
+                }
         return self._load_legacy_environment()
 
     def save(self, values: dict[str, str]) -> None:
@@ -72,8 +80,18 @@ class LLMSettingsStore:
         base_url = os.getenv(self.ENV_BASE_URL, "").strip()
         api_key = os.getenv(self.ENV_API_KEY, "").strip()
         if not any((provider, model, base_url, api_key)):
-            return {"provider": DEFAULT_PROVIDER, "model": "", "base_url": "", "api_key": ""}
-        return {"provider": provider or DEFAULT_PROVIDER, "model": model, "base_url": base_url, "api_key": api_key}
+            return {
+                "provider": DEFAULT_PROVIDER,
+                "model": "",
+                "base_url": "",
+                "api_key": "",
+            }
+        return {
+            "provider": provider or DEFAULT_PROVIDER,
+            "model": model,
+            "base_url": base_url,
+            "api_key": api_key,
+        }
 
 
 class LLMSettingsService:
@@ -88,17 +106,30 @@ class LLMSettingsService:
         self.store = store or LLMSettingsStore()
 
     @staticmethod
-    def _normalize_values(payload: dict[str, Any], current: dict[str, str] | None = None) -> dict[str, str]:
+    def _normalize_values(
+        payload: dict[str, Any], current: dict[str, str] | None = None
+    ) -> dict[str, str]:
         current = current or {}
-        provider = str(payload.get("provider", DEFAULT_PROVIDER)).strip() or DEFAULT_PROVIDER
+        provider = (
+            str(payload.get("provider", DEFAULT_PROVIDER)).strip() or DEFAULT_PROVIDER
+        )
         if provider not in SUPPORTED_PROVIDERS:
             raise ValueError(f"Unsupported LLM provider: {provider}")
         model = str(payload.get("model", "")).strip()
         base_url = str(payload.get("base_url", "")).strip()
         api_key = str(payload.get("api_key", "")).strip()
-        if not api_key and current.get("api_key") and payload.get("preserve_api_key", True):
+        if (
+            not api_key
+            and current.get("api_key")
+            and payload.get("preserve_api_key", True)
+        ):
             api_key = current["api_key"]
-        return {"provider": provider, "model": model, "base_url": base_url, "api_key": api_key}
+        return {
+            "provider": provider,
+            "model": model,
+            "base_url": base_url,
+            "api_key": api_key,
+        }
 
     @staticmethod
     def _settings_from_values(values: dict[str, str]) -> LLMSettings:
@@ -108,7 +139,9 @@ class LLMSettingsService:
         model = values.get("model", "").strip()
         base_url = values.get("base_url", "").strip()
         api_key = values.get("api_key", "").strip()
-        enabled = provider == "mock" or (provider != "in_process" and bool(model and base_url))
+        enabled = provider == "mock" or (
+            provider != "in_process" and bool(model and base_url)
+        )
         return LLMSettings(
             provider=provider,
             model=model,
@@ -149,9 +182,19 @@ class LLMSettingsService:
         if settings.provider == "mock":
             return {"ok": True, "provider": "mock", "models": ["mock"]}
         if settings.provider == "in_process":
-            return {"ok": False, "provider": "in_process", "models": [], "message": "In-process provider has no HTTP model catalog."}
+            return {
+                "ok": False,
+                "provider": "in_process",
+                "models": [],
+                "message": "In-process provider has no HTTP model catalog.",
+            }
         if not settings.base_url:
-            return {"ok": False, "provider": settings.provider, "models": [], "message": "LLM base URL is not configured."}
+            return {
+                "ok": False,
+                "provider": settings.provider,
+                "models": [],
+                "message": "LLM base URL is not configured.",
+            }
         headers = {"Accept": "application/json"}
         if values.get("api_key"):
             headers["Authorization"] = f"Bearer {values['api_key']}"
@@ -160,24 +203,61 @@ class LLMSettingsService:
         try:
             with urllib.request.urlopen(request, timeout=5) as response:
                 payload_data = json.loads(response.read().decode("utf-8"))
-            entries = payload_data.get("data", []) if isinstance(payload_data, dict) else []
-            models = [str(item.get("id")) for item in entries if isinstance(item, dict) and item.get("id")]
-            return {"ok": True, "provider": settings.provider, "models": models, "url": url}
+            entries = (
+                payload_data.get("data", []) if isinstance(payload_data, dict) else []
+            )
+            models = [
+                str(item.get("id"))
+                for item in entries
+                if isinstance(item, dict) and item.get("id")
+            ]
+            return {
+                "ok": True,
+                "provider": settings.provider,
+                "models": models,
+                "url": url,
+            }
         except urllib.error.HTTPError as error:
-            return {"ok": False, "provider": settings.provider, "models": [], "status": error.code, "message": f"HTTP {error.code}: {error.reason}", "url": url}
+            return {
+                "ok": False,
+                "provider": settings.provider,
+                "models": [],
+                "status": error.code,
+                "message": f"HTTP {error.code}: {error.reason}",
+                "url": url,
+            }
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
-            return {"ok": False, "provider": settings.provider, "models": [], "message": str(error), "url": url}
+            return {
+                "ok": False,
+                "provider": settings.provider,
+                "models": [],
+                "message": str(error),
+                "url": url,
+            }
 
     def test_connection(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """Probe persisted settings or unsaved form values without mutating storage."""
         values = self._effective_values(payload)
         settings = self._settings_from_values(values)
         if settings.provider == "mock":
-            return {"ok": True, "provider": "mock", "model": settings.model, "message": "Mock provider is available."}
+            return {
+                "ok": True,
+                "provider": "mock",
+                "model": settings.model,
+                "message": "Mock provider is available.",
+            }
         if settings.provider == "in_process":
-            return {"ok": False, "provider": "in_process", "message": "In-process provider requires a host model instance and cannot be tested from the GUI."}
+            return {
+                "ok": False,
+                "provider": "in_process",
+                "message": "In-process provider requires a host model instance and cannot be tested from the GUI.",
+            }
         if not settings.base_url:
-            return {"ok": False, "provider": settings.provider, "message": "LLM base URL is not configured."}
+            return {
+                "ok": False,
+                "provider": settings.provider,
+                "message": "LLM base URL is not configured.",
+            }
         headers = {"Accept": "application/json"}
         if values.get("api_key"):
             headers["Authorization"] = f"Bearer {values['api_key']}"
@@ -185,11 +265,34 @@ class LLMSettingsService:
         request = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=5) as response:
-                return {"ok": True, "provider": settings.provider, "model": settings.model, "status": response.status, "url": url}
+                return {
+                    "ok": True,
+                    "provider": settings.provider,
+                    "model": settings.model,
+                    "status": response.status,
+                    "url": url,
+                }
         except urllib.error.HTTPError as error:
-            return {"ok": False, "provider": settings.provider, "status": error.code, "message": f"HTTP {error.code}: {error.reason}", "url": url}
+            return {
+                "ok": False,
+                "provider": settings.provider,
+                "status": error.code,
+                "message": f"HTTP {error.code}: {error.reason}",
+                "url": url,
+            }
         except (urllib.error.URLError, TimeoutError) as error:
-            return {"ok": False, "provider": settings.provider, "message": str(error), "url": url}
+            return {
+                "ok": False,
+                "provider": settings.provider,
+                "message": str(error),
+                "url": url,
+            }
 
 
-__all__ = ["DEFAULT_PROVIDER", "LLMSettings", "LLMSettingsService", "LLMSettingsStore", "SUPPORTED_PROVIDERS"]
+__all__ = [
+    "DEFAULT_PROVIDER",
+    "SUPPORTED_PROVIDERS",
+    "LLMSettings",
+    "LLMSettingsService",
+    "LLMSettingsStore",
+]

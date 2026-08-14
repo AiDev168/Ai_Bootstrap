@@ -17,6 +17,7 @@ src/ai_engineering_bootstrap.egg-info/entry_points.txt
 src/ai_engineering_bootstrap.egg-info/requires.txt
 src/ai_engineering_bootstrap.egg-info/top_level.txt
 src/ai_engineering_bootstrap/agent/__init__.py
+src/ai_engineering_bootstrap/agent/decision_validator.py
 src/ai_engineering_bootstrap/agent/engine.py
 src/ai_engineering_bootstrap/agent/exceptions.py
 src/ai_engineering_bootstrap/agent/intent_parser.py
@@ -25,6 +26,7 @@ src/ai_engineering_bootstrap/agent/planning.py
 src/ai_engineering_bootstrap/agent/provider.py
 src/ai_engineering_bootstrap/agent/recovery_agent.py
 src/ai_engineering_bootstrap/agent/runtime.py
+src/ai_engineering_bootstrap/agent/strategy_llm_bridge.py
 src/ai_engineering_bootstrap/agent/strategy_planner.py
 src/ai_engineering_bootstrap/approval/__init__.py
 src/ai_engineering_bootstrap/approval/models.py
@@ -37,8 +39,13 @@ src/ai_engineering_bootstrap/audit/recommendations.py
 src/ai_engineering_bootstrap/audit/service.py
 src/ai_engineering_bootstrap/backend/__init__.py
 src/ai_engineering_bootstrap/backend/api.py
+src/ai_engineering_bootstrap/backend/execution_plan_builder.py
+src/ai_engineering_bootstrap/backend/llm_settings.py
+src/ai_engineering_bootstrap/backend/runtime_session_service.py
 src/ai_engineering_bootstrap/backend/server.py
 src/ai_engineering_bootstrap/backend/service.py
+src/ai_engineering_bootstrap/backend/session_service.py
+src/ai_engineering_bootstrap/backend/strategy_planner_runtime.py
 src/ai_engineering_bootstrap/bootstrap/__init__.py
 src/ai_engineering_bootstrap/bootstrap/service.py
 src/ai_engineering_bootstrap/engineering/__init__.py
@@ -48,6 +55,7 @@ src/ai_engineering_bootstrap/environment/installation_strategies.py
 src/ai_engineering_bootstrap/environment/models.py
 src/ai_engineering_bootstrap/environment/reconciler.py
 src/ai_engineering_bootstrap/environment/session_models.py
+src/ai_engineering_bootstrap/environment/session_repository.py
 src/ai_engineering_bootstrap/environment/session_store.py
 src/ai_engineering_bootstrap/environment/tool_catalog.py
 src/ai_engineering_bootstrap/executor/__init__.py

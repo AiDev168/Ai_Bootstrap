@@ -41,7 +41,9 @@ class ActionRegistry:
             # در مود واقعی، اگر هندلر واقعی نباشد، خطا می‌دهیم (حتی اگر سیف باشد)
             # مگر اینکه سیاست دیگری تعریف شود. اینجا سخت‌گیرانه عمل می‌کنیم.
             if action_id in self._safe_handlers:
-                raise KeyError(f"Action '{action_id}' is not approved for REAL execution (No real handler).")
+                raise KeyError(
+                    f"Action '{action_id}' is not approved for REAL execution (No real handler)."
+                )
             raise KeyError(f"Action '{action_id}' is not supported.")
         # SAFE MODE
         if action_id in self._safe_handlers:
@@ -59,7 +61,9 @@ class ActionRegistry:
     @property
     def supported_actions(self) -> list[str]:
         """Return sorted list of all supported action IDs."""
-        return sorted(set(list(self._safe_handlers.keys()) + list(self._real_handlers.keys())))
+        return sorted(
+            set(list(self._safe_handlers.keys()) + list(self._real_handlers.keys()))
+        )
 
 
 __all__ = ["ActionRegistry"]

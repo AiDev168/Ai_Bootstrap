@@ -22,9 +22,9 @@ class BootstrapPlanner:
         """Run the planner and display the execution plan."""
         audit_service = default_audit_service()
         self._audit_report = audit_service.run()
-        
+
         actions = self._generate_actions()
-        
+
         if not actions:
             self.console.print(
                 Panel(
@@ -33,32 +33,32 @@ class BootstrapPlanner:
                 )
             )
             return
-        
+
         self._display_plan(actions)
 
     def _generate_actions(self) -> list[dict[str, str]]:
         """Generate action steps based on audit report results."""
         actions: list[dict[str, str]] = []
-        
+
         if not self._audit_report:
             return actions
-        
+
         checks = self._audit_report.checks
-        
+
         for check in checks:
             if check.status != "failed":
                 continue
-            
+
             action = self._create_action_for_check(check)
             if action:
                 actions.append(action)
-        
+
         return actions
 
     def _create_action_for_check(self, check: AuditCheck) -> dict[str, str] | None:
         """Create an action item for a failed audit check."""
         check_name = check.name
-        
+
         # Python version check
         if check_name == "python_version":
             return {
@@ -68,7 +68,7 @@ class BootstrapPlanner:
                 "effort": "Medium",
                 "duration": "5 min",
             }
-        
+
         # Virtual environment check
         if check_name == "virtualenv":
             venv_actions = [
@@ -90,7 +90,7 @@ class BootstrapPlanner:
             # Special handling for multiple actions from one check
             # We'll handle this in _generate_actions by extending the list
             return venv_actions  # type: ignore[return-value]
-        
+
         # Editable install check
         if check_name == "editable_install":
             return {
@@ -100,7 +100,7 @@ class BootstrapPlanner:
                 "effort": "Low",
                 "duration": "2 min",
             }
-        
+
         # Package checks
         if check_name.startswith("package_"):
             pkg_name = check_name.replace("package_", "")
@@ -111,7 +111,7 @@ class BootstrapPlanner:
                 "effort": "Low",
                 "duration": "1 min",
             }
-        
+
         # Executable checks
         if check_name.startswith("executable_"):
             exe_name = check_name.replace("executable_", "")
@@ -129,20 +129,20 @@ class BootstrapPlanner:
                 "effort": effort,
                 "duration": duration,
             }
-        
+
         return None
 
     def _display_plan(self, actions: list[dict[str, str]]) -> None:
         """Display the execution plan table."""
         self.console.print("\n[bold blue]Execution Plan[/bold blue]\n")
-        
+
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("Step", style="dim", width=6)
         table.add_column("Action", style="cyan")
         table.add_column("Command", style="green")
         table.add_column("Effort", style="yellow")
         table.add_column("Duration", style="magenta")
-        
+
         for idx, action in enumerate(actions, start=1):
             action["step"] = idx
             table.add_row(
@@ -152,13 +152,13 @@ class BootstrapPlanner:
                 action["effort"],
                 action["duration"],
             )
-        
+
         self.console.print(table)
-        
+
         # Summary
         total_effort = self._calculate_total_effort(actions)
         total_duration = self._calculate_total_duration(actions)
-        
+
         self.console.print("\n[bold]Summary:[/bold]")
         self.console.print(f"  Total Steps: {len(actions)}")
         self.console.print(f"  Estimated Effort: {total_effort}")
@@ -168,7 +168,7 @@ class BootstrapPlanner:
         """Calculate overall effort level."""
         effort_scores = {"Low": 1, "Medium": 2, "High": 3}
         total = sum(effort_scores.get(a["effort"], 1) for a in actions)
-        
+
         if total >= 8:
             return "High"
         if total >= 4:
@@ -184,11 +184,9 @@ class BootstrapPlanner:
             "5 min": 5,
             "10 min": 10,
         }
-        
-        total_minutes = sum(
-            duration_map.get(a["duration"], 1) for a in actions
-        )
-        
+
+        total_minutes = sum(duration_map.get(a["duration"], 1) for a in actions)
+
         if total_minutes >= 15:
             return f"{total_minutes} min"
         return f"{total_minutes} min"

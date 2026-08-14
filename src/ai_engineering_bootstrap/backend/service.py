@@ -9,13 +9,19 @@ from ai_engineering_bootstrap.agent.intent_parser import IntentParser
 from ai_engineering_bootstrap.agent.provider import build_provider
 from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService
-from ai_engineering_bootstrap.backend.runtime_session_service import RuntimeSessionService
+from ai_engineering_bootstrap.backend.runtime_session_service import (
+    RuntimeSessionService,
+)
 from ai_engineering_bootstrap.backend.session_service import EnvironmentSessionService
-from ai_engineering_bootstrap.backend.strategy_planner_runtime import RuntimeStrategyPlanner
+from ai_engineering_bootstrap.backend.strategy_planner_runtime import (
+    RuntimeStrategyPlanner,
+)
 from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
 from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.environment import EnvironmentRequest
-from ai_engineering_bootstrap.environment.session_repository import InMemorySessionRepository
+from ai_engineering_bootstrap.environment.session_repository import (
+    InMemorySessionRepository,
+)
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 from ai_engineering_bootstrap.pipeline import PipelineEngine, PipelineResult
@@ -143,11 +149,15 @@ class ApplicationBackend:
 
     VERSION = "v1"
 
-    def __init__(self, session_service: EnvironmentSessionService | None = None) -> None:
+    def __init__(
+        self, session_service: EnvironmentSessionService | None = None
+    ) -> None:
         self._llm_settings = LLMSettingsService()
         self._session_service = session_service or RuntimeSessionService(
             repository=InMemorySessionRepository(),
-            strategy_planner=RuntimeStrategyPlanner(settings_service=self._llm_settings),
+            strategy_planner=RuntimeStrategyPlanner(
+                settings_service=self._llm_settings
+            ),
             intent_parser_factory=self._build_runtime_intent_parser,
         )
 
@@ -163,17 +173,48 @@ class ApplicationBackend:
 
     def health(self) -> BackendResult:
         settings = self._llm_settings.get()
-        return BackendResult({"status": "ok", "version": self.VERSION, "llm_available": settings.enabled, "llm": {"provider": settings.provider, "model": settings.model, "base_url": settings.base_url, "api_key_configured": settings.api_key_configured, "enabled": settings.enabled}})
+        return BackendResult(
+            {
+                "status": "ok",
+                "version": self.VERSION,
+                "llm_available": settings.enabled,
+                "llm": {
+                    "provider": settings.provider,
+                    "model": settings.model,
+                    "base_url": settings.base_url,
+                    "api_key_configured": settings.api_key_configured,
+                    "enabled": settings.enabled,
+                },
+            }
+        )
 
     def get_llm_settings(self) -> BackendResult:
         settings = self._llm_settings.get()
-        return BackendResult({"provider": settings.provider, "model": settings.model, "base_url": settings.base_url, "api_key_configured": settings.api_key_configured, "enabled": settings.enabled})
+        return BackendResult(
+            {
+                "provider": settings.provider,
+                "model": settings.model,
+                "base_url": settings.base_url,
+                "api_key_configured": settings.api_key_configured,
+                "enabled": settings.enabled,
+            }
+        )
 
     def update_llm_settings(self, payload: dict[str, Any]) -> BackendResult:
         settings = self._llm_settings.update(payload)
-        return BackendResult({"provider": settings.provider, "model": settings.model, "base_url": settings.base_url, "api_key_configured": settings.api_key_configured, "enabled": settings.enabled})
+        return BackendResult(
+            {
+                "provider": settings.provider,
+                "model": settings.model,
+                "base_url": settings.base_url,
+                "api_key_configured": settings.api_key_configured,
+                "enabled": settings.enabled,
+            }
+        )
 
-    def test_llm_connection(self, payload: dict[str, Any] | None = None) -> BackendResult:
+    def test_llm_connection(
+        self, payload: dict[str, Any] | None = None
+    ) -> BackendResult:
         return BackendResult(self._llm_settings.test_connection(payload))
 
     def list_llm_models(self, payload: dict[str, Any] | None = None) -> BackendResult:
@@ -188,17 +229,43 @@ class ApplicationBackend:
 
     def engineering(self) -> BackendResult:
         report = EngineeringEnvironmentService().run()
-        return BackendResult({"project_root": str(report.project_root), "ready": report.is_ready, "required_tools_ready": report.required_tools_ready, "cursor_rules_present": report.cursor_rules_present, "cursor_available": report.cursor_available, "tools": [{"name": tool.name, "required": tool.required, "available": tool.available, "path": tool.path} for tool in report.tools]})
+        return BackendResult(
+            {
+                "project_root": str(report.project_root),
+                "ready": report.is_ready,
+                "required_tools_ready": report.required_tools_ready,
+                "cursor_rules_present": report.cursor_rules_present,
+                "cursor_available": report.cursor_available,
+                "tools": [
+                    {
+                        "name": tool.name,
+                        "required": tool.required,
+                        "available": tool.available,
+                        "path": tool.path,
+                    }
+                    for tool in report.tools
+                ],
+            }
+        )
 
     def run_safe(self) -> BackendResult:
-        result = PipelineEngine().run(mode=ExecutionMode.SAFE, run_id="backend-safe-run")
+        result = PipelineEngine().run(
+            mode=ExecutionMode.SAFE, run_id="backend-safe-run"
+        )
         return BackendResult(_pipeline_dict(result))
 
     def run_real_requires_cli(self) -> BackendResult:
-        return BackendResult({"allowed": False, "message": "REAL execution requires explicit interactive approval through the CLI."})
+        return BackendResult(
+            {
+                "allowed": False,
+                "message": "REAL execution requires explicit interactive approval through the CLI.",
+            }
+        )
 
     def bootstrap_safe(self) -> BackendResult:
-        result = EnvironmentBootstrapService().run(mode=ExecutionMode.SAFE, run_id="backend-bootstrap-safe")
+        result = EnvironmentBootstrapService().run(
+            mode=ExecutionMode.SAFE, run_id="backend-bootstrap-safe"
+        )
         return BackendResult(_pipeline_dict(result.pipeline_result))
 
     def create_session(self, request: EnvironmentRequest) -> BackendResult:
@@ -209,16 +276,23 @@ class ApplicationBackend:
 
     def get_session(self, session_id: str) -> BackendResult:
         session = self._session_service.get(session_id)
-        return BackendResult({
-            "session_id": session.session_id,
-            "status": session.status.value,
-            "current_action": session.current_action,
-            "request": self._session_service._request_dict(session.request),
-            "approval_states": {key: value.to_dict() for key, value in session.approval_states.items()},
-            "execution_history": [item.to_dict() for item in session.execution_history],
-            "created_at": session.created_at.isoformat(),
-            "updated_at": session.updated_at.isoformat(),
-        })
+        return BackendResult(
+            {
+                "session_id": session.session_id,
+                "status": session.status.value,
+                "current_action": session.current_action,
+                "request": self._session_service._request_dict(session.request),
+                "approval_states": {
+                    key: value.to_dict()
+                    for key, value in session.approval_states.items()
+                },
+                "execution_history": [
+                    item.to_dict() for item in session.execution_history
+                ],
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat(),
+            }
+        )
 
     def get_session_state(self, session_id: str) -> BackendResult:
         return BackendResult(self._session_service.state(session_id).data)
@@ -235,9 +309,15 @@ class ApplicationBackend:
     def skip_action(self, session_id: str, action_id: str) -> BackendResult:
         return BackendResult(self._session_service.skip(session_id, action_id).data)
 
-    def start_session(self, session_id: str, mode: ExecutionMode = ExecutionMode.SAFE) -> BackendResult:
+    def start_session(
+        self, session_id: str, mode: ExecutionMode = ExecutionMode.SAFE
+    ) -> BackendResult:
         start_async = getattr(self._session_service, "start_async", None)
-        result = start_async(session_id, mode) if callable(start_async) else self._session_service.start(session_id, mode)
+        result = (
+            start_async(session_id, mode)
+            if callable(start_async)
+            else self._session_service.start(session_id, mode)
+        )
         return BackendResult(result.data)
 
     def cancel_session(self, session_id: str) -> BackendResult:

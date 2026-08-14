@@ -12,6 +12,7 @@ from ai_engineering_bootstrap.planner.models import ExecutionPlanAction
 
 class VerificationStatus(str, Enum):
     """Status of a verification check."""
+
     VERIFIED = "verified"
     FAILED = "failed"
     SKIPPED = "skipped"
@@ -20,6 +21,7 @@ class VerificationStatus(str, Enum):
 @dataclass(frozen=True)
 class VerificationResult:
     """Result of verifying a single action's outcome."""
+
     action_id: str
     status: VerificationStatus
     message: str
@@ -32,14 +34,11 @@ class ActionVerifier(Protocol):
     """Protocol for action verifiers."""
 
     def verify(
-        self, 
-        action: ExecutionPlanAction, 
-        execution_result: ActionResult, 
-        context: Any
+        self, action: ExecutionPlanAction, execution_result: ActionResult, context: Any
     ) -> VerificationResult:
         """
         Independently observe the environment to verify the action's effect.
-        
+
         Must NOT modify the system.
         Must NOT trust execution_result blindly.
         """
@@ -55,6 +54,7 @@ class VerifierRegistry:
         from ai_engineering_bootstrap.executor.handlers.verifiers import (
             DEFAULT_VERIFIERS,
         )
+
         for action_id, verifier in DEFAULT_VERIFIERS.items():
             self._verifiers[action_id] = verifier
 
@@ -69,5 +69,5 @@ __all__ = [
     "ActionVerifier",
     "VerificationResult",
     "VerificationStatus",
-    "VerifierRegistry"
+    "VerifierRegistry",
 ]

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Audit Service - Orchestrates probes and generates reports."""
-#src/ai_engineering_bootstrap/audit/service.py: #!/usr/bin/env python3
+# src/ai_engineering_bootstrap/audit/service.py: #!/usr/bin/env python3
 
 from __future__ import annotations
 
@@ -32,7 +32,9 @@ class AuditService:
         facts = facts or {}
         if facts.get("remediation_action") == "install_python_package":
             return CheckCategory.DEPENDENCIES
-        if facts.get("package") and facts.get("source", "").startswith(("project", "optional:")):
+        if facts.get("package") and facts.get("source", "").startswith(
+            ("project", "optional:")
+        ):
             return CheckCategory.DEPENDENCIES
         if "gpu" in name_lower or "cuda" in name_lower:
             return CheckCategory.SYSTEM
@@ -40,7 +42,11 @@ class AuditService:
             return CheckCategory.PYTHON
         if "virtual" in name_lower or "editable" in name_lower:
             return CheckCategory.ENVIRONMENT
-        if name_lower in ["typer", "rich", "pytest", "ruff"] or "dependency" in name_lower or name_lower in {"setuptools", "wheel"}:
+        if (
+            name_lower in ["typer", "rich", "pytest", "ruff"]
+            or "dependency" in name_lower
+            or name_lower in {"setuptools", "wheel"}
+        ):
             return CheckCategory.DEPENDENCIES
         if "git" in name_lower or "cursor" in name_lower:
             return CheckCategory.TOOLS
@@ -67,13 +73,13 @@ class AuditService:
                 status = status_map.get(result.status, CheckStatus.FAILED)
 
                 # استخراج جزئیات
-                details = getattr(result, 'details', "")
-                facts = getattr(result, 'facts', {}) or {}
+                details = getattr(result, "details", "")
+                facts = getattr(result, "facts", {}) or {}
 
                 # تعیین دسته‌بندی
-                category = self._map_category(getattr(result, 'name', 'Unknown'), facts)
+                category = self._map_category(getattr(result, "name", "Unknown"), facts)
 
-                if not details and hasattr(result, 'diagnostic') and result.diagnostic:
+                if not details and hasattr(result, "diagnostic") and result.diagnostic:
                     details = result.diagnostic
                 elif not details and "version" in facts:
                     details = facts["version"]
@@ -93,7 +99,7 @@ class AuditService:
 
                 # تولید توصیه‌ها
                 temp_check = AuditCheck(
-                    name=getattr(result, 'name', 'Unknown'),
+                    name=getattr(result, "name", "Unknown"),
                     status=status,
                     category=category,
                     details=details,
@@ -112,7 +118,7 @@ class AuditService:
                 checks.append(check)
 
             except Exception as error:  # noqa: BLE001
-                probe_name = getattr(probe, 'name', 'Unknown Probe')
+                probe_name = getattr(probe, "name", "Unknown Probe")
                 category = self._map_category(probe_name)
                 temp_check = AuditCheck(
                     name=probe_name,
@@ -123,14 +129,16 @@ class AuditService:
                 )
                 recommendations = self._recommendation_engine.generate(temp_check)
 
-                checks.append(AuditCheck(
-                    name=probe_name,
-                    status=CheckStatus.FAILED,
-                    category=category,
-                    details="Probe execution failed",
-                    facts={"error": str(error)},
-                    recommendations=recommendations,
-                ))
+                checks.append(
+                    AuditCheck(
+                        name=probe_name,
+                        status=CheckStatus.FAILED,
+                        category=category,
+                        details="Probe execution failed",
+                        facts={"error": str(error)},
+                        recommendations=recommendations,
+                    )
+                )
 
         readiness = EnvironmentReadiness.calculate(checks)
         return AuditReport(checks=checks, readiness=readiness)

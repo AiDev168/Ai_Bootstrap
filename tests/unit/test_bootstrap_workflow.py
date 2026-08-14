@@ -27,14 +27,25 @@ def test_missing_dependency_becomes_install_action(tmp_path: Path) -> None:
 
 
 def test_dependency_installation_requires_human_approval() -> None:
-    action = __import__("ai_engineering_bootstrap.planner.models", fromlist=["ExecutionPlanAction"]).ExecutionPlanAction(
-        "install_python_package", "Install package", 1, {"package": "demo_pkg", "requirement": "demo_pkg"}
+    action = __import__(
+        "ai_engineering_bootstrap.planner.models", fromlist=["ExecutionPlanAction"]
+    ).ExecutionPlanAction(
+        "install_python_package",
+        "Install package",
+        1,
+        {"package": "demo_pkg", "requirement": "demo_pkg"},
     )
-    plan = __import__("ai_engineering_bootstrap.planner.models", fromlist=["ExecutionPlan"]).ExecutionPlan(True, [action])
+    plan = __import__(
+        "ai_engineering_bootstrap.planner.models", fromlist=["ExecutionPlan"]
+    ).ExecutionPlan(True, [action])
     provider = InMemoryApprovalProvider()
     engine = PipelineEngine()
-    with patch("ai_engineering_bootstrap.pipeline.engine.default_audit_service") as audit, \
-         patch("ai_engineering_bootstrap.pipeline.engine.PlannerEngine") as planner:
+    with (
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.default_audit_service"
+        ) as audit,
+        patch("ai_engineering_bootstrap.pipeline.engine.PlannerEngine") as planner,
+    ):
         audit.return_value.run.return_value = MagicMock()
         planner.return_value.generate_plan.return_value = plan
         result = engine.run(

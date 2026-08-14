@@ -8,8 +8,11 @@ import urllib.request
 from typing import Any
 
 from ai_engineering_bootstrap.agent.models import AgentDecision
-from ai_engineering_bootstrap.agent.provider import InProcessProvider, LLMProvider, MockProvider
-
+from ai_engineering_bootstrap.agent.provider import (
+    InProcessProvider,
+    LLMProvider,
+    MockProvider,
+)
 
 _MOCK_STRATEGIES = {
     "cursor": "cursor_deb_linux",
@@ -50,10 +53,14 @@ class StrategyLLMProvider(LLMProvider):
         return meta
 
 
-def _complete_json(provider: LLMProvider, prompt: str, system_prompt: str) -> dict[str, Any]:
+def _complete_json(
+    provider: LLMProvider, prompt: str, system_prompt: str
+) -> dict[str, Any]:
     if isinstance(provider, MockProvider):
         strategies = []
-        for tool_id, _action in re.findall(r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE):
+        for tool_id, _action in re.findall(
+            r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE
+        ):
             strategy_id = _MOCK_STRATEGIES.get(tool_id.strip())
             if strategy_id:
                 strategies.append(
@@ -67,9 +74,16 @@ def _complete_json(provider: LLMProvider, prompt: str, system_prompt: str) -> di
                     }
                 )
         if "intent parser" in system_prompt.lower():
-            tools = [tool.strip() for tool, _ in re.findall(r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE)]
+            tools = [
+                tool.strip()
+                for tool, _ in re.findall(
+                    r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE
+                )
+            ]
             return {
-                "natural_language_goal": prompt.split("User goal:", 1)[-1].split("/no_think", 1)[0].strip(),
+                "natural_language_goal": prompt.split("User goal:", 1)[-1]
+                .split("/no_think", 1)[0]
+                .strip(),
                 "required_tools": [tool for tool in tools if tool in _MOCK_STRATEGIES],
                 "optional_tools": [],
                 "languages": [],
@@ -107,8 +121,14 @@ def _complete_json(provider: LLMProvider, prompt: str, system_prompt: str) -> di
     if config.api_key:
         headers["Authorization"] = f"Bearer {config.api_key}"
     base_url = config.base_url.rstrip("/")
-    endpoint = f"{base_url}/chat/completions" if base_url.endswith("/v1") else f"{base_url}/v1/chat/completions"
-    request = urllib.request.Request(endpoint, data=json.dumps(payload).encode("utf-8"), headers=headers)
+    endpoint = (
+        f"{base_url}/chat/completions"
+        if base_url.endswith("/v1")
+        else f"{base_url}/v1/chat/completions"
+    )
+    request = urllib.request.Request(
+        endpoint, data=json.dumps(payload).encode("utf-8"), headers=headers
+    )
     with urllib.request.urlopen(request, timeout=config.timeout) as response:
         data = json.loads(response.read().decode("utf-8"))
     choices = data.get("choices")

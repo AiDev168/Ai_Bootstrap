@@ -9,7 +9,10 @@ from typing import Any
 from ai_engineering_bootstrap.agent.decision_validator import StrategyDecisionValidator
 from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.environment.models import EnvironmentDelta
-from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog, ToolDefinition
+from ai_engineering_bootstrap.environment.tool_catalog import (
+    ToolCatalog,
+    ToolDefinition,
+)
 
 
 @dataclass
@@ -38,13 +41,19 @@ class StrategyPlan:
     requires_approval: bool = True
 
     def get_decisions_requiring_approval(self) -> list[StrategyDecision]:
-        return [decision for decision in self.decisions if decision.risk_level in {"medium", "high"}]
+        return [
+            decision
+            for decision in self.decisions
+            if decision.risk_level in {"medium", "high"}
+        ]
 
 
 class StrategyPlanner:
     """Select installation strategies with deterministic validation of LLM output."""
 
-    def __init__(self, tool_catalog: ToolCatalog, provider: LLMProvider | None = None) -> None:
+    def __init__(
+        self, tool_catalog: ToolCatalog, provider: LLMProvider | None = None
+    ) -> None:
         self.tool_catalog = tool_catalog
         self.provider = provider
         self.validator = StrategyDecisionValidator(tool_catalog)
@@ -61,8 +70,14 @@ class StrategyPlanner:
             if item.action.value in {"install", "upgrade", "INSTALL", "UPGRADE"}
         ]
         if not install_deltas:
-            summary = "No tool changes required." if not delta.tool_deltas else "No installations required."
-            return StrategyPlan(decisions=[], overall_confidence=1.0, reasoning_summary=summary)
+            summary = (
+                "No tool changes required."
+                if not delta.tool_deltas
+                else "No installations required."
+            )
+            return StrategyPlan(
+                decisions=[], overall_confidence=1.0, reasoning_summary=summary
+            )
         if not self.provider:
             return self._deterministic_plan(install_deltas, platform, architecture)
         try:
@@ -73,8 +88,12 @@ class StrategyPlanner:
             fallback.overall_confidence = min(fallback.overall_confidence, 0.55)
             return fallback
 
-    def _llm_plan(self, deltas: list[Any], platform: str | None, architecture: str | None) -> StrategyPlan:
-        decision = self.provider.decide(self._build_prompt(deltas, platform, architecture), [])
+    def _llm_plan(
+        self, deltas: list[Any], platform: str | None, architecture: str | None
+    ) -> StrategyPlan:
+        decision = self.provider.decide(
+            self._build_prompt(deltas, platform, architecture), []
+        )
         content = decision.reasoning_summary.strip()
         if content.startswith("```json"):
             content = content[7:].strip()
@@ -95,21 +114,28 @@ class StrategyPlanner:
                     candidate
                     for candidate in tool_def.installation_strategies
                     if candidate.strategy_id == strategy_name
-                    or self._public_strategy_name(candidate.strategy_id) == strategy_name
+                    or self._public_strategy_name(candidate.strategy_id)
+                    == strategy_name
                 ),
                 None,
             )
             if strategy is None:
-                raise ValueError(f"LLM selected unregistered strategy '{strategy_name}' for '{tool_id}'")
+                raise ValueError(
+                    f"LLM selected unregistered strategy '{strategy_name}' for '{tool_id}'"
+                )
             strategy_name = self._public_strategy_name(strategy.strategy_id)
             if not artifact_url:
                 artifact_url = strategy.source_url
                 if artifact_url:
                     args["artifact_url"] = artifact_url
             if strategy.artifact_format.value == "pip":
-                args.setdefault("package_name", strategy.package_name or tool_def.tool_id)
+                args.setdefault(
+                    "package_name", strategy.package_name or tool_def.tool_id
+                )
                 args.setdefault("package", strategy.package_name or tool_def.tool_id)
-                args.setdefault("requirement", strategy.package_name or tool_def.tool_id)
+                args.setdefault(
+                    "requirement", strategy.package_name or tool_def.tool_id
+                )
             candidate = StrategyDecision(
                 tool_id=tool_id,
                 strategy_name=strategy_name,
@@ -122,12 +148,20 @@ class StrategyPlanner:
                 risk_level=str(tool_def.risk_level.value),
                 privilege_level=str(tool_def.privilege_level.value),
             )
-            validation = self.validator.validate(candidate, platform=platform or "linux", architecture=architecture or "x86_64")
+            validation = self.validator.validate(
+                candidate,
+                platform=platform or "linux",
+                architecture=architecture or "x86_64",
+            )
             if not validation.is_valid:
-                raise ValueError("Invalid LLM strategy decision: " + "; ".join(validation.errors))
+                raise ValueError(
+                    "Invalid LLM strategy decision: " + "; ".join(validation.errors)
+                )
             decisions.append(candidate)
         if len(decisions) != len(deltas):
-            raise ValueError("LLM did not provide exactly one validated strategy for every installation delta")
+            raise ValueError(
+                "LLM did not provide exactly one validated strategy for every installation delta"
+            )
         return StrategyPlan(
             decisions=decisions,
             overall_confidence=decision.confidence,
@@ -146,7 +180,9 @@ class StrategyPlanner:
             tool_def = self.tool_catalog.get(delta.tool_id)
             if tool_def is None:
                 continue
-            strategy = self._select_strategy_deterministic(tool_def, platform, architecture)
+            strategy = self._select_strategy_deterministic(
+                tool_def, platform, architecture
+            )
             if strategy is None:
                 continue
             args: dict[str, Any] = {}
@@ -154,7 +190,13 @@ class StrategyPlanner:
                 args["artifact_url"] = strategy.source_url
             if strategy.artifact_format.value == "pip":
                 package = strategy.package_name or tool_def.tool_id
-                args.update({"package_name": package, "package": package, "requirement": package})
+                args.update(
+                    {
+                        "package_name": package,
+                        "package": package,
+                        "requirement": package,
+                    }
+                )
             candidate = StrategyDecision(
                 tool_id=tool_def.tool_id,
                 strategy_name=self._public_strategy_name(strategy.strategy_id),
@@ -166,7 +208,11 @@ class StrategyPlanner:
                 risk_level=tool_def.risk_level.value,
                 privilege_level=tool_def.privilege_level.value,
             )
-            validation = self.validator.validate(candidate, platform=platform or "linux", architecture=architecture or "x86_64")
+            validation = self.validator.validate(
+                candidate,
+                platform=platform or "linux",
+                architecture=architecture or "x86_64",
+            )
             if validation.is_valid:
                 decisions.append(candidate)
         return StrategyPlan(
@@ -197,31 +243,41 @@ class StrategyPlanner:
         architecture: str | None,
     ):
         selected_platform = (platform or "linux").lower().replace("darwin", "macos")
-        selected_architecture = (architecture or "x86_64").lower().replace("amd64", "x86_64")
+        selected_architecture = (
+            (architecture or "x86_64").lower().replace("amd64", "x86_64")
+        )
         for strategy in tool_def.installation_strategies:
             if strategy.platform.value != selected_platform:
                 continue
-            if selected_architecture not in {arch.value for arch in strategy.architecture}:
+            if selected_architecture not in {
+                arch.value for arch in strategy.architecture
+            }:
                 continue
             return strategy
         return None
 
-    def _build_prompt(self, deltas: list[Any], platform: str | None, architecture: str | None) -> str:
+    def _build_prompt(
+        self, deltas: list[Any], platform: str | None, architecture: str | None
+    ) -> str:
         tool_lines: list[str] = []
         for delta in deltas:
             tool_def = self.tool_catalog.get(delta.tool_id)
             if tool_def is None:
                 continue
-            strategies = ", ".join(strategy.strategy_id for strategy in tool_def.installation_strategies)
-            tool_lines.append(f"- {delta.tool_id}: {delta.action.value}; registered strategies: [{strategies}]")
+            strategies = ", ".join(
+                strategy.strategy_id for strategy in tool_def.installation_strategies
+            )
+            tool_lines.append(
+                f"- {delta.tool_id}: {delta.action.value}; registered strategies: [{strategies}]"
+            )
         tools_info = "\n".join(tool_lines)
         return f"""You are a strategy planner for tool installation.
 
 Tools requiring installation:
 {tools_info}
 
-Platform: {platform or 'auto-detect'}
-Architecture: {architecture or 'auto-detect'}
+Platform: {platform or "auto-detect"}
+Architecture: {architecture or "auto-detect"}
 
 Use ONLY the registered strategies listed above. Never invent a shell command,
 source domain, artifact URL, or strategy name. Prefer official sources.

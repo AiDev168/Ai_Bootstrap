@@ -7,11 +7,19 @@ from typing import TYPE_CHECKING
 
 from ai_engineering_bootstrap.executor.handlers.base import ExecutionContext
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
-from ai_engineering_bootstrap.executor.models import ActionResult, ExecutionResult, ExecutionStatus
+from ai_engineering_bootstrap.executor.models import (
+    ActionResult,
+    ExecutionResult,
+    ExecutionStatus,
+)
 from ai_engineering_bootstrap.executor.policy import SafetyGate
 from ai_engineering_bootstrap.executor.recovery import RetryPolicy
 from ai_engineering_bootstrap.executor.registry import ActionRegistry
-from ai_engineering_bootstrap.executor.verifier import VerificationResult, VerificationStatus, VerifierRegistry
+from ai_engineering_bootstrap.executor.verifier import (
+    VerificationResult,
+    VerificationStatus,
+    VerifierRegistry,
+)
 
 if TYPE_CHECKING:
     from ai_engineering_bootstrap.planner.models import ExecutionPlan
@@ -38,35 +46,75 @@ class ExecutorEngine:
         context = getattr(action, "context", {})
         return str(context.get("executor_action_id", getattr(action, "action_id", "")))
 
-    def verify(self, plan: ExecutionPlan, execution_result: ExecutionResult) -> list[VerificationResult]:
+    def verify(
+        self, plan: ExecutionPlan, execution_result: ExecutionResult
+    ) -> list[VerificationResult]:
         """Verify successful action results using independent read-only verifiers."""
         results: list[VerificationResult] = []
         for action_index, action in enumerate(plan.actions):
-            result = execution_result.results[action_index] if action_index < len(execution_result.results) else None
+            result = (
+                execution_result.results[action_index]
+                if action_index < len(execution_result.results)
+                else None
+            )
             executor_action_id = self._executor_action_id(action)
             verifier = self._verifier_registry.get_verifier(executor_action_id)
             if verifier is None:
-                results.append(VerificationResult(action.action_id, VerificationStatus.SKIPPED, "No verifier registered for this action."))
+                results.append(
+                    VerificationResult(
+                        action.action_id,
+                        VerificationStatus.SKIPPED,
+                        "No verifier registered for this action.",
+                    )
+                )
                 continue
             if result is None:
-                results.append(VerificationResult(action.action_id, VerificationStatus.SKIPPED, "No execution result exists for this action."))
+                results.append(
+                    VerificationResult(
+                        action.action_id,
+                        VerificationStatus.SKIPPED,
+                        "No execution result exists for this action.",
+                    )
+                )
                 continue
-            context = ExecutionContext(mode=self._mode, dry_run=self._mode == ExecutionMode.SAFE, is_approved=self._is_approved)
+            context = ExecutionContext(
+                mode=self._mode,
+                dry_run=self._mode == ExecutionMode.SAFE,
+                is_approved=self._is_approved,
+            )
             results.append(verifier.verify(action, result, context))
         return results
 
     def execute(self, plan: ExecutionPlan, max_attempts: int = 1) -> ExecutionResult:
         """Process all actions deterministically with optional retry."""
         if not plan.is_intact():
-            return ExecutionResult(is_success=False, results=[], summary="Execution blocked: execution plan integrity check failed.")
+            return ExecutionResult(
+                is_success=False,
+                results=[],
+                summary="Execution blocked: execution plan integrity check failed.",
+            )
 
         results: list[ActionResult] = []
-        context = ExecutionContext(mode=self._mode, dry_run=self._mode == ExecutionMode.SAFE, is_approved=self._is_approved)
+        context = ExecutionContext(
+            mode=self._mode,
+            dry_run=self._mode == ExecutionMode.SAFE,
+            is_approved=self._is_approved,
+        )
         policy = RetryPolicy(max_attempts=max_attempts)
 
         for action_index, action in enumerate(plan.actions):
             if action_index in self._rejected_action_indexes:
-                results.append(ActionResult(action_id=action.action_id, status=ExecutionStatus.SKIPPED, message="Action rejected by human approval.", details={"reason": "human_rejection", "action_index": action_index}))
+                results.append(
+                    ActionResult(
+                        action_id=action.action_id,
+                        status=ExecutionStatus.SKIPPED,
+                        message="Action rejected by human approval.",
+                        details={
+                            "reason": "human_rejection",
+                            "action_index": action_index,
+                        },
+                    )
+                )
                 continue
 
             executor_action_id = self._executor_action_id(action)
@@ -74,9 +122,19 @@ class ExecutorEngine:
             final_result: ActionResult | None = None
             while attempt < max_attempts:
                 attempt += 1
-                allowed, reason = self._safety_gate.evaluate(executor_action_id, self._mode, is_approved=self._is_approved)
+                allowed, reason = self._safety_gate.evaluate(
+                    executor_action_id, self._mode, is_approved=self._is_approved
+                )
                 if not allowed:
-                    final_result = ActionResult(action_id=action.action_id, status=ExecutionStatus.FAILED, message=f"Safety Gate Denied: {reason}", details={"reason": "policy_violation", "executor_action_id": executor_action_id})
+                    final_result = ActionResult(
+                        action_id=action.action_id,
+                        status=ExecutionStatus.FAILED,
+                        message=f"Safety Gate Denied: {reason}",
+                        details={
+                            "reason": "policy_violation",
+                            "executor_action_id": executor_action_id,
+                        },
+                    )
                     break
                 try:
                     handler = self._registry.get_handler(executor_action_id, self._mode)
@@ -86,23 +144,42 @@ class ExecutorEngine:
                             action_id=action.action_id,
                             status=result.status,
                             message=result.message,
-                            details={**result.details, "executor_action_id": executor_action_id},
+                            details={
+                                **result.details,
+                                "executor_action_id": executor_action_id,
+                            },
                         )
                         break
                     final_result = ActionResult(
                         action_id=action.action_id,
                         status=result.status,
                         message=result.message,
-                        details={**result.details, "executor_action_id": executor_action_id},
+                        details={
+                            **result.details,
+                            "executor_action_id": executor_action_id,
+                        },
                     )
                     failure_record = policy.classify_failure(final_result)
                     if not failure_record.is_retryable:
                         break
                 except KeyError as err:
-                    final_result = ActionResult(action_id=action.action_id, status=ExecutionStatus.FAILED, message=str(err), details={"error": "Unsupported or Unauthorized", "executor_action_id": executor_action_id})
+                    final_result = ActionResult(
+                        action_id=action.action_id,
+                        status=ExecutionStatus.FAILED,
+                        message=str(err),
+                        details={
+                            "error": "Unsupported or Unauthorized",
+                            "executor_action_id": executor_action_id,
+                        },
+                    )
                     break
                 except Exception as err:  # noqa: BLE001 - handler boundary converts unexpected failures to structured results
-                    final_result = ActionResult(action_id=action.action_id, status=ExecutionStatus.FAILED, message=f"Handler execution error: {err!s}", details={"executor_action_id": executor_action_id})
+                    final_result = ActionResult(
+                        action_id=action.action_id,
+                        status=ExecutionStatus.FAILED,
+                        message=f"Handler execution error: {err!s}",
+                        details={"executor_action_id": executor_action_id},
+                    )
                     rec = policy.classify_failure(final_result)
                     if not rec.is_retryable:
                         break

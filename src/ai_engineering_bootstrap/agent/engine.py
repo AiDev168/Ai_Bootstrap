@@ -58,7 +58,9 @@ class AgentDecisionEngine:
             }
         metadata = dict(decision.metadata)
         metadata.setdefault("provider", provider_metadata)
-        metadata.setdefault("llm_used", provider_metadata.get("provider_type") != "MockProvider")
+        metadata.setdefault(
+            "llm_used", provider_metadata.get("provider_type") != "MockProvider"
+        )
         return replace(decision, metadata=metadata)
 
 

@@ -86,7 +86,7 @@ def _report_data(report: AuditReport) -> dict[str, Any]:
             "passed": report.readiness.passed_count,
             "failed": report.readiness.failed_count,
             "warnings": report.readiness.warning_count,
-        }
+        },
     }
 
 
@@ -102,12 +102,7 @@ def _render_table(report: AuditReport) -> None:
         status_str = "OK" if check.status == CheckStatus.PASSED else "FAILED"
         if check.status == CheckStatus.WARNING:
             status_str = "WARNING"
-        table.add_row(
-            check.category.value,
-            check.name,
-            status_str,
-            check.details
-        )
+        table.add_row(check.category.value, check.name, status_str, check.details)
     console.print(table)
 
 
@@ -121,7 +116,9 @@ def audit(
 ) -> None:
     """Run a read-only audit of the local engineering environment."""
     if output_format not in ("table", "json"):
-        typer.echo(f"Error: Invalid format '{output_format}'. Use 'table' or 'json'.", err=True)
+        typer.echo(
+            f"Error: Invalid format '{output_format}'. Use 'table' or 'json'.", err=True
+        )
         raise typer.Exit(code=1)
     report = default_audit_service().run()
     if output_format == "json":
@@ -203,7 +200,9 @@ def doctor() -> None:
     console.print(f"[bold]Development Ready :[/bold] {dev_status_str}")
     console.print(f"[bold]Production Ready :[/bold] {prod_status_str}")
     console.print(f"[bold]Health Score      :[/bold] {r.health_score}/100")
-    console.print(f"[bold]Passed :[/bold] {r.passed_count}  [bold]Failed :[/bold] {r.failed_count}  [bold]Warnings :[/bold] {r.warning_count}")
+    console.print(
+        f"[bold]Passed :[/bold] {r.passed_count}  [bold]Failed :[/bold] {r.failed_count}  [bold]Warnings :[/bold] {r.warning_count}"
+    )
 
     all_recommendations = set()
     for check in report.checks:
@@ -230,15 +229,25 @@ def engineering_bootstrap() -> None:
         requirement = "required" if tool.required else "optional"
         location = f" — {tool.path}" if tool.path else ""
         console.print(f"• {tool.name} ({requirement}): {status}{location}")
-    rules = "[green]PRESENT[/green]" if report.cursor_rules_present else "[red]MISSING[/red]"
-    cursor = "[green]AVAILABLE[/green]" if report.cursor_available else "[yellow]NOT DETECTED[/yellow]"
+    rules = (
+        "[green]PRESENT[/green]"
+        if report.cursor_rules_present
+        else "[red]MISSING[/red]"
+    )
+    cursor = (
+        "[green]AVAILABLE[/green]"
+        if report.cursor_available
+        else "[yellow]NOT DETECTED[/yellow]"
+    )
     console.print(f"• Cursor rules: {rules}")
     console.print(f"• Cursor CLI: {cursor}")
     console.print()
     if report.is_ready:
         console.print("[green bold]✓ Engineering environment is ready.[/green bold]")
     else:
-        console.print("[yellow bold]⚠ Engineering environment needs attention.[/yellow bold]")
+        console.print(
+            "[yellow bold]⚠ Engineering environment needs attention.[/yellow bold]"
+        )
 
 
 @app.command()
@@ -255,7 +264,9 @@ def plan() -> None:
     console.print("[bold]Execution Plan:[/bold]\n")
     for i, action in enumerate(plan.actions, 1):
         console.print(f"{i}. [cyan]{action.description}[/cyan]")
-        console.print(f"   [dim]ID: {action.action_id} | Priority: {action.priority}[/dim]")
+        console.print(
+            f"   [dim]ID: {action.action_id} | Priority: {action.priority}[/dim]"
+        )
         console.print()
 
 
@@ -295,7 +306,9 @@ def execute() -> None:
             else ("red" if res.status.value == "failed" else "yellow")
         )
         status_str = res.status.value.upper()
-        console.print(f"[{status_color}]• [{status_str}] {res.action_id}[/{status_color}]")
+        console.print(
+            f"[{status_color}]• [{status_str}] {res.action_id}[/{status_color}]"
+        )
         console.print(f"  [dim]{res.message}[/dim]")
 
     console.print()
@@ -329,8 +342,11 @@ def run_pipeline(
     ),
 ) -> None:
     from ai_engineering_bootstrap.executor.mode import ExecutionMode
+
     mode = ExecutionMode.REAL if real_execution else ExecutionMode.SAFE
-    console.print(f"[bold cyan]Running Full Pipeline ({mode.value.upper()} MODE)...[/bold cyan]\n")
+    console.print(
+        f"[bold cyan]Running Full Pipeline ({mode.value.upper()} MODE)...[/bold cyan]\n"
+    )
     if mode == ExecutionMode.REAL:
         console.print("[yellow bold]⚠️ REAL EXECUTION MODE ACTIVE[/yellow bold]")
         console.print("Only pre-approved, non-destructive actions will run.\n")
@@ -343,6 +359,7 @@ def run_pipeline(
         if not real_execution:
             raise typer.BadParameter("--interactive-approval requires --real-execution")
         from ai_engineering_bootstrap.approval.provider import InMemoryApprovalProvider
+
         approval_provider = InMemoryApprovalProvider()
 
     if interactive_approval:
@@ -372,7 +389,9 @@ def run_pipeline(
     console.print(f"[bold]1. Audit Complete:[/bold] Health Score {r.health_score}/100")
     # 2. Plan
     if result.original_plan.is_actionable:
-        console.print(f"[bold]2. Plan Generated:[/bold] {len(result.original_plan.actions)} action(s).")
+        console.print(
+            f"[bold]2. Plan Generated:[/bold] {len(result.original_plan.actions)} action(s)."
+        )
     else:
         console.print("[bold]2. Plan Generated:[/bold] No actions required.")
     # 3. Validation
@@ -387,23 +406,31 @@ def run_pipeline(
     # 4. Execution
     if result.execution_result:
         if result.execution_result.is_success:
-             console.print("[bold]4. Execution:[/bold] [green]SUCCESS[/green]")
+            console.print("[bold]4. Execution:[/bold] [green]SUCCESS[/green]")
         else:
-             console.print("[bold]4. Execution:[/bold] [red]FAILED[/red]")
+            console.print("[bold]4. Execution:[/bold] [red]FAILED[/red]")
         for res in result.execution_result.results:
-            color = "green" if res.status.value == "success" else ("red" if res.status.value == "failed" else "yellow")
-            console.print(f"   [{color}]• [{res.status.value.upper()}] {res.action_id}[/{color}]")
+            color = (
+                "green"
+                if res.status.value == "success"
+                else ("red" if res.status.value == "failed" else "yellow")
+            )
+            console.print(
+                f"   [{color}]• [{res.status.value.upper()}] {res.action_id}[/{color}]"
+            )
             console.print(f"      [dim]{res.message}[/dim]")
     else:
-        console.print("[bold]4. Execution:[/bold] [dim]Skipped (Validation Failed)[/dim]")
+        console.print(
+            "[bold]4. Execution:[/bold] [dim]Skipped (Validation Failed)[/dim]"
+        )
     # 5. Verification
     # اصلاح: استفاده از getattr برای جلوگیری از خطا در صورت عدم وجود فیلد
     # و بررسی نام صحیح فیلد (احتمالاً verification_result به صورت مفرد یا جمع)
     console.print()
     # تلاش برای دریافت لیست نتایج تأیید با نام‌های محتمل
-    verification_results = getattr(result, 'verification_results', None)
+    verification_results = getattr(result, "verification_results", None)
     if verification_results is None:
-        verification_results = getattr(result, 'verification_result', None)
+        verification_results = getattr(result, "verification_result", None)
     # اگر لیست نبود و یک تک نتیجه بود، آن را به لیست تبدیل کن
     if verification_results and not isinstance(verification_results, list):
         verification_results = [verification_results]
@@ -418,10 +445,16 @@ def run_pipeline(
         else:
             console.print("[bold]5. Verification:[/bold] [red]ISSUES DETECTED[/red]")
         for v in verification_results:
-            color = "green" if v.status.value == "verified" else ("red" if v.status.value == "failed" else "yellow")
-            console.print(f"   [{color}]• [{v.status.value.upper()}] {v.action_id}[/{color}]")
+            color = (
+                "green"
+                if v.status.value == "verified"
+                else ("red" if v.status.value == "failed" else "yellow")
+            )
+            console.print(
+                f"   [{color}]• [{v.status.value.upper()}] {v.action_id}[/{color}]"
+            )
             console.print(f"      [dim]{v.message}[/dim]")
-            if hasattr(v, 'observed') and v.observed:
+            if hasattr(v, "observed") and v.observed:
                 console.print(f"      [dim]Observed: {v.observed}[/dim]")
     else:
         console.print("[bold]5. Verification:[/bold] [dim]No actions to verify[/dim]")
@@ -496,10 +529,11 @@ def bootstrap(
         console.print("\n[bold]Missing / Failed Requirements:[/bold]")
         for check in missing_checks:
             requirement = str(check.facts.get("requirement", "")).strip()
-            target = requirement or str(check.facts.get("package", "")).strip() or check.name
+            target = (
+                requirement or str(check.facts.get("package", "")).strip() or check.name
+            )
             console.print(
-                f"   [red]• [MISSING][/red] {target} "
-                f"[dim]({check.name})[/dim]"
+                f"   [red]• [MISSING][/red] {target} [dim]({check.name})[/dim]"
             )
             if check.details:
                 console.print(f"      [dim]{check.details}[/dim]")
@@ -518,15 +552,13 @@ def bootstrap(
             if action_result.action_id == "install_python_package" and target:
                 label = f"Install Python package: {target}"
             console.print(
-                f"[{color}]• [{action_result.status.value.upper()}] "
-                f"{label}[/{color}]"
+                f"[{color}]• [{action_result.status.value.upper()}] {label}[/{color}]"
             )
             console.print(f"  [dim]{action_result.message}[/dim]")
 
     if result.rejected_actions:
         console.print(
-            "[yellow]Rejected actions:[/yellow] "
-            + ", ".join(result.rejected_actions)
+            "[yellow]Rejected actions:[/yellow] " + ", ".join(result.rejected_actions)
         )
 
     if not result.is_success:

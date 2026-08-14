@@ -24,7 +24,9 @@ from ai_engineering_bootstrap.planner.models import ExecutionPlanAction
 class CheckPythonVersionRealHandler(ActionHandler):
     """Read the active Python version without modifying the system."""
 
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         try:
             current = sys.version_info[:3]
             version = f"{current[0]}.{current[1]}.{current[2]}"

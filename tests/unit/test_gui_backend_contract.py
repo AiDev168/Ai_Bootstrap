@@ -1,6 +1,9 @@
 """Backend contracts exercised by the GUI."""
 
-from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService, LLMSettingsStore
+from ai_engineering_bootstrap.backend.llm_settings import (
+    LLMSettingsService,
+    LLMSettingsStore,
+)
 from ai_engineering_bootstrap.backend.service import ApplicationBackend
 from ai_engineering_bootstrap.environment.models import EnvironmentRequest
 
@@ -19,7 +22,9 @@ def backend_with_temp_settings(monkeypatch, tmp_path) -> ApplicationBackend:
 
 def test_session_endpoints_return_serializable_data() -> None:
     backend = ApplicationBackend()
-    created = backend.create_session(EnvironmentRequest(natural_language_goal="prepare python ai"))
+    created = backend.create_session(
+        EnvironmentRequest(natural_language_goal="prepare python ai")
+    )
     session_id = created.data["session_id"]
 
     session = backend.get_session(session_id)
@@ -55,7 +60,9 @@ def test_llm_settings_round_trip_is_secret_safe(monkeypatch, tmp_path) -> None:
     assert backend.get_llm_settings().data["base_url"] == "https://example.invalid/v1"
 
 
-def test_unsaved_llm_probe_does_not_change_persisted_settings(monkeypatch, tmp_path) -> None:
+def test_unsaved_llm_probe_does_not_change_persisted_settings(
+    monkeypatch, tmp_path
+) -> None:
     backend = backend_with_temp_settings(monkeypatch, tmp_path)
     backend.update_llm_settings(
         {

@@ -8,20 +8,36 @@ from collections.abc import Callable
 from threading import Lock, Thread
 
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser, ParsedIntent
-from ai_engineering_bootstrap.backend.session_service import EnvironmentSessionService, SessionServiceResult
-from ai_engineering_bootstrap.environment.models import EnvironmentRequest, PythonPackageRequirement
-from ai_engineering_bootstrap.environment.session_models import AgentDecision, SessionStatus
+from ai_engineering_bootstrap.backend.session_service import (
+    EnvironmentSessionService,
+    SessionServiceResult,
+)
+from ai_engineering_bootstrap.environment.models import (
+    EnvironmentRequest,
+    PythonPackageRequirement,
+)
+from ai_engineering_bootstrap.environment.session_models import (
+    AgentDecision,
+    SessionStatus,
+)
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 
 logger = logging.getLogger(__name__)
-_PACKAGE_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*(?:\s*(?:===|==|!=|~=|>=|<=|>|<)\s*[A-Za-z0-9][A-Za-z0-9+_.!-]*)?$")
-_INSTALL_CLAUSE = re.compile(r"\b(?:install|reinstall|setup|set up|add)\s+(.+?)(?=\s+(?:on|onto|into|for|using)\s+|$)", re.IGNORECASE)
+_PACKAGE_TOKEN = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9_.-]*(?:\s*(?:===|==|!=|~=|>=|<=|>|<)\s*[A-Za-z0-9][A-Za-z0-9+_.!-]*)?$"
+)
+_INSTALL_CLAUSE = re.compile(
+    r"\b(?:install|reinstall|setup|set up|add)\s+(.+?)(?=\s+(?:on|onto|into|for|using)\s+|$)",
+    re.IGNORECASE,
+)
 
 
 class RuntimeSessionService(EnvironmentSessionService):
     """Add runtime LLM intent parsing and non-blocking GUI execution."""
 
-    def __init__(self, intent_parser_factory: Callable[[], IntentParser] | None = None, **kwargs) -> None:
+    def __init__(
+        self, intent_parser_factory: Callable[[], IntentParser] | None = None, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self._intent_parser_factory = intent_parser_factory
         self._running: set[str] = set()
@@ -39,7 +55,9 @@ class RuntimeSessionService(EnvironmentSessionService):
             session = self.get(result.data["session_id"])
             if parsed.reasoning_summary.startswith("LLM-parsed"):
                 provider = "llm"
-            elif parsed.reasoning_summary.startswith("Deterministic fallback after LLM"):
+            elif parsed.reasoning_summary.startswith(
+                "Deterministic fallback after LLM"
+            ):
                 provider = "llm_fallback"
             else:
                 provider = "deterministic"
@@ -77,15 +95,30 @@ class RuntimeSessionService(EnvironmentSessionService):
         """Start execution in a background worker so the GUI remains responsive."""
         with self._running_lock:
             if session_id in self._running:
-                return SessionServiceResult({"session_id": session_id, "status": "executing", "accepted": False})
+                return SessionServiceResult(
+                    {"session_id": session_id, "status": "executing", "accepted": False}
+                )
             session = self.get(session_id)
-            if session.status in {SessionStatus.COMPLETED, SessionStatus.FAILED, SessionStatus.CANCELLED}:
-                raise ValueError(f"Session {session_id} is already terminal: {session.status.value}")
+            if session.status in {
+                SessionStatus.COMPLETED,
+                SessionStatus.FAILED,
+                SessionStatus.CANCELLED,
+            }:
+                raise ValueError(
+                    f"Session {session_id} is already terminal: {session.status.value}"
+                )
             self._running.add(session_id)
 
-        thread = Thread(target=self._run_worker, args=(session_id, mode), daemon=True, name=f"bootstrap-{session_id[:8]}")
+        thread = Thread(
+            target=self._run_worker,
+            args=(session_id, mode),
+            daemon=True,
+            name=f"bootstrap-{session_id[:8]}",
+        )
         thread.start()
-        return SessionServiceResult({"session_id": session_id, "status": "executing", "accepted": True})
+        return SessionServiceResult(
+            {"session_id": session_id, "status": "executing", "accepted": True}
+        )
 
     def _run_worker(self, session_id: str, mode: ExecutionMode) -> None:
         try:
@@ -97,30 +130,49 @@ class RuntimeSessionService(EnvironmentSessionService):
                 session.add_event("approval_required", str(error))
             else:
                 session.status = SessionStatus.FAILED
-                session.add_event("session_failed", str(error), {"error_type": type(error).__name__})
+                session.add_event(
+                    "session_failed", str(error), {"error_type": type(error).__name__}
+                )
             self.repository.update(session)
-        except Exception as error:  # noqa: BLE001 - isolated worker boundary must persist failure state
-            logger.exception("Unhandled bootstrap worker failure for session %s", session_id)
+        except Exception as error:
+            logger.exception(
+                "Unhandled bootstrap worker failure for session %s", session_id
+            )
             session = self.get(session_id)
             session.status = SessionStatus.FAILED
-            session.add_event("session_failed", str(error), {"error_type": type(error).__name__})
+            session.add_event(
+                "session_failed", str(error), {"error_type": type(error).__name__}
+            )
             self.repository.update(session)
         finally:
             with self._running_lock:
                 self._running.discard(session_id)
 
     @staticmethod
-    def _merge_request(request: EnvironmentRequest, parsed: ParsedIntent) -> EnvironmentRequest:
-        required = list(dict.fromkeys([*request.required_tools, *parsed.required_tools]))
-        optional = [tool for tool in dict.fromkeys([*request.optional_tools, *parsed.optional_tools]) if tool not in required]
+    def _merge_request(
+        request: EnvironmentRequest, parsed: ParsedIntent
+    ) -> EnvironmentRequest:
+        required = list(
+            dict.fromkeys([*request.required_tools, *parsed.required_tools])
+        )
+        optional = [
+            tool
+            for tool in dict.fromkeys([*request.optional_tools, *parsed.optional_tools])
+            if tool not in required
+        ]
         languages = list(dict.fromkeys([*request.languages, *parsed.languages]))
         frameworks = list(dict.fromkeys([*request.frameworks, *parsed.frameworks]))
         dependencies = list(request.project_dependencies)
         existing_dependencies = {item.name.lower() for item in dependencies}
         required_lower = {tool.lower() for tool in required}
-        extracted = RuntimeSessionService._extract_install_packages(request.natural_language_goal, required)
+        extracted = RuntimeSessionService._extract_install_packages(
+            request.natural_language_goal, required
+        )
         for name in [*parsed.project_dependencies, *extracted]:
-            if name.lower() not in existing_dependencies and name.lower() not in required_lower:
+            if (
+                name.lower() not in existing_dependencies
+                and name.lower() not in required_lower
+            ):
                 dependencies.append(PythonPackageRequirement(name=name))
                 existing_dependencies.add(name.lower())
         constraints = dict(request.constraints)
@@ -150,10 +202,21 @@ class RuntimeSessionService(EnvironmentSessionService):
         required = {tool.lower() for tool in required_tools}
         result: list[str] = []
         for match in _INSTALL_CLAUSE.finditer(goal):
-            clause = re.sub(r"\bpython\s+(?:package|packages)\b", "", match.group(1), flags=re.IGNORECASE)
-            for token in re.split(r"\s*(?:,|&|\band\b|\+)\s*", clause, flags=re.IGNORECASE):
+            clause = re.sub(
+                r"\bpython\s+(?:package|packages)\b",
+                "",
+                match.group(1),
+                flags=re.IGNORECASE,
+            )
+            for token in re.split(
+                r"\s*(?:,|&|\band\b|\+)\s*", clause, flags=re.IGNORECASE
+            ):
                 token = token.strip(" .;:()[]")
-                if not token or token.lower() in required or not _PACKAGE_TOKEN.fullmatch(token):
+                if (
+                    not token
+                    or token.lower() in required
+                    or not _PACKAGE_TOKEN.fullmatch(token)
+                ):
                     continue
                 if token.lower() not in {item.lower() for item in result}:
                     result.append(token)

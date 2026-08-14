@@ -38,11 +38,21 @@ def _get_test_capabilities():
 
 
 def test_local_provider_success() -> None:
-    config = ProviderConfig(provider_type="local_server", base_url="http://localhost:1234", model="test")
+    config = ProviderConfig(
+        provider_type="local_server", base_url="http://localhost:1234", model="test"
+    )
     provider = LocalServerProvider(config)
 
     mock_response = {
-        "choices": [{"message": {"content": json.dumps({"selected_capability_ids": ["check_py"], "confidence": 0.9})}}]
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {"selected_capability_ids": ["check_py"], "confidence": 0.9}
+                    )
+                }
+            }
+        ]
     }
 
     with mock.patch("urllib.request.urlopen") as mock_urlopen:
@@ -58,25 +68,37 @@ def test_local_provider_success() -> None:
 
 
 def test_local_provider_connection_failure() -> None:
-    config = ProviderConfig(provider_type="local_server", base_url="http://localhost:1234")
+    config = ProviderConfig(
+        provider_type="local_server", base_url="http://localhost:1234"
+    )
     provider = LocalServerProvider(config)
 
-    with mock.patch("urllib.request.urlopen", side_effect=URLError("Connection refused")), \
-         pytest.raises(ProviderConnectionError):
+    with (
+        mock.patch(
+            "urllib.request.urlopen", side_effect=URLError("Connection refused")
+        ),
+        pytest.raises(ProviderConnectionError),
+    ):
         provider.decide("test", _get_test_capabilities())
 
 
 def test_local_provider_timeout() -> None:
-    config = ProviderConfig(provider_type="local_server", base_url="http://localhost:1234", timeout=1)
+    config = ProviderConfig(
+        provider_type="local_server", base_url="http://localhost:1234", timeout=1
+    )
     provider = LocalServerProvider(config)
 
-    with mock.patch("urllib.request.urlopen", side_effect=TimeoutError()), \
-         pytest.raises(ProviderTimeoutError):
+    with (
+        mock.patch("urllib.request.urlopen", side_effect=TimeoutError()),
+        pytest.raises(ProviderTimeoutError),
+    ):
         provider.decide("test", _get_test_capabilities())
 
 
 def test_local_provider_malformed_response() -> None:
-    config = ProviderConfig(provider_type="local_server", base_url="http://localhost:1234")
+    config = ProviderConfig(
+        provider_type="local_server", base_url="http://localhost:1234"
+    )
     provider = LocalServerProvider(config)
 
     with mock.patch("urllib.request.urlopen") as mock_urlopen:
@@ -99,7 +121,15 @@ def test_remote_provider_success() -> None:
     provider = RemoteAPIProvider(config)
 
     mock_response = {
-        "choices": [{"message": {"content": json.dumps({"selected_capability_ids": ["check_py"], "confidence": 0.8})}}]
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {"selected_capability_ids": ["check_py"], "confidence": 0.8}
+                    )
+                }
+            }
+        ]
     }
 
     with mock.patch("urllib.request.urlopen") as mock_urlopen:
@@ -146,7 +176,10 @@ def test_api_key_not_in_error_message() -> None:
     )
     provider = RemoteAPIProvider(config)
 
-    with mock.patch("urllib.request.urlopen", side_effect=HTTPError("", 401, "Unauthorized", {}, None)):
+    with mock.patch(
+        "urllib.request.urlopen",
+        side_effect=HTTPError("", 401, "Unauthorized", {}, None),
+    ):
         with pytest.raises(ProviderResponseError) as exc_info:
             provider.decide("test", _get_test_capabilities())
 
@@ -156,9 +189,13 @@ def test_api_key_not_in_error_message() -> None:
 def test_in_process_provider_success() -> None:
     class FakeModel:
         def generate(self, prompt):
-            return json.dumps({"selected_capability_ids": ["check_py"], "confidence": 0.95})
+            return json.dumps(
+                {"selected_capability_ids": ["check_py"], "confidence": 0.95}
+            )
 
-    config = ProviderConfig(provider_type="in_process", options={"model_instance": FakeModel()})
+    config = ProviderConfig(
+        provider_type="in_process", options={"model_instance": FakeModel()}
+    )
     provider = InProcessProvider(config)
 
     decision = provider.decide("test", _get_test_capabilities())
@@ -185,8 +222,18 @@ def test_mock_provider_deterministic() -> None:
 def test_provider_factory_supports_three_deployment_modes() -> None:
     from ai_engineering_bootstrap.agent.provider import build_provider
 
-    assert isinstance(build_provider(ProviderConfig("local_server", base_url="http://localhost:1234")), LocalServerProvider)
-    assert isinstance(build_provider(ProviderConfig("in_process", options={"model_instance": object()})), InProcessProvider)
+    assert isinstance(
+        build_provider(
+            ProviderConfig("local_server", base_url="http://localhost:1234")
+        ),
+        LocalServerProvider,
+    )
+    assert isinstance(
+        build_provider(
+            ProviderConfig("in_process", options={"model_instance": object()})
+        ),
+        InProcessProvider,
+    )
     assert isinstance(build_provider(ProviderConfig("mock")), MockProvider)
 
 
@@ -246,12 +293,16 @@ def test_local_provider_empty_content_with_length_has_actionable_error() -> None
         ]
     }
 
-    with mock.patch.object(provider, "_request", return_value=response), \
-         pytest.raises(ProviderResponseError, match="truncated"):
-            provider.decide("fix env", _get_test_capabilities())
+    with (
+        mock.patch.object(provider, "_request", return_value=response),
+        pytest.raises(ProviderResponseError, match="truncated"),
+    ):
+        provider.decide("fix env", _get_test_capabilities())
 
 
-def test_local_provider_reads_json_from_reasoning_content_when_content_is_empty() -> None:
+def test_local_provider_reads_json_from_reasoning_content_when_content_is_empty() -> (
+    None
+):
     provider = LocalServerProvider(
         ProviderConfig(provider_type="local_server", base_url="http://localhost:1234")
     )

@@ -36,7 +36,7 @@ def make_error(code: str, message: str) -> dict[str, str]:
 
 # Get the directory where this file is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-GUI_TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'gui', 'templates')
+GUI_TEMPLATE_DIR = os.path.join(BASE_DIR, "..", "gui", "templates")
 
 
 # Pydantic Models for API
@@ -98,18 +98,16 @@ audit_service = default_audit_service()
 def serve_gui():
     """Serve the main GUI HTML page."""
     template_path = os.path.join(GUI_TEMPLATE_DIR, "index.html")
-    with open(template_path, 'r') as f:
+    with open(template_path, "r") as f:
         return HTMLResponse(content=f.read())
 
 
-def make_response(request_id: str, status: str, data: dict | None = None, error: dict | None = None) -> dict:
+def make_response(
+    request_id: str, status: str, data: dict | None = None, error: dict | None = None
+) -> dict:
     """Create standardized API response."""
     return APIResponse(
-        api_version="v1",
-        request_id=request_id,
-        status=status,
-        data=data,
-        error=error
+        api_version="v1", request_id=request_id, status=status, data=data, error=error
     ).dict()
 
 
@@ -125,7 +123,7 @@ async def health_check():
             "status": "healthy",
             "timestamp": datetime.now(UTC).isoformat(),
             "llm_available": intent_parser.is_llm_available(),
-        }
+        },
     )
 
 
@@ -136,9 +134,7 @@ async def get_audit():
     try:
         audit_result = audit_service.run_audit()
         return make_response(
-            request_id=request_id,
-            status="ok",
-            data={"audit": audit_result}
+            request_id=request_id, status="ok", data={"audit": audit_result}
         )
     except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
@@ -151,45 +147,43 @@ async def get_environment_state():
     try:
         audit = default_audit_service()
         report = audit.run()
-        
+
         # Build ActualEnvironmentState from audit report
         tools = {}
         python_packages = {}
         system_info = {}
-        
+
         for check in report.checks:
-            if check.category.value == 'Tools':
+            if check.category.value == "Tools":
                 tool_id = check.name.lower()
-                if check.status.value == 'passed':
+                if check.status.value == "passed":
                     tools[tool_id] = ToolStatus(
                         tool_id=tool_id,
-                        status='installed',
-                        version=check.details.split()[1] if 'version' in check.details.lower() else None,
-                        health='healthy'
+                        status="installed",
+                        version=check.details.split()[1]
+                        if "version" in check.details.lower()
+                        else None,
+                        health="healthy",
                     )
                 else:
                     tools[tool_id] = ToolStatus(
-                        tool_id=tool_id,
-                        status='missing',
-                        health='unknown'
+                        tool_id=tool_id, status="missing", health="unknown"
                     )
-            elif check.category.value == 'Python':
-                python_packages['python'] = check.details
-            elif check.category.value == 'Platform':
+            elif check.category.value == "Python":
+                python_packages["python"] = check.details
+            elif check.category.value == "Platform":
                 system_info[check.name] = check.details
-        
+
         actual_state = ActualEnvironmentState(
             tools=tools,
             python_packages=python_packages,
             system_info=system_info,
             probe_timestamp=datetime.now(UTC).isoformat(),
-            probe_evidence={check.name: check.facts for check in report.checks}
+            probe_evidence={check.name: check.facts for check in report.checks},
         )
-        
+
         return make_response(
-            request_id=request_id,
-            status="ok",
-            data={"actual_state": actual_state}
+            request_id=request_id, status="ok", data={"actual_state": actual_state}
         )
     except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
@@ -201,13 +195,10 @@ async def get_tools_catalog():
     request_id = str(uuid.uuid4())
     try:
         from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
+
         catalog = ToolCatalog()
         tools = catalog.list_tools()
-        return make_response(
-            request_id=request_id,
-            status="ok",
-            data={"tools": tools}
-        )
+        return make_response(request_id=request_id, status="ok", data={"tools": tools})
     except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -221,12 +212,16 @@ async def create_environment_request(input_data: EnvironmentRequestInput):
         if input_data.natural_language_goal:
             parsed = intent_parser.parse(input_data.natural_language_goal)
             # Merge parsed intent with explicit inputs
-            required_tools = list(set(input_data.required_tools + parsed.required_tools))
-            optional_tools = list(set(input_data.optional_tools + parsed.optional_tools))
+            required_tools = list(
+                set(input_data.required_tools + parsed.required_tools)
+            )
+            optional_tools = list(
+                set(input_data.optional_tools + parsed.optional_tools)
+            )
         else:
             required_tools = input_data.required_tools
             optional_tools = input_data.optional_tools
-        
+
         environment_request = EnvironmentRequest(
             project_path=input_data.project_path,
             natural_language_goal=input_data.natural_language_goal,
@@ -235,11 +230,9 @@ async def create_environment_request(input_data: EnvironmentRequestInput):
             project_dependencies=input_data.project_dependencies,
             constraints=input_data.constraints,
         )
-        
+
         return make_response(
-            request_id=request_id,
-            status="ok",
-            data={"request": environment_request}
+            request_id=request_id, status="ok", data={"request": environment_request}
         )
     except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=400, detail=str(e))
@@ -252,7 +245,7 @@ async def create_session(input_data: EnvironmentRequestInput):
     try:
         # Parse intent
         parsed = intent_parser.parse(input_data.natural_language_goal)
-        
+
         # Create environment request
         environment_request = EnvironmentRequest(
             project_path=input_data.project_path,
@@ -262,55 +255,56 @@ async def create_session(input_data: EnvironmentRequestInput):
             project_dependencies=input_data.project_dependencies,
             constraints=input_data.constraints,
         )
-        
+
         # Get actual state
         audit = default_audit_service()
         report = audit.run()
-        
+
         # Build ActualEnvironmentState from audit report
         tools = {}
         python_packages = {}
         system_info = {}
-        
+
         for check in report.checks:
-            if check.category.value == 'Tools':
+            if check.category.value == "Tools":
                 tool_id = check.name.lower()
-                if check.status.value == 'passed':
+                if check.status.value == "passed":
                     tools[tool_id] = ToolStatus(
                         tool_id=tool_id,
-                        status='installed',
-                        version=check.details.split()[1] if 'version' in check.details.lower() else None,
-                        health='healthy'
+                        status="installed",
+                        version=check.details.split()[1]
+                        if "version" in check.details.lower()
+                        else None,
+                        health="healthy",
                     )
                 else:
                     tools[tool_id] = ToolStatus(
-                        tool_id=tool_id,
-                        status='missing',
-                        health='unknown'
+                        tool_id=tool_id, status="missing", health="unknown"
                     )
-            elif check.category.value == 'Python':
-                python_packages['python'] = check.details
-            elif check.category.value == 'Platform':
+            elif check.category.value == "Python":
+                python_packages["python"] = check.details
+            elif check.category.value == "Platform":
                 system_info[check.name] = check.details
-        
+
         actual_state = ActualEnvironmentState(
             tools=tools,
             python_packages=python_packages,
             system_info=system_info,
             probe_timestamp=datetime.now(UTC).isoformat(),
-            probe_evidence={check.name: check.facts for check in report.checks}
+            probe_evidence={check.name: check.facts for check in report.checks},
         )
-        
+
         # Create desired state
         desired_state = environment_request.to_desired_state()
-        
+
         # Reconcile
         delta = reconciler.reconcile(actual_state, desired_state)
-        
+
         # Create session
         from ai_engineering_bootstrap.environment.session_models import (
             EnvironmentSession,
         )
+
         session = EnvironmentSession(
             request=environment_request,
             actual_state=actual_state,
@@ -318,11 +312,11 @@ async def create_session(input_data: EnvironmentRequestInput):
             delta=delta,
         )
         session_store.create(session)
-        
+
         return make_response(
             request_id=request_id,
             status="ok",
-            data={"session_id": session.session_id, "status": session.status.value}
+            data={"session_id": session.session_id, "status": session.status.value},
         )
     except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=400, detail=str(e))
@@ -338,15 +332,17 @@ async def list_sessions():
         return make_response(
             request_id=request_id,
             status="ok",
-            data={"sessions": [
-                {
-                    "session_id": s.session_id,
-                    "status": s.status.value,
-                    "created_at": s.created_at.isoformat(),
-                    "updated_at": s.updated_at.isoformat(),
-                }
-                for s in sessions
-            ]}
+            data={
+                "sessions": [
+                    {
+                        "session_id": s.session_id,
+                        "status": s.status.value,
+                        "created_at": s.created_at.isoformat(),
+                        "updated_at": s.updated_at.isoformat(),
+                    }
+                    for s in sessions
+                ]
+            },
         )
     except Exception as e:  # noqa: BLE001 - API boundary normalization
         raise HTTPException(status_code=500, detail=str(e))
@@ -361,9 +357,7 @@ async def get_session(session_id: str):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
         return make_response(
-            request_id=request_id,
-            status="ok",
-            data={"session": session}
+            request_id=request_id, status="ok", data={"session": session}
         )
     except HTTPException:
         raise
@@ -386,7 +380,7 @@ async def get_session_state(session_id: str):
                 "actual_state": session.actual_state,
                 "desired_state": session.desired_state,
                 "delta": session.delta,
-            }
+            },
         )
     except HTTPException:
         raise
@@ -402,17 +396,15 @@ async def get_session_plan(session_id: str):
         session = session_store.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         # Generate plan if not exists
         if not session.plan:
             plan = strategy_planner.create_plan(session.delta, session.actual_state)
             session.plan = plan
             session_store.update_session(session)
-        
+
         return make_response(
-            request_id=request_id,
-            status="ok",
-            data={"plan": session.plan}
+            request_id=request_id, status="ok", data={"plan": session.plan}
         )
     except HTTPException:
         raise
@@ -429,9 +421,7 @@ async def get_session_events(session_id: str):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
         return make_response(
-            request_id=request_id,
-            status="ok",
-            data={"events": session.events}
+            request_id=request_id, status="ok", data={"events": session.events}
         )
     except HTTPException:
         raise
@@ -450,7 +440,7 @@ async def get_agent_decisions(session_id: str):
         return make_response(
             request_id=request_id,
             status="ok",
-            data={"agent_decisions": session.agent_decisions}
+            data={"agent_decisions": session.agent_decisions},
         )
     except HTTPException:
         raise
@@ -466,15 +456,18 @@ async def start_session(session_id: str):
         session = session_store.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         session.status = "EXECUTING"
         session_store.update_session(session)
-        session_store.append_event(session_id, {"type": "session_started", "timestamp": datetime.now(UTC).isoformat()})
-        
+        session_store.append_event(
+            session_id,
+            {"type": "session_started", "timestamp": datetime.now(UTC).isoformat()},
+        )
+
         return make_response(
             request_id=request_id,
             status="ok",
-            data={"session_id": session_id, "status": "EXECUTING"}
+            data={"session_id": session_id, "status": "EXECUTING"},
         )
     except HTTPException:
         raise
@@ -482,28 +475,36 @@ async def start_session(session_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/v1/sessions/{session_id}/actions/{action_id}/approve", response_model=APIResponse)
-async def approve_action(session_id: str, action_id: str, input_data: ActionApprovalInput):
+@app.post(
+    "/api/v1/sessions/{session_id}/actions/{action_id}/approve",
+    response_model=APIResponse,
+)
+async def approve_action(
+    session_id: str, action_id: str, input_data: ActionApprovalInput
+):
     """Approve an action in the session."""
     request_id = str(uuid.uuid4())
     try:
         session = session_store.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         # Update action approval state
         session.approval_states[action_id] = "approved"
         session_store.update_session(session)
-        session_store.append_event(session_id, {
-            "type": "action_approved",
-            "action_id": action_id,
-            "timestamp": datetime.now(UTC).isoformat()
-        })
-        
+        session_store.append_event(
+            session_id,
+            {
+                "type": "action_approved",
+                "action_id": action_id,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
         return make_response(
             request_id=request_id,
             status="ok",
-            data={"action_id": action_id, "status": "approved"}
+            data={"action_id": action_id, "status": "approved"},
         )
     except HTTPException:
         raise
@@ -511,7 +512,10 @@ async def approve_action(session_id: str, action_id: str, input_data: ActionAppr
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/v1/sessions/{session_id}/actions/{action_id}/reject", response_model=APIResponse)
+@app.post(
+    "/api/v1/sessions/{session_id}/actions/{action_id}/reject",
+    response_model=APIResponse,
+)
 async def reject_action(session_id: str, action_id: str):
     """Reject an action in the session."""
     request_id = str(uuid.uuid4())
@@ -519,19 +523,22 @@ async def reject_action(session_id: str, action_id: str):
         session = session_store.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         session.approval_states[action_id] = "rejected"
         session_store.update_session(session)
-        session_store.append_event(session_id, {
-            "type": "action_rejected",
-            "action_id": action_id,
-            "timestamp": datetime.now(UTC).isoformat()
-        })
-        
+        session_store.append_event(
+            session_id,
+            {
+                "type": "action_rejected",
+                "action_id": action_id,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
         return make_response(
             request_id=request_id,
             status="ok",
-            data={"action_id": action_id, "status": "rejected"}
+            data={"action_id": action_id, "status": "rejected"},
         )
     except HTTPException:
         raise
@@ -539,7 +546,9 @@ async def reject_action(session_id: str, action_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/v1/sessions/{session_id}/actions/{action_id}/skip", response_model=APIResponse)
+@app.post(
+    "/api/v1/sessions/{session_id}/actions/{action_id}/skip", response_model=APIResponse
+)
 async def skip_action(session_id: str, action_id: str):
     """Skip an action in the session."""
     request_id = str(uuid.uuid4())
@@ -547,19 +556,22 @@ async def skip_action(session_id: str, action_id: str):
         session = session_store.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         session.approval_states[action_id] = "skipped"
         session_store.update_session(session)
-        session_store.append_event(session_id, {
-            "type": "action_skipped",
-            "action_id": action_id,
-            "timestamp": datetime.now(UTC).isoformat()
-        })
-        
+        session_store.append_event(
+            session_id,
+            {
+                "type": "action_skipped",
+                "action_id": action_id,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
         return make_response(
             request_id=request_id,
             status="ok",
-            data={"action_id": action_id, "status": "skipped"}
+            data={"action_id": action_id, "status": "skipped"},
         )
     except HTTPException:
         raise
@@ -575,15 +587,18 @@ async def cancel_session(session_id: str):
         session = session_store.get_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         session.status = "CANCELLED"
         session_store.update_session(session)
-        session_store.append_event(session_id, {"type": "session_cancelled", "timestamp": datetime.now(UTC).isoformat()})
-        
+        session_store.append_event(
+            session_id,
+            {"type": "session_cancelled", "timestamp": datetime.now(UTC).isoformat()},
+        )
+
         return make_response(
             request_id=request_id,
             status="ok",
-            data={"session_id": session_id, "status": "CANCELLED"}
+            data={"session_id": session_id, "status": "CANCELLED"},
         )
     except HTTPException:
         raise
@@ -600,24 +615,27 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             # Send session state updates
             session = session_store.get_session(session_id)
             if session:
-                await websocket.send_json({
-                    "type": "session_update",
-                    "data": {
-                        "session_id": session.session_id,
-                        "status": session.status,
-                        "current_action": session.current_action,
-                        "events": session.events[-5:],  # Last 5 events
+                await websocket.send_json(
+                    {
+                        "type": "session_update",
+                        "data": {
+                            "session_id": session.session_id,
+                            "status": session.status,
+                            "current_action": session.current_action,
+                            "events": session.events[-5:],  # Last 5 events
+                        },
                     }
-                })
-            
+                )
+
             # Wait for client message
             await websocket.receive_text()
             # Handle client messages if needed
-            
+
     except WebSocketDisconnect:
         pass
     except Exception:
         logger.exception("Unexpected WebSocket failure for session %s", session_id)
+
 
 # LLM Settings endpoints
 @app.get("/api/v1/llm/settings")
@@ -629,21 +647,22 @@ async def get_llm_settings():
             "provider": "lm_studio",  # Default or from config
             "api_url": "http://localhost:1234/v1",
             "model": "qwen-2.5-coder-32b",
-            "api_key": None
+            "api_key": None,
         }
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
             status="ok",
-            data=settings
+            data=settings,
         )
     except Exception as e:  # noqa: BLE001 - API boundary normalization
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
             status="error",
-            error=make_error("settings_error", str(e))
+            error=make_error("settings_error", str(e)),
         )
+
 
 @app.post("/api/v1/llm/settings")
 async def save_llm_settings(settings: dict):
@@ -653,25 +672,26 @@ async def save_llm_settings(settings: dict):
         # For now, just validate and acknowledge
         provider = settings.get("provider", "lm_studio")
         model = settings.get("model", "")
-        
+
         # Update intent parser configuration if available
         if intent_parser:
             # This would update the actual LLM client configuration
             pass
-        
+
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
             status="ok",
-            data={"message": "Settings saved", "provider": provider, "model": model}
+            data={"message": "Settings saved", "provider": provider, "model": model},
         )
     except Exception as e:  # noqa: BLE001 - API boundary normalization
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
             status="error",
-            error=make_error("settings_error", str(e))
+            error=make_error("settings_error", str(e)),
         )
+
 
 @app.post("/api/v1/llm/test")
 async def test_llm_connection():
@@ -683,19 +703,19 @@ async def test_llm_connection():
                 api_version=API_VERSION,
                 request_id=str(uuid.uuid4()),
                 status="ok",
-                data={"connected": True, "model": "test-model"}
+                data={"connected": True, "model": "test-model"},
             )
         else:
             return APIResponse(
                 api_version=API_VERSION,
                 request_id=str(uuid.uuid4()),
                 status="error",
-                error=make_error("connection_failed", "LLM not available")
+                error=make_error("connection_failed", "LLM not available"),
             )
     except Exception as e:  # noqa: BLE001 - API boundary normalization
         return APIResponse(
             api_version=API_VERSION,
             request_id=str(uuid.uuid4()),
             status="error",
-            error=make_error("connection_error", str(e))
+            error=make_error("connection_error", str(e)),
         )

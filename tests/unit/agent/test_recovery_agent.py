@@ -1,6 +1,5 @@
 """Tests for failure diagnosis and recovery agent."""
 
-
 from ai_engineering_bootstrap.agent.provider import MockProvider
 from ai_engineering_bootstrap.agent.recovery_agent import (
     FailureDiagnoser,
@@ -254,9 +253,10 @@ class TestRecoveryAgent:
 
         proposal = self.agent.propose_recovery(execution, error)
 
-        assert "network" in str(proposal.recovery_actions).lower() or "retry" in str(
-            proposal.recovery_actions
-        ).lower()
+        assert (
+            "network" in str(proposal.recovery_actions).lower()
+            or "retry" in str(proposal.recovery_actions).lower()
+        )
 
     def test_propose_recovery_success_probability(self) -> None:
         """Test success probability estimation."""
@@ -272,7 +272,10 @@ class TestRecoveryAgent:
         proposal2 = self.agent.propose_recovery(execution, "error", retry_count=3)
 
         # Success probability should decrease with retries
-        assert proposal1.estimated_success_probability >= proposal2.estimated_success_probability
+        assert (
+            proposal1.estimated_success_probability
+            >= proposal2.estimated_success_probability
+        )
 
     def test_propose_recovery_platform_unsupported(self) -> None:
         """Test proposing recovery for unsupported platform."""

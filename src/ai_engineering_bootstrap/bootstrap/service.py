@@ -67,7 +67,9 @@ class EnvironmentBootstrapService:
         """Bootstrap each planned action in deterministic order."""
         discovery = None
         if plan_override is None:
-            discovery = self._pipeline.run(mode=ExecutionMode.SAFE, run_id=f"{run_id}-plan")
+            discovery = self._pipeline.run(
+                mode=ExecutionMode.SAFE, run_id=f"{run_id}-plan"
+            )
             plan = discovery.original_plan
         else:
             plan = plan_override

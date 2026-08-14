@@ -18,9 +18,9 @@ class FakeProvider:
 
 
 def test_agent_decision_records_provider_metadata() -> None:
-    result = AgentDecisionEngine(
-        FakeProvider(), default_capability_registry()
-    ).decide("fix environment")
+    result = AgentDecisionEngine(FakeProvider(), default_capability_registry()).decide(
+        "fix environment"
+    )
 
     assert result.metadata["llm_used"] is True
     assert result.metadata["provider"]["provider_type"] == "local_server"

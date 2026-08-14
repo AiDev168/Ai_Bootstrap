@@ -55,10 +55,16 @@ def test_pipeline_uses_agent_for_recovery_after_diagnosable_failure() -> None:
     service.decide_and_plan.return_value = AgentPlanningResult(decision, second)
 
     with (
-        patch("ai_engineering_bootstrap.pipeline.engine.default_audit_service") as audit_factory,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.default_audit_service"
+        ) as audit_factory,
         patch("ai_engineering_bootstrap.pipeline.engine.PlannerEngine") as planner_cls,
-        patch("ai_engineering_bootstrap.pipeline.engine.ExecutorEngine") as executor_cls,
-        patch("ai_engineering_bootstrap.pipeline.engine.ExecutionPlanValidator") as validator_cls,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.ExecutorEngine"
+        ) as executor_cls,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.ExecutionPlanValidator"
+        ) as validator_cls,
     ):
         audit_factory.return_value.run.side_effect = [_report(), _report()]
         planner_cls.return_value.generate_plan.return_value = first

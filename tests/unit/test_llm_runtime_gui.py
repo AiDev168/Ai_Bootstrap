@@ -1,11 +1,25 @@
 from pathlib import Path
 
-from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService, LLMSettingsStore
+from ai_engineering_bootstrap.backend.llm_settings import (
+    LLMSettingsService,
+    LLMSettingsStore,
+)
 from ai_engineering_bootstrap.backend.service import ApplicationBackend
-from ai_engineering_bootstrap.backend.strategy_planner_runtime import RuntimeStrategyPlanner
-from ai_engineering_bootstrap.environment.models import DeltaAction, EnvironmentDelta, ToolDelta, ToolRequirement, ToolStatus
+from ai_engineering_bootstrap.backend.strategy_planner_runtime import (
+    RuntimeStrategyPlanner,
+)
+from ai_engineering_bootstrap.environment.models import (
+    DeltaAction,
+    EnvironmentDelta,
+    ToolDelta,
+    ToolRequirement,
+    ToolStatus,
+)
 
-HTML_PATH = Path(__file__).resolve().parents[2] / "src/ai_engineering_bootstrap/gui/static/index.html"
+HTML_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "src/ai_engineering_bootstrap/gui/static/index.html"
+)
 
 
 def test_mock_provider_connection_is_offline(tmp_path: Path) -> None:
@@ -59,7 +73,9 @@ def test_llm_settings_survive_service_restart(tmp_path: Path) -> None:
 
 def test_application_backend_uses_runtime_strategy_planner() -> None:
     backend = ApplicationBackend()
-    assert isinstance(backend._session_service._strategy_planner, RuntimeStrategyPlanner)
+    assert isinstance(
+        backend._session_service._strategy_planner, RuntimeStrategyPlanner
+    )
 
 
 def test_gui_exposes_provider_choices_and_operational_session_controls() -> None:

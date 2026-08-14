@@ -2,7 +2,10 @@ import json
 from pathlib import Path
 from urllib.request import Request
 
-from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService, LLMSettingsStore
+from ai_engineering_bootstrap.backend.llm_settings import (
+    LLMSettingsService,
+    LLMSettingsStore,
+)
 
 
 def test_settings_persist_across_service_instances(tmp_path: Path) -> None:

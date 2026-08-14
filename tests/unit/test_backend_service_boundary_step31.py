@@ -4,7 +4,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai_engineering_bootstrap.agent.strategy_planner import StrategyDecision, StrategyPlan
+from ai_engineering_bootstrap.agent.strategy_planner import (
+    StrategyDecision,
+    StrategyPlan,
+)
 from ai_engineering_bootstrap.backend.execution_plan_builder import ExecutionPlanBuilder
 from ai_engineering_bootstrap.backend.service import ApplicationBackend
 from ai_engineering_bootstrap.environment.models import (
@@ -24,13 +27,17 @@ def _delta() -> EnvironmentDelta:
             ToolDelta(
                 tool_id="cursor",
                 action=DeltaAction.INSTALL,
-                desired_requirement=ToolRequirement("cursor", ToolRequirementLevel.REQUIRED),
+                desired_requirement=ToolRequirement(
+                    "cursor", ToolRequirementLevel.REQUIRED
+                ),
                 actual_status=ToolStatus("cursor", "missing"),
             ),
             ToolDelta(
                 tool_id="ruff",
                 action=DeltaAction.INSTALL,
-                desired_requirement=ToolRequirement("ruff", ToolRequirementLevel.REQUIRED),
+                desired_requirement=ToolRequirement(
+                    "ruff", ToolRequirementLevel.REQUIRED
+                ),
                 actual_status=ToolStatus("ruff", "missing"),
             ),
         ],

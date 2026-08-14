@@ -25,8 +25,12 @@ class EnvironmentReconciler:
     ) -> EnvironmentDelta:
         """Compute the delta between actual and desired states."""
         tool_deltas = self._reconcile_tools(actual.tools, desired.tools)
-        package_deltas = self._reconcile_packages(actual.python_packages, desired.python_packages)
-        configuration_deltas = self._reconcile_configurations(actual.system_info, desired.configurations)
+        package_deltas = self._reconcile_packages(
+            actual.python_packages, desired.python_packages
+        )
+        configuration_deltas = self._reconcile_configurations(
+            actual.system_info, desired.configurations
+        )
         return EnvironmentDelta(
             tool_deltas=tool_deltas,
             package_deltas=package_deltas,
@@ -54,7 +58,10 @@ class EnvironmentReconciler:
                     )
                 )
                 continue
-            if force_install and requirement.level in {ToolRequirementLevel.REQUIRED, ToolRequirementLevel.OPTIONAL}:
+            if force_install and requirement.level in {
+                ToolRequirementLevel.REQUIRED,
+                ToolRequirementLevel.OPTIONAL,
+            }:
                 deltas.append(
                     ToolDelta(
                         tool_id=tool_id,
@@ -77,7 +84,9 @@ class EnvironmentReconciler:
                 )
                 continue
             if requirement.version_constraint and actual_status.version:
-                if not self._version_satisfies(actual_status.version, requirement.version_constraint):
+                if not self._version_satisfies(
+                    actual_status.version, requirement.version_constraint
+                ):
                     deltas.append(
                         ToolDelta(
                             tool_id=tool_id,
@@ -99,7 +108,9 @@ class EnvironmentReconciler:
                 )
         return deltas
 
-    def _reconcile_packages(self, actual_packages: dict[str, str], desired_packages: list) -> list[PackageDelta]:
+    def _reconcile_packages(
+        self, actual_packages: dict[str, str], desired_packages: list
+    ) -> list[PackageDelta]:
         """Reconcile Python package states deterministically."""
         deltas: list[PackageDelta] = []
         for pkg_req in desired_packages:
@@ -115,7 +126,9 @@ class EnvironmentReconciler:
                         reason=f"Package '{pkg_req.name}' is not installed",
                     )
                 )
-            elif pkg_req.version_constraint and not self._version_satisfies(actual_version, pkg_req.version_constraint):
+            elif pkg_req.version_constraint and not self._version_satisfies(
+                actual_version, pkg_req.version_constraint
+            ):
                 deltas.append(
                     PackageDelta(
                         package_name=pkg_req.name,
@@ -127,7 +140,9 @@ class EnvironmentReconciler:
                 )
         return deltas
 
-    def _reconcile_configurations(self, actual_system: dict, desired_configs: dict) -> dict:
+    def _reconcile_configurations(
+        self, actual_system: dict, desired_configs: dict
+    ) -> dict:
         """Reconcile configuration states."""
         return desired_configs
 

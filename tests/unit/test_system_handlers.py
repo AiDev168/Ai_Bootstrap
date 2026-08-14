@@ -111,17 +111,21 @@ def test_cursor_handler_downloads_resolved_package_url_without_shell(
         "_resolve_download_url",
         return_value=package_url,
     ):
+
         def write_package(url: str, destination: Path) -> None:
             assert url == package_url
             destination.write_bytes(b"debian-package")
 
         downloader.side_effect = write_package
-        with patch(
-            "ai_engineering_bootstrap.executor.handlers.system_handlers.platform.system",
-            return_value="Linux",
-        ), patch(
-            "ai_engineering_bootstrap.executor.handlers.system_handlers.shutil.which",
-            return_value="/usr/bin/tool",
+        with (
+            patch(
+                "ai_engineering_bootstrap.executor.handlers.system_handlers.platform.system",
+                return_value="Linux",
+            ),
+            patch(
+                "ai_engineering_bootstrap.executor.handlers.system_handlers.shutil.which",
+                return_value="/usr/bin/tool",
+            ),
         ):
             result = handler.execute(_action(), _real_context())
 

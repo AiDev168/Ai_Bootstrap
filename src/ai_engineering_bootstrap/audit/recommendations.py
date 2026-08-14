@@ -29,11 +29,15 @@ class RecommendationEngine:
             in_venv = facts.get("in_venv", "False")
             if str(in_venv).lower() == "false":
                 recommendations.append("Create and activate a virtual environment.")
-                recommendations.append("Run: python -m venv .venv && source .venv/bin/activate (Linux/Mac) or .venv\\Scripts\\activate (Windows).")
+                recommendations.append(
+                    "Run: python -m venv .venv && source .venv/bin/activate (Linux/Mac) or .venv\\Scripts\\activate (Windows)."
+                )
 
         # Editable Install
         elif "editable" in name_lower:
-            recommendations.append('Install the project in editable mode: python -m pip install -e ".[dev]"')
+            recommendations.append(
+                'Install the project in editable mode: python -m pip install -e ".[dev]"'
+            )
 
         # Project/runtime dependencies
         elif facts.get("remediation_action") == "install_python_package":
@@ -52,11 +56,17 @@ class RecommendationEngine:
 
         # Tools
         elif "git" in name_lower:
-            recommendations.append("Install Git and ensure it is available in your PATH.")
+            recommendations.append(
+                "Install Git and ensure it is available in your PATH."
+            )
         elif "docker" in name_lower:
-            recommendations.append("Install Docker Engine and ensure the daemon is running.")
+            recommendations.append(
+                "Install Docker Engine and ensure the daemon is running."
+            )
         elif "cursor" in name_lower:
-            recommendations.append("Install Cursor desktop using the approved engineering-environment handler.")
+            recommendations.append(
+                "Install Cursor desktop using the approved engineering-environment handler."
+            )
 
         # Fallback for other failures
         else:

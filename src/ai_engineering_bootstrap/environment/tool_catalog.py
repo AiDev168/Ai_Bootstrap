@@ -90,7 +90,7 @@ class ProbeDefinition:
 class ToolDefinition:
     """
     Complete definition of an engineering tool.
-    
+
     This includes detection, installation strategies, configuration, and verification.
     """
 
@@ -141,10 +141,17 @@ def _python_tool() -> ToolDefinition:
             InstallationStrategy(
                 strategy_id="python_apt",
                 platform=Platform.LINUX,
-                architecture=[Architecture.X86_64, Architecture.ARM64, Architecture.AARCH64],
+                architecture=[
+                    Architecture.X86_64,
+                    Architecture.ARM64,
+                    Architecture.AARCH64,
+                ],
                 artifact_format=ArtifactFormat.DEB,
                 package_name="python3",
-                commands=["sudo apt-get update", "sudo apt-get install -y python3 python3-pip python3-venv"],
+                commands=[
+                    "sudo apt-get update",
+                    "sudo apt-get install -y python3 python3-pip python3-venv",
+                ],
                 privilege_level=PrivilegeLevel.ROOT,
                 interactive=True,
             ),
@@ -153,7 +160,11 @@ def _python_tool() -> ToolDefinition:
         risk_level=RiskLevel.LOW,
         official_sources=["https://www.python.org/"],
         allowed_domains=["python.org", "packages.python.org"],
-        artifact_formats=[ArtifactFormat.DEB, ArtifactFormat.RPM, ArtifactFormat.TARBALL],
+        artifact_formats=[
+            ArtifactFormat.DEB,
+            ArtifactFormat.RPM,
+            ArtifactFormat.TARBALL,
+        ],
     )
 
 
@@ -180,7 +191,11 @@ def _git_tool() -> ToolDefinition:
             InstallationStrategy(
                 strategy_id="git_apt",
                 platform=Platform.LINUX,
-                architecture=[Architecture.X86_64, Architecture.ARM64, Architecture.AARCH64],
+                architecture=[
+                    Architecture.X86_64,
+                    Architecture.ARM64,
+                    Architecture.AARCH64,
+                ],
                 artifact_format=ArtifactFormat.DEB,
                 package_name="git",
                 commands=["sudo apt-get install -y git"],
@@ -192,7 +207,11 @@ def _git_tool() -> ToolDefinition:
         risk_level=RiskLevel.LOW,
         official_sources=["https://git-scm.com/"],
         allowed_domains=["git-scm.com"],
-        artifact_formats=[ArtifactFormat.DEB, ArtifactFormat.RPM, ArtifactFormat.TARBALL],
+        artifact_formats=[
+            ArtifactFormat.DEB,
+            ArtifactFormat.RPM,
+            ArtifactFormat.TARBALL,
+        ],
     )
 
 
@@ -272,7 +291,11 @@ def _docker_tool() -> ToolDefinition:
             InstallationStrategy(
                 strategy_id="docker_apt",
                 platform=Platform.LINUX,
-                architecture=[Architecture.X86_64, Architecture.ARM64, Architecture.AARCH64],
+                architecture=[
+                    Architecture.X86_64,
+                    Architecture.ARM64,
+                    Architecture.AARCH64,
+                ],
                 artifact_format=ArtifactFormat.DEB,
                 package_name="docker.io",
                 commands=[
@@ -288,7 +311,11 @@ def _docker_tool() -> ToolDefinition:
         risk_level=RiskLevel.HIGH,
         official_sources=["https://docs.docker.com/"],
         allowed_domains=["docker.com", "docker.io"],
-        artifact_formats=[ArtifactFormat.DEB, ArtifactFormat.RPM, ArtifactFormat.TARBALL],
+        artifact_formats=[
+            ArtifactFormat.DEB,
+            ArtifactFormat.RPM,
+            ArtifactFormat.TARBALL,
+        ],
         dependencies=["containerd", "runc"],
     )
 
@@ -316,7 +343,11 @@ def _ruff_tool() -> ToolDefinition:
             InstallationStrategy(
                 strategy_id="ruff_pip",
                 platform=Platform.LINUX,
-                architecture=[Architecture.X86_64, Architecture.ARM64, Architecture.AARCH64],
+                architecture=[
+                    Architecture.X86_64,
+                    Architecture.ARM64,
+                    Architecture.AARCH64,
+                ],
                 artifact_format=ArtifactFormat.PIP,
                 package_name="ruff",
                 commands=["pip install ruff"],
@@ -355,7 +386,11 @@ def _pytest_tool() -> ToolDefinition:
             InstallationStrategy(
                 strategy_id="pytest_pip",
                 platform=Platform.LINUX,
-                architecture=[Architecture.X86_64, Architecture.ARM64, Architecture.AARCH64],
+                architecture=[
+                    Architecture.X86_64,
+                    Architecture.ARM64,
+                    Architecture.AARCH64,
+                ],
                 artifact_format=ArtifactFormat.PIP,
                 package_name="pytest",
                 commands=["pip install pytest"],
@@ -394,7 +429,11 @@ def _black_tool() -> ToolDefinition:
             InstallationStrategy(
                 strategy_id="black_pip",
                 platform=Platform.LINUX,
-                architecture=[Architecture.X86_64, Architecture.ARM64, Architecture.AARCH64],
+                architecture=[
+                    Architecture.X86_64,
+                    Architecture.ARM64,
+                    Architecture.AARCH64,
+                ],
                 artifact_format=ArtifactFormat.PIP,
                 package_name="black",
                 commands=["pip install black"],
@@ -433,7 +472,11 @@ def _github_cli_tool() -> ToolDefinition:
             InstallationStrategy(
                 strategy_id="gh_apt",
                 platform=Platform.LINUX,
-                architecture=[Architecture.X86_64, Architecture.ARM64, Architecture.AARCH64],
+                architecture=[
+                    Architecture.X86_64,
+                    Architecture.ARM64,
+                    Architecture.AARCH64,
+                ],
                 artifact_format=ArtifactFormat.DEB,
                 commands=[
                     "type -p curl >/dev/null || (sudo apt update && sudo apt-get install curl -y)",
@@ -451,7 +494,11 @@ def _github_cli_tool() -> ToolDefinition:
         risk_level=RiskLevel.MEDIUM,
         official_sources=["https://cli.github.com/"],
         allowed_domains=["github.com", "cli.github.com"],
-        artifact_formats=[ArtifactFormat.DEB, ArtifactFormat.RPM, ArtifactFormat.TARBALL],
+        artifact_formats=[
+            ArtifactFormat.DEB,
+            ArtifactFormat.RPM,
+            ArtifactFormat.TARBALL,
+        ],
     )
 
 
@@ -478,7 +525,11 @@ def _nodejs_tool() -> ToolDefinition:
             InstallationStrategy(
                 strategy_id="nodejs_apt",
                 platform=Platform.LINUX,
-                architecture=[Architecture.X86_64, Architecture.ARM64, Architecture.AARCH64],
+                architecture=[
+                    Architecture.X86_64,
+                    Architecture.ARM64,
+                    Architecture.AARCH64,
+                ],
                 artifact_format=ArtifactFormat.DEB,
                 commands=[
                     "curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -",
@@ -492,7 +543,11 @@ def _nodejs_tool() -> ToolDefinition:
         risk_level=RiskLevel.MEDIUM,
         official_sources=["https://nodejs.org/"],
         allowed_domains=["nodejs.org", "nodesource.com"],
-        artifact_formats=[ArtifactFormat.DEB, ArtifactFormat.RPM, ArtifactFormat.TARBALL],
+        artifact_formats=[
+            ArtifactFormat.DEB,
+            ArtifactFormat.RPM,
+            ArtifactFormat.TARBALL,
+        ],
     )
 
 
@@ -548,7 +603,11 @@ def _uv_tool() -> ToolDefinition:
             InstallationStrategy(
                 strategy_id="uv_pip",
                 platform=Platform.LINUX,
-                architecture=[Architecture.X86_64, Architecture.ARM64, Architecture.AARCH64],
+                architecture=[
+                    Architecture.X86_64,
+                    Architecture.ARM64,
+                    Architecture.AARCH64,
+                ],
                 artifact_format=ArtifactFormat.PIP,
                 package_name="uv",
                 commands=["pip install uv"],
@@ -587,7 +646,11 @@ def _poetry_tool() -> ToolDefinition:
             InstallationStrategy(
                 strategy_id="poetry_pip",
                 platform=Platform.LINUX,
-                architecture=[Architecture.X86_64, Architecture.ARM64, Architecture.AARCH64],
+                architecture=[
+                    Architecture.X86_64,
+                    Architecture.ARM64,
+                    Architecture.AARCH64,
+                ],
                 artifact_format=ArtifactFormat.PIP,
                 package_name="poetry",
                 commands=["pip install poetry"],

@@ -4,7 +4,10 @@ from urllib.request import Request
 
 from ai_engineering_bootstrap.agent.provider import LocalServerProvider, ProviderConfig
 from ai_engineering_bootstrap.agent.strategy_llm_bridge import StrategyLLMProvider
-from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService, LLMSettingsStore
+from ai_engineering_bootstrap.backend.llm_settings import (
+    LLMSettingsService,
+    LLMSettingsStore,
+)
 from ai_engineering_bootstrap.environment.models import (
     ActualEnvironmentState,
     DeltaAction,
@@ -13,21 +16,35 @@ from ai_engineering_bootstrap.environment.models import (
 )
 from ai_engineering_bootstrap.environment.reconciler import EnvironmentReconciler
 
-HTML_PATH = Path(__file__).resolve().parents[1] / "../src/ai_engineering_bootstrap/gui/static/index.html"
-RUNTIME_PATH = Path(__file__).resolve().parents[1] / "../src/ai_engineering_bootstrap/gui/static/app-runtime.js"
+HTML_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "../src/ai_engineering_bootstrap/gui/static/index.html"
+)
+RUNTIME_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "../src/ai_engineering_bootstrap/gui/static/app-runtime.js"
+)
 
 
 def test_force_install_is_encoded_in_desired_state() -> None:
-    request = EnvironmentRequest(required_tools=["ruff"], constraints={"force_install": True})
+    request = EnvironmentRequest(
+        required_tools=["ruff"], constraints={"force_install": True}
+    )
     desired = request.to_desired_state()
     assert desired.tools["ruff"].configuration["force_install"] is True
 
 
 def test_reconciler_creates_install_delta_for_explicit_repair() -> None:
-    request = EnvironmentRequest(required_tools=["ruff"], constraints={"force_install": True})
+    request = EnvironmentRequest(
+        required_tools=["ruff"], constraints={"force_install": True}
+    )
     desired = request.to_desired_state()
     actual = ActualEnvironmentState(
-        tools={"ruff": ToolStatus(tool_id="ruff", status="installed", version="0.12.0", health="healthy")}
+        tools={
+            "ruff": ToolStatus(
+                tool_id="ruff", status="installed", version="0.12.0", health="healthy"
+            )
+        }
     )
     delta = EnvironmentReconciler().reconcile(actual, desired)
     assert len(delta.tool_deltas) == 1
@@ -70,11 +87,7 @@ def test_local_server_strategy_passes_api_key(monkeypatch) -> None:
     calls: list[Request] = []
     response_payload = {
         "choices": [
-            {
-                "message": {
-                    "content": json.dumps({"strategies": [], "confidence": 0.9})
-                }
-            }
+            {"message": {"content": json.dumps({"strategies": [], "confidence": 0.9})}}
         ]
     }
 
