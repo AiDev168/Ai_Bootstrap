@@ -89,7 +89,10 @@ class IntentNormalizer:
             for candidate in self._split_targets(positive.group(1)):
                 tool_id = self._resolve_tool(candidate)
                 if tool_id:
-                    if tool_id.lower() not in excluded_tool_set and tool_id not in required:
+                    if (
+                        tool_id.lower() not in excluded_tool_set
+                        and tool_id not in required
+                    ):
                         required.append(tool_id)
                         required_set.add(tool_id.lower())
                 elif (
@@ -103,11 +106,17 @@ class IntentNormalizer:
                     dependency_set.add(candidate.lower())
 
         intent.required_tools = list(
-            dict.fromkeys(item for item in required if item.lower() not in excluded_tool_set)
+            dict.fromkeys(
+                item for item in required if item.lower() not in excluded_tool_set
+            )
         )
         intent.excluded_tools = list(dict.fromkeys(excluded_tools))
         intent.project_dependencies = list(
-            dict.fromkeys(item for item in dependencies if item.lower() not in excluded_package_set)
+            dict.fromkeys(
+                item
+                for item in dependencies
+                if item.lower() not in excluded_package_set
+            )
         )
         intent.excluded_packages = list(dict.fromkeys(excluded_packages))
         return intent
@@ -118,7 +127,9 @@ class IntentNormalizer:
             if lowered == tool_id.lower():
                 return tool_id
         for tool_id, aliases in _TOOL_ALIASES.items():
-            if tool_id in self.tool_ids and lowered in {alias.lower() for alias in aliases}:
+            if tool_id in self.tool_ids and lowered in {
+                alias.lower() for alias in aliases
+            }:
                 return tool_id
         return None
 
@@ -145,7 +156,9 @@ class IntentNormalizer:
         result: list[str] = []
         for part in parts:
             candidate = part.strip(" .:()[]،")
-            candidate = re.sub(r"(?:را|رو)\s*$", "", candidate, flags=re.IGNORECASE).strip()
+            candidate = re.sub(
+                r"(?:را|رو)\s*$", "", candidate, flags=re.IGNORECASE
+            ).strip()
             if candidate:
                 result.append(candidate)
         return result

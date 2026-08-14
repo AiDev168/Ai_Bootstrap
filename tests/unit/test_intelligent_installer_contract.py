@@ -34,7 +34,9 @@ def test_negative_english_package_is_excluded() -> None:
     assert "ruff" in session.request.required_tools
     assert "pytest" in session.request.required_tools
     assert "colorama" in session.request.excluded_packages
-    assert "colorama" not in [item.name for item in session.request.project_dependencies]
+    assert "colorama" not in [
+        item.name for item in session.request.project_dependencies
+    ]
 
 
 def test_negative_persian_package_is_excluded() -> None:
@@ -43,7 +45,9 @@ def test_negative_persian_package_is_excluded() -> None:
     assert "ruff" in session.request.required_tools
     assert "pytest" in session.request.required_tools
     assert "colorama" in session.request.excluded_packages
-    assert "colorama" not in [item.name for item in session.request.project_dependencies]
+    assert "colorama" not in [
+        item.name for item in session.request.project_dependencies
+    ]
 
 
 def test_multiple_install_targets_are_preserved() -> None:

@@ -224,7 +224,9 @@ def execute() -> None:
             if item.status.value == "failed"
             else "yellow"
         )
-        console.print(f"[{color}]• [{item.status.value.upper()}] {item.action_id}[/{color}]")
+        console.print(
+            f"[{color}]• [{item.status.value.upper()}] {item.action_id}[/{color}]"
+        )
         console.print(f"  [dim]{item.message}[/dim]")
 
 

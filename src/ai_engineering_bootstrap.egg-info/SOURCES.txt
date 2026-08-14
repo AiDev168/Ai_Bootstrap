@@ -20,6 +20,7 @@ src/ai_engineering_bootstrap/agent/__init__.py
 src/ai_engineering_bootstrap/agent/decision_validator.py
 src/ai_engineering_bootstrap/agent/engine.py
 src/ai_engineering_bootstrap/agent/exceptions.py
+src/ai_engineering_bootstrap/agent/intent_normalizer.py
 src/ai_engineering_bootstrap/agent/intent_parser.py
 src/ai_engineering_bootstrap/agent/models.py
 src/ai_engineering_bootstrap/agent/planning.py
