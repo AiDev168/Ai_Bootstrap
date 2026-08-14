@@ -17,6 +17,7 @@ from ai_engineering_bootstrap.environment.session_models import AgentDecision, E
 from ai_engineering_bootstrap.environment.session_repository import InMemorySessionRepository, SessionRepository
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
+from ai_engineering_bootstrap.planner.models import ExecutionPlan
 
 
 @dataclass(frozen=True)
@@ -146,11 +147,7 @@ class EnvironmentSessionService:
                 session.status = SessionStatus.AWAITING_APPROVAL
                 self.repository.update(session)
                 raise ValueError(f"Approval required for actions: {', '.join(sorted(pending))}")
-            execution_actions = [
-                action
-                for action in session.plan.actions
-                if not self._requires_approval(action) or action.action_id in approved
-            ]
+            execution_actions = [action for action in session.plan.actions if not self._requires_approval(action) or action.action_id in approved]
             excluded_actions = sorted(skipped)
         else:
             approved = set()
@@ -169,18 +166,8 @@ class EnvironmentSessionService:
         self.repository.update(session)
 
         provider = InMemoryApprovalProvider() if mode == ExecutionMode.REAL else None
-        plan_for_execution = ExecutionPlan(
-            is_actionable=True,
-            actions=execution_actions,
-            summary=session.plan.summary,
-        )
-        result = self._bootstrap_factory().run(
-            mode=mode,
-            approval_provider=provider,
-            approval_callback=lambda request: request.action_id in approved,
-            run_id=session.session_id,
-            plan_override=plan_for_execution,
-        )
+        plan_for_execution = ExecutionPlan(is_actionable=True, actions=execution_actions, summary=session.plan.summary)
+        result = self._bootstrap_factory().run(mode=mode, approval_provider=provider, approval_callback=lambda request: request.action_id in approved, run_id=session.session_id, plan_override=plan_for_execution)
         for execution in result.action_results:
             for action_result in execution.results:
                 session.add_execution_evidence(ExecutionEvidence(action_id=action_result.action_id, success=action_result.status.value == "success", output=action_result.message, error=None if action_result.status.value == "success" else action_result.message))
