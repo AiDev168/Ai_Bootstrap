@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from urllib.request import Request
 
@@ -8,7 +9,6 @@ from ai_engineering_bootstrap.environment.models import (
     ActualEnvironmentState,
     DeltaAction,
     EnvironmentRequest,
-    ToolRequirement,
     ToolStatus,
 )
 from ai_engineering_bootstrap.environment.reconciler import EnvironmentReconciler
@@ -68,6 +68,15 @@ def test_local_server_api_key_is_accepted(tmp_path, monkeypatch) -> None:
 
 def test_local_server_strategy_passes_api_key(monkeypatch) -> None:
     calls: list[Request] = []
+    response_payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps({"strategies": [], "confidence": 0.9})
+                }
+            }
+        ]
+    }
 
     class Response:
         def __enter__(self):
@@ -77,7 +86,7 @@ def test_local_server_strategy_passes_api_key(monkeypatch) -> None:
             return False
 
         def read(self):
-            return b'{"choices":[{"message":{"content":"{\"strategies\":[],\"confidence\":0.9}"}}]}'
+            return json.dumps(response_payload).encode()
 
     def fake_urlopen(request: Request, timeout: int):
         calls.append(request)
