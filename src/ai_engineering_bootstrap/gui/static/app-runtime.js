@@ -199,10 +199,9 @@
                 constraints: forceInstall ? { force_install: true } : {},
             };
             const result = await window.api("/sessions", "POST", payload);
-            window.state.sessionId = result.session_id;
             window.openTab("sessions");
             await window.loadSessions();
-            await window.viewSession(window.state.sessionId);
+            await window.viewSession(result.session_id);
         } catch (error) {
             showError(error.message);
         } finally {
