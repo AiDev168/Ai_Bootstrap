@@ -7,10 +7,14 @@ from ai_engineering_bootstrap.environment.session_repository import InMemorySess
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 
 
+def _empty_audit_factory():
+    return SimpleNamespace(run=lambda: SimpleNamespace(checks=[]))
+
+
 def test_natural_language_goal_populates_required_tools() -> None:
     service = RuntimeSessionService(
         repository=InMemorySessionRepository(),
-        audit_factory=lambda: SimpleNamespace(checks=[]),
+        audit_factory=_empty_audit_factory,
         intent_parser_factory=lambda: IntentParser(tool_catalog=ToolCatalog()),
     )
     result = service.create(EnvironmentRequest(natural_language_goal="install Cursor and Ruff"))
@@ -24,7 +28,7 @@ def test_natural_language_goal_populates_required_tools() -> None:
 def test_force_install_goal_produces_install_delta() -> None:
     service = RuntimeSessionService(
         repository=InMemorySessionRepository(),
-        audit_factory=lambda: SimpleNamespace(checks=[]),
+        audit_factory=_empty_audit_factory,
         intent_parser_factory=lambda: IntentParser(tool_catalog=ToolCatalog()),
     )
     request = EnvironmentRequest(
