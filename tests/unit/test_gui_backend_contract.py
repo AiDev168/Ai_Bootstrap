@@ -1,5 +1,6 @@
 """Backend contracts exercised by the GUI."""
 
+from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService
 from ai_engineering_bootstrap.backend.service import ApplicationBackend
 from ai_engineering_bootstrap.environment.models import EnvironmentRequest
 
@@ -24,7 +25,14 @@ def test_session_endpoints_return_serializable_data() -> None:
     assert plan.data["status"] in {"ready", "blocked"}
 
 
-def test_llm_settings_round_trip_is_secret_safe() -> None:
+def test_llm_settings_round_trip_is_secret_safe(monkeypatch) -> None:
+    for name in (
+        LLMSettingsService.ENV_PROVIDER,
+        LLMSettingsService.ENV_MODEL,
+        LLMSettingsService.ENV_BASE_URL,
+        LLMSettingsService.ENV_API_KEY,
+    ):
+        monkeypatch.delenv(name, raising=False)
     backend = ApplicationBackend()
     result = backend.update_llm_settings(
         {
@@ -42,7 +50,14 @@ def test_llm_settings_round_trip_is_secret_safe() -> None:
     assert backend.get_llm_settings().data["base_url"] == "https://example.invalid/v1"
 
 
-def test_supported_llm_provider_modes_are_exposed() -> None:
+def test_supported_llm_provider_modes_are_exposed(monkeypatch) -> None:
+    for name in (
+        LLMSettingsService.ENV_PROVIDER,
+        LLMSettingsService.ENV_MODEL,
+        LLMSettingsService.ENV_BASE_URL,
+        LLMSettingsService.ENV_API_KEY,
+    ):
+        monkeypatch.delenv(name, raising=False)
     backend = ApplicationBackend()
     for provider in ("local_server", "remote_api", "mock", "in_process"):
         result = backend.update_llm_settings({"provider": provider, "model": "test-model", "base_url": "http://127.0.0.1:1234/v1"})
