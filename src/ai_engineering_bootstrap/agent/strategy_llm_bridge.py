@@ -14,6 +14,7 @@ from ai_engineering_bootstrap.agent.provider import (
     MockProvider,
 )
 
+
 _MOCK_STRATEGIES = {
     "cursor": "cursor_deb_linux",
     "git": "git_apt",
@@ -74,14 +75,10 @@ def _decode_http_json(raw: bytes) -> dict[str, Any]:
     return data
 
 
-def _complete_json(
-    provider: LLMProvider, prompt: str, system_prompt: str
-) -> dict[str, Any]:
+def _complete_json(provider: LLMProvider, prompt: str, system_prompt: str) -> dict[str, Any]:
     if isinstance(provider, MockProvider):
         strategies = []
-        for tool_id, _action in re.findall(
-            r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE
-        ):
+        for tool_id, _action in re.findall(r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE):
             strategy_id = _MOCK_STRATEGIES.get(tool_id.strip())
             if strategy_id:
                 strategies.append(
@@ -96,9 +93,7 @@ def _complete_json(
                 )
         if "intent parser" in system_prompt.lower():
             return {
-                "natural_language_goal": prompt.split("User goal:", 1)[-1]
-                .split("/no_think", 1)[0]
-                .strip(),
+                "natural_language_goal": prompt.split("User goal:", 1)[-1].split("/no_think", 1)[0].strip(),
                 "required_tools": [],
                 "optional_tools": [],
                 "excluded_tools": [],
