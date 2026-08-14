@@ -6,13 +6,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai_engineering_bootstrap.audit import default_audit_service
+from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService
 from ai_engineering_bootstrap.backend.session_service import EnvironmentSessionService
 from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
 from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.environment import EnvironmentRequest
-from ai_engineering_bootstrap.environment.session_repository import (
-    InMemorySessionRepository,
-)
+from ai_engineering_bootstrap.environment.session_repository import InMemorySessionRepository
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 from ai_engineering_bootstrap.pipeline import PipelineEngine, PipelineResult
 from ai_engineering_bootstrap.planner import PlannerEngine
@@ -143,6 +142,54 @@ class ApplicationBackend:
         self._session_service = session_service or EnvironmentSessionService(
             repository=InMemorySessionRepository()
         )
+        self._llm_settings = LLMSettingsService()
+
+    def health(self) -> BackendResult:
+        """Return backend health and safe LLM status."""
+        settings = self._llm_settings.get()
+        return BackendResult(
+            {
+                "status": "ok",
+                "version": self.VERSION,
+                "llm_available": settings.enabled,
+                "llm": {
+                    "provider": settings.provider,
+                    "model": settings.model,
+                    "base_url": settings.base_url,
+                    "api_key_configured": settings.api_key_configured,
+                },
+            }
+        )
+
+    def get_llm_settings(self) -> BackendResult:
+        """Return safe LLM configuration metadata."""
+        settings = self._llm_settings.get()
+        return BackendResult(
+            {
+                "provider": settings.provider,
+                "model": settings.model,
+                "base_url": settings.base_url,
+                "api_key_configured": settings.api_key_configured,
+                "enabled": settings.enabled,
+            }
+        )
+
+    def update_llm_settings(self, payload: dict[str, Any]) -> BackendResult:
+        """Update process-local LLM configuration."""
+        settings = self._llm_settings.update(payload)
+        return BackendResult(
+            {
+                "provider": settings.provider,
+                "model": settings.model,
+                "base_url": settings.base_url,
+                "api_key_configured": settings.api_key_configured,
+                "enabled": settings.enabled,
+            }
+        )
+
+    def test_llm_connection(self) -> BackendResult:
+        """Probe the configured OpenAI-compatible LLM endpoint."""
+        return BackendResult(self._llm_settings.test_connection())
 
     def audit(self) -> BackendResult:
         return BackendResult(_audit_dict(default_audit_service().run()))
@@ -203,7 +250,7 @@ class ApplicationBackend:
             {
                 "session_id": session.session_id,
                 "status": session.status.value,
-                "request": session.request.to_dict() if session.request else None,
+                "request": self._session_service._request_dict(session.request),
                 "created_at": session.created_at.isoformat(),
                 "updated_at": session.updated_at.isoformat(),
             }
