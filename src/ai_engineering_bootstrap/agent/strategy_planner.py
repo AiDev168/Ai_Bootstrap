@@ -9,10 +9,7 @@ from typing import Any
 from ai_engineering_bootstrap.agent.decision_validator import StrategyDecisionValidator
 from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.environment.models import EnvironmentDelta
-from ai_engineering_bootstrap.environment.tool_catalog import (
-    ToolCatalog,
-    ToolDefinition,
-)
+from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog, ToolDefinition
 
 
 @dataclass
@@ -65,17 +62,16 @@ class StrategyPlanner:
         ]
         if not install_deltas:
             summary = "No tool changes required." if not delta.tool_deltas else "No installations required."
-            return StrategyPlan(
-                decisions=[],
-                overall_confidence=1.0,
-                reasoning_summary=summary,
-            )
+            return StrategyPlan(decisions=[], overall_confidence=1.0, reasoning_summary=summary)
         if not self.provider:
             return self._deterministic_plan(install_deltas, platform, architecture)
         try:
             return self._llm_plan(install_deltas, platform, architecture)
-        except Exception:  # noqa: BLE001 - intentional LLM fallback boundary
-            return self._deterministic_plan(install_deltas, platform, architecture)
+        except Exception as error:  # noqa: BLE001 - intentional LLM fallback boundary
+            fallback = self._deterministic_plan(install_deltas, platform, architecture)
+            fallback.reasoning_summary = f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            fallback.overall_confidence = min(fallback.overall_confidence, 0.55)
+            return fallback
 
     def _llm_plan(self, deltas: list[Any], platform: str | None, architecture: str | None) -> StrategyPlan:
         decision = self.provider.decide(self._build_prompt(deltas, platform, architecture), [])
@@ -84,7 +80,6 @@ class StrategyPlanner:
             content = content[7:].strip()
         if content.endswith("```"):
             content = content[:-3].strip()
-
         parsed = json.loads(content)
         decisions: list[StrategyDecision] = []
         for item in parsed.get("strategies", []):
@@ -111,7 +106,10 @@ class StrategyPlanner:
                 artifact_url = strategy.source_url
                 if artifact_url:
                     args["artifact_url"] = artifact_url
-
+            if strategy.artifact_format.value == "pip":
+                args.setdefault("package_name", strategy.package_name or tool_def.tool_id)
+                args.setdefault("package", strategy.package_name or tool_def.tool_id)
+                args.setdefault("requirement", strategy.package_name or tool_def.tool_id)
             candidate = StrategyDecision(
                 tool_id=tool_id,
                 strategy_name=strategy_name,
@@ -124,18 +122,12 @@ class StrategyPlanner:
                 risk_level=str(tool_def.risk_level.value),
                 privilege_level=str(tool_def.privilege_level.value),
             )
-            validation = self.validator.validate(
-                candidate,
-                platform=platform or "linux",
-                architecture=architecture or "x86_64",
-            )
+            validation = self.validator.validate(candidate, platform=platform or "linux", architecture=architecture or "x86_64")
             if not validation.is_valid:
                 raise ValueError("Invalid LLM strategy decision: " + "; ".join(validation.errors))
             decisions.append(candidate)
-
         if len(decisions) != len(deltas):
             raise ValueError("LLM did not provide exactly one validated strategy for every installation delta")
-
         return StrategyPlan(
             decisions=decisions,
             overall_confidence=decision.confidence,
@@ -160,6 +152,9 @@ class StrategyPlanner:
             args: dict[str, Any] = {}
             if strategy.source_url:
                 args["artifact_url"] = strategy.source_url
+            if strategy.artifact_format.value == "pip":
+                package = strategy.package_name or tool_def.tool_id
+                args.update({"package_name": package, "package": package, "requirement": package})
             candidate = StrategyDecision(
                 tool_id=tool_def.tool_id,
                 strategy_name=self._public_strategy_name(strategy.strategy_id),
@@ -171,14 +166,9 @@ class StrategyPlanner:
                 risk_level=tool_def.risk_level.value,
                 privilege_level=tool_def.privilege_level.value,
             )
-            validation = self.validator.validate(
-                candidate,
-                platform=platform or "linux",
-                architecture=architecture or "x86_64",
-            )
+            validation = self.validator.validate(candidate, platform=platform or "linux", architecture=architecture or "x86_64")
             if validation.is_valid:
                 decisions.append(candidate)
-
         return StrategyPlan(
             decisions=decisions,
             overall_confidence=0.85 if decisions else 0.0,
@@ -188,7 +178,6 @@ class StrategyPlanner:
 
     @staticmethod
     def _public_strategy_name(strategy_id: str) -> str:
-        """Normalize catalog strategy IDs to stable semantic strategy names."""
         if strategy_id.endswith("_pip"):
             return "pip_install"
         if "_deb" in strategy_id:
@@ -217,11 +206,15 @@ class StrategyPlanner:
             return strategy
         return None
 
-    @staticmethod
-    def _build_prompt(deltas: list[Any], platform: str | None, architecture: str | None) -> str:
-        tools_info = "\n".join(
-            f"- {delta.tool_id}: {delta.action.value}" for delta in deltas
-        )
+    def _build_prompt(self, deltas: list[Any], platform: str | None, architecture: str | None) -> str:
+        tool_lines: list[str] = []
+        for delta in deltas:
+            tool_def = self.tool_catalog.get(delta.tool_id)
+            if tool_def is None:
+                continue
+            strategies = ", ".join(strategy.strategy_id for strategy in tool_def.installation_strategies)
+            tool_lines.append(f"- {delta.tool_id}: {delta.action.value}; registered strategies: [{strategies}]")
+        tools_info = "\n".join(tool_lines)
         return f"""You are a strategy planner for tool installation.
 
 Tools requiring installation:
@@ -230,7 +223,7 @@ Tools requiring installation:
 Platform: {platform or 'auto-detect'}
 Architecture: {architecture or 'auto-detect'}
 
-Use only strategies registered in the tool catalog. Never invent a shell command,
+Use ONLY the registered strategies listed above. Never invent a shell command,
 source domain, artifact URL, or strategy name. Prefer official sources.
 
 Return ONLY valid JSON:
@@ -252,4 +245,4 @@ Return ONLY valid JSON:
 /no_think"""
 
 
-__all__ = ["StrategyDecision", "StrategyPlan", "StrategyPlanner"]
+__all__ = ["StrategyDecision", "StrategyPlan"]
