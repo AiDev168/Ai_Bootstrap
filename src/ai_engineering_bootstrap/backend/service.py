@@ -5,14 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from ai_engineering_bootstrap.agent.intent_parser import IntentParser
+from ai_engineering_bootstrap.agent.provider import build_provider
 from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService
-from ai_engineering_bootstrap.backend.session_service import EnvironmentSessionService
+from ai_engineering_bootstrap.backend.runtime_session_service import RuntimeSessionService
 from ai_engineering_bootstrap.backend.strategy_planner_runtime import RuntimeStrategyPlanner
 from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
 from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.environment import EnvironmentRequest
 from ai_engineering_bootstrap.environment.session_repository import InMemorySessionRepository
+from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 from ai_engineering_bootstrap.pipeline import PipelineEngine, PipelineResult
 from ai_engineering_bootstrap.planner import PlannerEngine
@@ -139,12 +142,23 @@ class ApplicationBackend:
 
     VERSION = "v1"
 
-    def __init__(self, session_service: EnvironmentSessionService | None = None) -> None:
+    def __init__(self, session_service: RuntimeSessionService | None = None) -> None:
         self._llm_settings = LLMSettingsService()
-        self._session_service = session_service or EnvironmentSessionService(
+        self._session_service = session_service or RuntimeSessionService(
             repository=InMemorySessionRepository(),
             strategy_planner=RuntimeStrategyPlanner(settings_service=self._llm_settings),
+            intent_parser_factory=self._build_runtime_intent_parser,
         )
+
+    def _build_runtime_intent_parser(self) -> IntentParser:
+        settings = self._llm_settings.get()
+        if not settings.enabled or settings.provider == "mock":
+            return IntentParser(tool_catalog=ToolCatalog())
+        try:
+            provider = build_provider(self._llm_settings.provider_config())
+        except (RuntimeError, ValueError):
+            provider = None
+        return IntentParser(provider=provider, tool_catalog=ToolCatalog())
 
     def health(self) -> BackendResult:
         """Return backend health and safe LLM status."""
@@ -281,7 +295,7 @@ class ApplicationBackend:
         return BackendResult(self._session_service.skip(session_id, action_id).data)
 
     def start_session(self, session_id: str, mode: ExecutionMode = ExecutionMode.SAFE) -> BackendResult:
-        return BackendResult(self._session_service.start(session_id, mode).data)
+        return BackendResult(self._session_service.start_async(session_id, mode).data)
 
     def cancel_session(self, session_id: str) -> BackendResult:
         return BackendResult(self._session_service.cancel(session_id).data)
