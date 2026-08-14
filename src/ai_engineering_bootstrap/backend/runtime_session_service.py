@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from threading import Lock, Thread
 
@@ -10,6 +11,9 @@ from ai_engineering_bootstrap.backend.session_service import EnvironmentSessionS
 from ai_engineering_bootstrap.environment.models import EnvironmentRequest, PythonPackageRequirement
 from ai_engineering_bootstrap.environment.session_models import AgentDecision, SessionStatus
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
+
+_PACKAGE_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*(?:\s*(?:===|==|!=|~=|>=|<=|>|<)\s*[A-Za-z0-9][A-Za-z0-9+_.!-]*)?$")
+_INSTALL_CLAUSE = re.compile(r"\b(?:install|reinstall|setup|set up|add)\s+(.+?)(?=\s+(?:on|onto|into|for|using)\s+|$)", re.IGNORECASE)
 
 
 class RuntimeSessionService(EnvironmentSessionService):
@@ -35,7 +39,7 @@ class RuntimeSessionService(EnvironmentSessionService):
         result = super().create(request)
         if parsed is not None:
             session = self.get(result.data["session_id"])
-            provider = "llm" if parsed.reasoning_summary.startswith("LLM") else "deterministic"
+            provider = "llm" if parsed.reasoning_summary.startswith("LLM") else "llm_fallback" if parsed.reasoning_summary.startswith("Deterministic fallback after LLM") else "deterministic"
             session.add_agent_decision(
                 AgentDecision(
                     session_id=session.session_id,
@@ -60,6 +64,7 @@ class RuntimeSessionService(EnvironmentSessionService):
                     "provider": provider,
                     "confidence": parsed.confidence,
                     "required_tools": list(parsed.required_tools),
+                    "project_dependencies": list(parsed.project_dependencies),
                 },
             )
             self.repository.update(session)
@@ -108,9 +113,10 @@ class RuntimeSessionService(EnvironmentSessionService):
         frameworks = list(dict.fromkeys([*request.frameworks, *parsed.frameworks]))
         dependencies = list(request.project_dependencies)
         existing_dependencies = {item.name.lower() for item in dependencies}
-        for name in parsed.project_dependencies:
-            if name.lower() not in existing_dependencies:
+        for name in [*parsed.project_dependencies, *RuntimeSessionService._extract_install_packages(request.natural_language_goal, required)]:
+            if name.lower() not in existing_dependencies and name.lower() not in {tool.lower() for tool in required}:
                 dependencies.append(PythonPackageRequirement(name=name))
+                existing_dependencies.add(name.lower())
         constraints = dict(request.constraints)
         for constraint in parsed.constraints:
             constraints[constraint] = True
@@ -132,6 +138,20 @@ class RuntimeSessionService(EnvironmentSessionService):
             platform_preferences=platform_preferences,
             user_preferences=dict(request.user_preferences),
         )
+
+    @staticmethod
+    def _extract_install_packages(goal: str, required_tools: list[str]) -> list[str]:
+        required = {tool.lower() for tool in required_tools}
+        result: list[str] = []
+        for match in _INSTALL_CLAUSE.finditer(goal):
+            clause = re.sub(r"\bpython\s+(?:package|packages)\b", "", match.group(1), flags=re.IGNORECASE)
+            for token in re.split(r"\s*(?:,|&|\band\b|\+)\s*", clause, flags=re.IGNORECASE):
+                token = token.strip(" .;:()[]")
+                if not token or token.lower() in required or not _PACKAGE_TOKEN.fullmatch(token):
+                    continue
+                if token.lower() not in {item.lower() for item in result}:
+                    result.append(token)
+        return result
 
 
 __all__ = ["RuntimeSessionService"]
