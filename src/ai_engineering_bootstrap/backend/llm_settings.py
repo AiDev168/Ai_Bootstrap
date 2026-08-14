@@ -28,7 +28,7 @@ class LLMSettings:
     model: str = ""
     base_url: str = ""
     api_key_configured: bool = False
-    enabled: bool = True
+    enabled: bool = False
 
 
 class LLMSettingsStore:
@@ -85,12 +85,14 @@ class LLMSettingsStore:
                 "model": "",
                 "base_url": "",
                 "api_key": "",
+                "enabled": "false",
             }
         return {
             "provider": provider or DEFAULT_PROVIDER,
             "model": model,
             "base_url": base_url,
             "api_key": api_key,
+            "enabled": "true",
         }
 
 
@@ -118,30 +120,33 @@ class LLMSettingsService:
         model = str(payload.get("model", "")).strip()
         base_url = str(payload.get("base_url", "")).strip()
         api_key = str(payload.get("api_key", "")).strip()
-        if (
-            not api_key
-            and current.get("api_key")
-            and payload.get("preserve_api_key", True)
-        ):
-            api_key = current["api_key"]
+        if not api_key and payload.get("preserve_api_key"):
+            api_key = current.get("api_key", "")
+        enabled = provider != "mock" and bool(model or base_url)
+        if provider == "in_process":
+            enabled = bool(model)
+        if provider == "remote_api" and not api_key:
+            enabled = False
         return {
             "provider": provider,
             "model": model,
             "base_url": base_url,
             "api_key": api_key,
+            "enabled": str(enabled).lower(),
         }
 
-    @staticmethod
-    def _settings_from_values(values: dict[str, str]) -> LLMSettings:
-        provider = values.get("provider", DEFAULT_PROVIDER).strip() or DEFAULT_PROVIDER
-        if provider not in SUPPORTED_PROVIDERS:
-            provider = DEFAULT_PROVIDER
-        model = values.get("model", "").strip()
-        base_url = values.get("base_url", "").strip()
-        api_key = values.get("api_key", "").strip()
-        enabled = provider == "mock" or (
-            provider != "in_process" and bool(model and base_url)
-        )
+    def get(self) -> LLMSettings:
+        values = self.store.load()
+        provider = values.get("provider", DEFAULT_PROVIDER)
+        model = values.get("model", "")
+        base_url = values.get("base_url", "")
+        api_key = values.get("api_key", "")
+        enabled = values.get("enabled", "false").lower() == "true"
+        enabled = enabled and provider != "mock"
+        if provider == "in_process":
+            enabled = enabled and bool(model)
+        if provider == "remote_api":
+            enabled = enabled and bool(api_key)
         return LLMSettings(
             provider=provider,
             model=model,
@@ -150,149 +155,96 @@ class LLMSettingsService:
             enabled=enabled,
         )
 
-    def get(self) -> LLMSettings:
-        return self._settings_from_values(self.store.load())
+    def update(self, payload: dict[str, Any]) -> LLMSettings:
+        current = self.store.load()
+        values = self._normalize_values(payload, current)
+        self.store.save(values)
+        return self.get()
 
     def provider_config(self) -> ProviderConfig:
         values = self.store.load()
-        settings = self._settings_from_values(values)
         return ProviderConfig(
-            provider_type=settings.provider,
-            model=settings.model or None,
-            base_url=settings.base_url or None,
+            provider_type=values.get("provider", DEFAULT_PROVIDER),
+            model=values.get("model") or None,
+            base_url=values.get("base_url") or None,
             api_key=values.get("api_key") or None,
-            timeout=30,
-            options={"temperature": 0.1, "max_tokens": 900},
+            options={
+                "temperature": float(values.get("temperature", "0.1")),
+                "max_tokens": int(values.get("max_tokens", "900")),
+                "enable_thinking": values.get("enable_thinking", "false").lower() == "true",
+            },
         )
 
-    def update(self, payload: dict[str, Any]) -> LLMSettings:
-        values = self._normalize_values(payload, self.store.load())
-        self.store.save(values)
-        return self._settings_from_values(values)
-
-    def _effective_values(self, payload: dict[str, Any] | None) -> dict[str, str]:
-        if payload is None:
-            return self.store.load()
-        return self._normalize_values(payload, self.store.load())
+    def test_connection(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        values = self._normalize_values(payload or {}, self.store.load())
+        provider = values["provider"]
+        if provider == "mock":
+            return {
+                "ok": False,
+                "provider": provider,
+                "message": "Mock provider is test-only and is not a runtime LLM.",
+            }
+        config = ProviderConfig(
+            provider_type=provider,
+            model=values.get("model") or None,
+            base_url=values.get("base_url") or None,
+            api_key=values.get("api_key") or None,
+            options={},
+        )
+        if provider == "local_server":
+            if not config.base_url:
+                raise ValueError("Base URL is required for local_server")
+            endpoint = config.base_url.rstrip("/") + "/models" if config.base_url.rstrip("/").endswith("/v1") else config.base_url.rstrip("/") + "/v1/models"
+            request = urllib.request.Request(endpoint, headers={"Authorization": f"Bearer {config.api_key}"} if config.api_key else {})
+            try:
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    return {
+                        "ok": 200 <= response.status < 300,
+                        "provider": provider,
+                        "message": "Local server is reachable.",
+                    }
+            except (urllib.error.URLError, urllib.error.HTTPError) as error:
+                return {
+                    "ok": False,
+                    "provider": provider,
+                    "message": f"Connection failed: {error}",
+                }
+        return {
+            "ok": True,
+            "provider": provider,
+            "message": "Provider configuration accepted.",
+        }
 
     def models(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Return model IDs for persisted settings or an unsaved form configuration."""
-        values = self._effective_values(payload)
-        settings = self._settings_from_values(values)
-        if settings.provider == "mock":
-            return {"ok": True, "provider": "mock", "models": ["mock"]}
-        if settings.provider == "in_process":
-            return {
-                "ok": False,
-                "provider": "in_process",
-                "models": [],
-                "message": "In-process provider has no HTTP model catalog.",
-            }
-        if not settings.base_url:
-            return {
-                "ok": False,
-                "provider": settings.provider,
-                "models": [],
-                "message": "LLM base URL is not configured.",
-            }
-        headers = {"Accept": "application/json"}
-        if values.get("api_key"):
-            headers["Authorization"] = f"Bearer {values['api_key']}"
-        url = settings.base_url.rstrip("/") + "/models"
-        request = urllib.request.Request(url, headers=headers)
-        try:
-            with urllib.request.urlopen(request, timeout=5) as response:
-                payload_data = json.loads(response.read().decode("utf-8"))
-            entries = (
-                payload_data.get("data", []) if isinstance(payload_data, dict) else []
-            )
-            models = [
-                str(item.get("id"))
-                for item in entries
-                if isinstance(item, dict) and item.get("id")
-            ]
-            return {
-                "ok": True,
-                "provider": settings.provider,
-                "models": models,
-                "url": url,
-            }
-        except urllib.error.HTTPError as error:
-            return {
-                "ok": False,
-                "provider": settings.provider,
-                "models": [],
-                "status": error.code,
-                "message": f"HTTP {error.code}: {error.reason}",
-                "url": url,
-            }
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
-            return {
-                "ok": False,
-                "provider": settings.provider,
-                "models": [],
-                "message": str(error),
-                "url": url,
-            }
-
-    def test_connection(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Probe persisted settings or unsaved form values without mutating storage."""
-        values = self._effective_values(payload)
-        settings = self._settings_from_values(values)
-        if settings.provider == "mock":
-            return {
-                "ok": True,
-                "provider": "mock",
-                "model": settings.model,
-                "message": "Mock provider is available.",
-            }
-        if settings.provider == "in_process":
-            return {
-                "ok": False,
-                "provider": "in_process",
-                "message": "In-process provider requires a host model instance and cannot be tested from the GUI.",
-            }
-        if not settings.base_url:
-            return {
-                "ok": False,
-                "provider": settings.provider,
-                "message": "LLM base URL is not configured.",
-            }
-        headers = {"Accept": "application/json"}
-        if values.get("api_key"):
-            headers["Authorization"] = f"Bearer {values['api_key']}"
-        url = settings.base_url.rstrip("/") + "/models"
-        request = urllib.request.Request(url, headers=headers)
-        try:
-            with urllib.request.urlopen(request, timeout=5) as response:
-                return {
-                    "ok": True,
-                    "provider": settings.provider,
-                    "model": settings.model,
-                    "status": response.status,
-                    "url": url,
-                }
-        except urllib.error.HTTPError as error:
-            return {
-                "ok": False,
-                "provider": settings.provider,
-                "status": error.code,
-                "message": f"HTTP {error.code}: {error.reason}",
-                "url": url,
-            }
-        except (urllib.error.URLError, TimeoutError) as error:
-            return {
-                "ok": False,
-                "provider": settings.provider,
-                "message": str(error),
-                "url": url,
-            }
+        values = self._normalize_values(payload or {}, self.store.load())
+        provider = values["provider"]
+        config = ProviderConfig(
+            provider_type=provider,
+            model=values.get("model") or None,
+            base_url=values.get("base_url") or None,
+            api_key=values.get("api_key") or None,
+            options={},
+        )
+        if provider == "local_server":
+            if not config.base_url:
+                raise ValueError("Base URL is required for local_server")
+            base_url = config.base_url.rstrip("/")
+            endpoint = f"{base_url}/models" if base_url.endswith("/v1") else f"{base_url}/v1/models"
+            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            request = urllib.request.Request(endpoint, headers=headers)
+            try:
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    data = json.loads(response.read().decode("utf-8"))
+                return {"ok": True, "provider": provider, "models": [item.get("id") for item in data.get("data", []) if isinstance(item, dict) and item.get("id")]}
+            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as error:
+                return {"ok": False, "provider": provider, "models": [], "message": f"Model discovery failed: {error}"}
+        return {"ok": True, "provider": provider, "models": [config.model] if config.model else []}
 
 
 __all__ = [
     "DEFAULT_PROVIDER",
-    "SUPPORTED_PROVIDERS",
     "LLMSettings",
     "LLMSettingsService",
     "LLMSettingsStore",
+    "SUPPORTED_PROVIDERS",
 ]
