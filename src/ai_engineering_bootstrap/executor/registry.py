@@ -5,7 +5,9 @@ from __future__ import annotations
 
 from ai_engineering_bootstrap.executor.handlers.base import ActionHandler
 from ai_engineering_bootstrap.executor.handlers.real_handlers import REAL_HANDLERS
-from ai_engineering_bootstrap.executor.handlers.safe_handlers import DEFAULT_SAFE_HANDLERS
+from ai_engineering_bootstrap.executor.handlers.safe_handlers import (
+    DEFAULT_SAFE_HANDLERS,
+)
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 
 
