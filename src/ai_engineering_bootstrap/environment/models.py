@@ -75,7 +75,9 @@ class EnvironmentRequest:
                 tools[tool_id] = ToolRequirement(
                     tool_id=tool_id,
                     level=ToolRequirementLevel.OPTIONAL,
-                    configuration={"force_install": force_install} if force_install else {},
+                    configuration={"force_install": force_install}
+                    if force_install
+                    else {},
                 )
 
         packages = [
