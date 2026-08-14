@@ -1,4 +1,4 @@
-"""LLM-powered intent parsing for natural language environment requests."""
+"""LLM-powered semantic intent parsing for environment installation requests."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.agent.strategy_llm_bridge import StrategyLLMProvider
-from ai_engineering_bootstrap.environment.models import EnvironmentRequest
+from ai_engineering_bootstrap.environment.models import EnvironmentRequest, PythonPackageRequirement
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 
 _TOOL_ALIASES = {
@@ -18,7 +18,7 @@ _TOOL_ALIASES = {
     "ruff": {"ruff", "روف", "رووف", "راف"},
     "pytest": {"pytest", "py test", "پایتست", "پای تست", "پی‌تست"},
     "black": {"black", "بلک"},
-    "github-cli": {"github-cli", "gh"},
+    "github-cli": {"github-cli", "gh", "گیت هاب کلای"},
     "nodejs": {"node", "nodejs", "نود"},
     "npm": {"npm", "ان پی ام"},
     "uv": {"uv"},
@@ -26,17 +26,14 @@ _TOOL_ALIASES = {
     "python": {"python", "python3", "پایتون"},
 }
 
-_POSITIVE_VERBS = re.compile(
-    r"\b(?:install|reinstall|setup|set up|add|نصب|نصب کن|نصب کنید|راه[ -]?اندازی)\b",
-    re.IGNORECASE,
-)
+_INSTALL_VERB = r"(?:install|reinstall|setup|set\s+up|add|نصب(?:\s+کن(?:ید|م)?)?|راه[ -]?اندازی(?:\s+کن(?:ید|م)?)?|اضافه(?:\s+کن(?:ید|م)?)?)"
 _NEGATION = re.compile(
-    r"(?:\bdon['’]?t\b|\bdo not\b|\bdont\b|\bnever\b|\bavoid\b|\bwithout\b|"
+    r"(?:\bdon['’]?t\b|\bdo\s+not\b|\bdont\b|\bnever\b|\bavoid\b|"
     r"نصب\s+نکن(?:ید|م)?|نصب\s+نشود|نمی[‌ ]?(?:خوام|خواهم)|نیازی\s+به\s+نصب)",
     re.IGNORECASE,
 )
 _TOKEN = re.compile(
-    r"^[A-Za-z0-9][A-Za-z0-9_.+-]*(?:\s*(?:===|==|!=|~=|>=|<=|>|<)\s*[A-Za-z0-9][A-Za-z0-9+_.!-]*)?$"
+    r"^[A-Za-z0-9][A-Za-z0-9_.+\-]*(?:\s*(?:===|==|!=|~=|>=|<=|>|<)\s*[A-Za-z0-9][A-Za-z0-9+_.!\-]*)?$"
 )
 
 
@@ -60,7 +57,7 @@ class ParsedIntent:
     def to_environment_request(
         self, project_path: str, project_id: str | None = None
     ) -> EnvironmentRequest:
-        """Convert parsed intent into a structured EnvironmentRequest."""
+        """Convert the parsed intent into the canonical request model."""
         return EnvironmentRequest(
             request_id="",
             project_id=project_id or "",
@@ -71,7 +68,7 @@ class ParsedIntent:
             excluded_tools=self.excluded_tools,
             languages=self.languages,
             frameworks=self.frameworks,
-            project_dependencies=self.project_dependencies,
+            project_dependencies=[PythonPackageRequirement(name=name) for name in self.project_dependencies],
             excluded_packages=self.excluded_packages,
             configurations={},
             constraints={constraint: True for constraint in self.constraints},
@@ -83,7 +80,7 @@ class ParsedIntent:
 
 
 class IntentParser:
-    """Parse natural language into structured environment requests."""
+    """Parse natural-language installation intent with LLM-first semantics."""
 
     def __init__(
         self,
@@ -112,84 +109,82 @@ class IntentParser:
         }
 
     def is_llm_available(self) -> bool:
-        """Return whether a semantic LLM provider is configured."""
+        """Return whether semantic LLM parsing is configured."""
         return self.provider is not None
 
     def parse(self, natural_language: str) -> ParsedIntent:
-        """Parse a natural-language goal, using LLM semantics with safe fallback."""
+        """Parse intent; deterministic parsing is fallback-only and never infers installs."""
         if not natural_language.strip():
             return ParsedIntent(reasoning_summary="Empty intent")
-        if not self.provider:
+        if self.provider is None:
             return self._deterministic_parse(natural_language)
         try:
             return self._llm_parse(natural_language)
-        except Exception as error:  # noqa: BLE001 - provider boundary must preserve a usable fallback
+        except Exception as error:  # noqa: BLE001 - semantic provider fallback boundary
             fallback = self._deterministic_parse(natural_language)
-            fallback.reasoning_summary = f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            fallback.reasoning_summary = (
+                f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            )
             fallback.confidence = min(fallback.confidence, 0.55)
             return fallback
 
     def _llm_parse(self, natural_language: str) -> ParsedIntent:
-        """Use the configured LLM as the semantic intent authority."""
+        """Delegate semantic extraction to the configured provider."""
         decision = StrategyLLMProvider(
             self.provider,
             system_prompt=(
                 "You are the semantic intent engine for an engineering environment installer. "
-                "Understand English and Persian. Extract what the user explicitly wants installed "
-                "and what the user explicitly says must NOT be installed. "
-                "Negative instructions override positive mentions. Return ONLY valid JSON."
+                "Understand English and Persian. Return ONLY valid JSON. Capture every explicit "
+                "installation request and every explicit exclusion. Never infer an installation "
+                "from a mere mention of a language, framework, or tool. Negative instructions "
+                "override positive mentions."
             ),
         ).decide(self._build_prompt(natural_language), [])
         parsed = json.loads(decision.reasoning_summary.strip())
         if not isinstance(parsed, dict):
             raise TypeError("LLM intent response must be an object.")
 
-        excluded_tools, excluded_packages = self._deterministic_exclusions(
-            natural_language
+        deterministic_excluded_tools, deterministic_excluded_packages = (
+            self._deterministic_exclusions(natural_language)
         )
-        lexical_tools = self._deterministic_tool_mentions(
-            natural_language, excluded_tools
+        lexical_tools = self._deterministic_explicit_tool_mentions(
+            natural_language, deterministic_excluded_tools
         )
-        required_tools = self._normalise_strings(
-            parsed.get("required_tools", []), self._known_tools
-        )
-        optional_tools = self._normalise_strings(
-            parsed.get("optional_tools", []), self._known_tools
-        )
+
         excluded_tools = self._merge_unique(
-            excluded_tools,
-            self._normalise_strings(
-                parsed.get("excluded_tools", []), self._known_tools
-            ),
+            deterministic_excluded_tools,
+            self._normalise_strings(parsed.get("excluded_tools", []), self._known_tools),
+        )
+        excluded_packages = self._merge_unique(
+            deterministic_excluded_packages,
+            self._normalise_packages(parsed.get("excluded_packages", [])),
+        )
+        excluded_tool_set = {tool.lower() for tool in excluded_tools}
+        excluded_package_set = {package.lower() for package in excluded_packages}
+
+        required_tools = self._merge_unique(
+            self._normalise_strings(parsed.get("required_tools", []), self._known_tools),
+            lexical_tools,
         )
         required_tools = [
-            tool
-            for tool in self._merge_unique(required_tools, lexical_tools)
-            if tool.lower() not in {item.lower() for item in excluded_tools}
+            tool for tool in required_tools if tool.lower() not in excluded_tool_set
         ]
         optional_tools = [
             tool
-            for tool in self._merge_unique(optional_tools, [])
-            if tool.lower() not in {item.lower() for item in excluded_tools}
-            and tool not in required_tools
+            for tool in self._normalise_strings(
+                parsed.get("optional_tools", []), self._known_tools
+            )
+            if tool.lower() not in excluded_tool_set and tool not in required_tools
         ]
 
-        project_dependencies = self._normalise_packages(
-            parsed.get("project_dependencies", [])
-        )
-        excluded_packages = self._merge_unique(
-            excluded_packages,
-            self._normalise_strings(parsed.get("excluded_packages", [])),
-        )
-        excluded_package_set = {item.lower() for item in excluded_packages}
         project_dependencies = [
             package
-            for package in project_dependencies
+            for package in self._normalise_packages(parsed.get("project_dependencies", []))
             if package.lower() not in excluded_package_set
         ]
 
         return ParsedIntent(
-            natural_language_goal=parsed.get("natural_language_goal", natural_language),
+            natural_language_goal=str(parsed.get("natural_language_goal", natural_language)),
             required_tools=required_tools,
             optional_tools=optional_tools,
             excluded_tools=excluded_tools,
@@ -206,90 +201,62 @@ class IntentParser:
         )
 
     def _deterministic_parse(self, natural_language: str) -> ParsedIntent:
-        """High-recall deterministic fallback for common English/Persian requests."""
+        """Fallback parser for explicit English/Persian install and exclusion clauses."""
         excluded_tools, excluded_packages = self._deterministic_exclusions(
             natural_language
         )
-        required_tools = self._deterministic_tool_mentions(
+        required_tools = self._deterministic_explicit_tool_mentions(
             natural_language, excluded_tools
         )
-        optional_tools: list[str] = []
+        packages = self._extract_install_packages(natural_language, required_tools)
+        excluded_package_set = {package.lower() for package in excluded_packages}
+        packages = [
+            package for package in packages if package.lower() not in excluded_package_set
+        ]
+
         text_lower = natural_language.lower()
-        languages: list[str] = []
+        languages = []
+        if "python" in text_lower or "پایتون" in text_lower:
+            languages.append("python")
+        if "javascript" in text_lower or re.search(r"\bjs\b", text_lower):
+            languages.append("javascript")
+        if "typescript" in text_lower or re.search(r"\bts\b", text_lower):
+            languages.append("typescript")
+
         frameworks = [
             framework for framework in self._known_frameworks if framework in text_lower
         ]
-        dependencies = self._extract_install_packages(natural_language, required_tools)
-        dependencies = [
-            package
-            for package in dependencies
-            if package.lower() not in {item.lower() for item in excluded_packages}
-        ]
-        constraints: list[str] = []
-
-        if "python" in text_lower or "پایتون" in text_lower:
-            languages.append("python")
-        if "javascript" in text_lower or " js " in f" {text_lower} ":
-            languages.append("javascript")
-        if "typescript" in text_lower or " ts " in f" {text_lower} ":
-            languages.append("typescript")
-        if (
-            "no sudo" in text_lower
-            or "without root" in text_lower
-            or "بدون روت" in text_lower
-        ):
+        constraints = []
+        if "no sudo" in text_lower or "without root" in text_lower or "بدون روت" in text_lower:
             constraints.append("no_root_required")
         if "virtualenv" in text_lower or "venv" in text_lower:
             constraints.append("use_virtualenv")
         if "isolated" in text_lower or "ایزوله" in text_lower:
             constraints.append("isolated_environment")
-        if any(
-            value in text_lower
-            for value in (
-                "ai",
-                "ml",
-                "machine learning",
-                "هوش مصنوعی",
-                "یادگیری ماشین",
-            )
-        ):
-            if "python" not in required_tools:
-                required_tools.append("python")
-            if "pytorch" not in frameworks and "tensorflow" not in frameworks:
-                frameworks.append("pytorch")
-            if "transformers" not in frameworks:
-                frameworks.append("transformers")
-        if "fastapi" in text_lower:
-            if "python" not in required_tools:
-                required_tools.append("python")
-            if "uvicorn" not in [item.lower() for item in dependencies]:
-                dependencies.append("uvicorn")
-            if "pytest" in self._known_tools and "pytest" not in required_tools:
-                required_tools.append("pytest")
 
         return ParsedIntent(
             natural_language_goal=natural_language,
             required_tools=required_tools,
-            optional_tools=optional_tools,
+            optional_tools=[],
             excluded_tools=excluded_tools,
             languages=languages,
             frameworks=frameworks,
-            project_dependencies=dependencies,
+            project_dependencies=packages,
             excluded_packages=excluded_packages,
             constraints=constraints,
             confidence=0.7,
-            reasoning_summary="Deterministic high-recall fallback parsing",
+            reasoning_summary="Deterministic explicit-intent fallback",
         )
 
     def _build_prompt(self, natural_language: str) -> str:
-        """Build the semantic JSON contract used for intent extraction."""
+        """Build a strict semantic contract for the LLM."""
         return f"""You are the semantic intent engine for an engineering environment installer.
-Understand both English and Persian user requests.
+Understand both English and Persian.
 
-Catalog of valid tool IDs:
+Valid tool IDs:
 {sorted(self._known_tools)}
 
-Return ONLY this JSON object:
+Return ONLY one JSON object with exactly these fields:
 {{
   "natural_language_goal": "...",
   "required_tools": ["tool1", "tool2"],
@@ -297,96 +264,77 @@ Return ONLY this JSON object:
   "excluded_tools": ["tool4"],
   "languages": ["python"],
   "frameworks": ["fastapi"],
-  "project_dependencies": ["package1"],
-  "excluded_packages": ["package2"],
+  "project_dependencies": ["colorama"],
+  "excluded_packages": ["colorama"],
   "constraints": ["no_root_required"],
   "platform_preferences": ["linux"]
 }}
 
-Rules:
-1. Capture EVERY explicitly requested install target; do not stop after one or two.
-2. Negative instructions such as "don't install colorama", "do not install pytest", "کالرآما را نصب نکن" or "پی‌تست نصب نشود" go to excluded_tools or excluded_packages and override any positive mention.
-3. Never invent a tool ID. Unknown package names may go to project_dependencies.
-4. Preserve explicit version constraints when present.
-5. Do not infer an installation merely because a framework or language was mentioned.
-6. The result is used to build an execution plan, so omission of a requested item is a semantic error.
+Hard rules:
+1. Capture EVERY explicit installation target, not only the first one or two.
+2. "don't install X", "do not install X", "avoid X", "X را نصب نکن", and "X نصب نشود" are exclusions.
+3. Exclusions override positive mentions.
+4. Unknown names that look like Python packages belong in project_dependencies/excluded_packages.
+5. Do not infer installation because a framework, language, or tool was merely mentioned.
+6. Preserve version constraints if the user supplied them.
+7. Do not omit an explicit requested item.
+8. Persian and English may be mixed in one sentence.
 
 User goal:
 {natural_language}
 /no_think"""
 
-    def _deterministic_tool_mentions(
+    def _deterministic_explicit_tool_mentions(
         self, text: str, excluded_tools: list[str]
     ) -> list[str]:
         lowered = text.lower()
-        excluded = {item.lower() for item in excluded_tools}
-        found: list[str] = []
-        for tool_id in self._known_tools:
-            aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
-            for alias in aliases:
-                for match in re.finditer(re.escape(alias.lower()), lowered):
-                    context = lowered[max(0, match.start() - 90) : match.start()]
-                    if _NEGATION.search(context):
-                        continue
-                    found.append(tool_id)
-                    break
-                if tool_id in found:
-                    break
-        return [
-            tool
-            for tool in self._merge_unique(found, [])
-            if tool.lower() not in excluded
-        ]
+        excluded = {tool.lower() for tool in excluded_tools}
+        result: list[str] = []
+        clauses = re.split(r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", lowered, flags=re.IGNORECASE)
+        for clause in clauses:
+            if not re.search(_INSTALL_VERB, clause, flags=re.IGNORECASE):
+                continue
+            for tool_id in self._known_tools:
+                aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
+                if any(re.search(re.escape(alias.lower()), clause) for alias in aliases):
+                    if tool_id.lower() not in excluded:
+                        result.append(tool_id)
+        return self._merge_unique(result, [])
 
     def _deterministic_exclusions(self, text: str) -> tuple[list[str], list[str]]:
         lowered = text.lower()
         excluded_tools: list[str] = []
-        for tool_id in self._known_tools:
-            aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
-            for alias in aliases:
-                for match in re.finditer(re.escape(alias.lower()), lowered):
-                    context = lowered[max(0, match.start() - 100) : match.start()]
-                    if _NEGATION.search(context):
-                        excluded_tools.append(tool_id)
-                        break
-                if tool_id in excluded_tools:
-                    break
-
-        excluded_packages = self._extract_negative_packages(text)
-        return self._merge_unique(excluded_tools, []), self._merge_unique(
-            excluded_packages, []
-        )
+        clauses = re.split(r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", lowered, flags=re.IGNORECASE)
+        for clause in clauses:
+            if not _NEGATION.search(clause):
+                continue
+            for tool_id in self._known_tools:
+                aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
+                if any(re.search(re.escape(alias.lower()), clause) for alias in aliases):
+                    excluded_tools.append(tool_id)
+        return self._merge_unique(excluded_tools, []), self._extract_negative_packages(text)
 
     @staticmethod
     def _extract_negative_packages(text: str) -> list[str]:
         result: list[str] = []
-        clauses = re.split(
-            r"[\n.;،]+|\bbut\b|\bاما\b|\bولی\b", text, flags=re.IGNORECASE
-        )
+        clauses = re.split(r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", text, flags=re.IGNORECASE)
         for clause in clauses:
-            if not _NEGATION.search(clause) or not _POSITIVE_VERBS.search(clause):
+            if not _NEGATION.search(clause):
                 continue
             match = re.search(
-                r"(?:don't|do not|dont|never|avoid)\s+(?:install|reinstall|setup|set up|add)\s+(.+)$",
+                rf"(?:don't|do\s+not|dont|never|avoid)\s+{_INSTALL_VERB}\s+(.+)$",
                 clause,
                 flags=re.IGNORECASE,
             )
             payload = match.group(1) if match else clause
             payload = re.sub(
-                r".*?\b(?:نصب\s+نکن(?:ید|م)?|نصب\s+نشود)\b\s*",
+                r".*?(?:نصب\s+نکن(?:ید|م)?|نصب\s+نشود)\s*",
                 "",
                 payload,
                 flags=re.IGNORECASE,
             )
-            for token in re.split(
-                r"\s*(?:,|&|\band\b|\band/or\b|\bو\b|\+)\s*",
-                payload,
-                flags=re.IGNORECASE,
-            ):
-                candidate = token.strip(" .;:()[]،")
-                candidate = re.sub(
-                    r"(?:را|رو)\s*$", "", candidate, flags=re.IGNORECASE
-                ).strip()
+            for token in re.split(r"\s*(?:,|&|\band\b|\bو\b|\+)\s*", payload, flags=re.IGNORECASE):
+                candidate = re.sub(r"(?:را|رو)\s*$", "", token.strip(" .;:()[]،"), flags=re.IGNORECASE).strip()
                 if candidate and _TOKEN.fullmatch(candidate):
                     result.append(candidate)
         return list(dict.fromkeys(result))
@@ -395,18 +343,17 @@ User goal:
     def _extract_install_packages(text: str, required_tools: list[str]) -> list[str]:
         required = {tool.lower() for tool in required_tools}
         result: list[str] = []
-        positive_clauses = [
-            match.group(1)
-            for match in re.finditer(
-                r"\b(?:install|reinstall|setup|set up|add)\s+(.+?)(?=\s+(?:on|onto|into|for|using)\s+|$)",
-                text,
+        pattern = rf"{_INSTALL_VERB}\s+(.+?)(?=\s+(?:on|onto|into|for|using|در|روی|برای)\s+|$)"
+        for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+            clause = re.sub(
+                r"\bpython\s+(?:package|packages)\b",
+                "",
+                match.group(1),
                 flags=re.IGNORECASE,
             )
-        ]
-        for clause in positive_clauses:
-            for token in re.split(
-                r"\s*(?:,|&|\band\b|\+)\s*", clause, flags=re.IGNORECASE
-            ):
+            if _NEGATION.search(match.group(0)):
+                continue
+            for token in re.split(r"\s*(?:,|&|\band\b|\bو\b|\+)\s*", clause, flags=re.IGNORECASE):
                 candidate = token.strip(" .;:()[]،")
                 if (
                     candidate
