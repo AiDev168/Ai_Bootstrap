@@ -55,9 +55,7 @@ class RuntimeSessionService(EnvironmentSessionService):
             session = self.get(result.data["session_id"])
             if parsed.reasoning_summary.startswith("LLM-parsed"):
                 provider = "llm"
-            elif parsed.reasoning_summary.startswith(
-                "Deterministic fallback after LLM"
-            ):
+            elif parsed.reasoning_summary.startswith("Deterministic fallback after LLM"):
                 provider = "llm_fallback"
             else:
                 provider = "deterministic"
@@ -74,9 +72,7 @@ class RuntimeSessionService(EnvironmentSessionService):
                         "excluded_tools": list(parsed.excluded_tools),
                         "languages": list(parsed.languages),
                         "frameworks": list(parsed.frameworks),
-                        "project_dependencies": [
-                            item.name for item in parsed.project_dependencies
-                        ],
+                        "project_dependencies": list(parsed.project_dependencies),
                         "excluded_packages": list(parsed.excluded_packages),
                         "constraints": list(parsed.constraints),
                     },
@@ -90,9 +86,7 @@ class RuntimeSessionService(EnvironmentSessionService):
                     "confidence": parsed.confidence,
                     "required_tools": list(parsed.required_tools),
                     "excluded_tools": list(parsed.excluded_tools),
-                    "project_dependencies": [
-                        item.name for item in parsed.project_dependencies
-                    ],
+                    "project_dependencies": list(parsed.project_dependencies),
                     "excluded_packages": list(parsed.excluded_packages),
                 },
             )
@@ -189,14 +183,14 @@ class RuntimeSessionService(EnvironmentSessionService):
         ]
         existing_dependencies = {item.name.lower() for item in dependencies}
         required_lower = {tool.lower() for tool in required}
-        for package in [*parsed.project_dependencies]:
+        for name in parsed.project_dependencies:
             if (
-                package.name.lower() not in excluded_package_set
-                and package.name.lower() not in existing_dependencies
-                and package.name.lower() not in required_lower
+                name.lower() not in excluded_package_set
+                and name.lower() not in existing_dependencies
+                and name.lower() not in required_lower
             ):
-                dependencies.append(package)
-                existing_dependencies.add(package.name.lower())
+                dependencies.append(PythonPackageRequirement(name=name))
+                existing_dependencies.add(name.lower())
 
         extracted = RuntimeSessionService._extract_install_packages(
             request.natural_language_goal, required
@@ -250,7 +244,7 @@ class RuntimeSessionService(EnvironmentSessionService):
             for token in re.split(
                 r"\s*(?:,|&|\band\b|\+)\s*", clause, flags=re.IGNORECASE
             ):
-                token = token.strip(" .;:()[]،")
+                token = token.strip(" .;:()[]")
                 if (
                     not token
                     or token.lower() in required
