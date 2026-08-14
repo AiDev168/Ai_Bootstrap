@@ -171,7 +171,8 @@ class LLMSettingsService:
             options={
                 "temperature": float(values.get("temperature", "0.1")),
                 "max_tokens": int(values.get("max_tokens", "900")),
-                "enable_thinking": values.get("enable_thinking", "false").lower() == "true",
+                "enable_thinking": values.get("enable_thinking", "false").lower()
+                == "true",
             },
         )
 
@@ -194,8 +195,17 @@ class LLMSettingsService:
         if provider == "local_server":
             if not config.base_url:
                 raise ValueError("Base URL is required for local_server")
-            endpoint = config.base_url.rstrip("/") + "/models" if config.base_url.rstrip("/").endswith("/v1") else config.base_url.rstrip("/") + "/v1/models"
-            request = urllib.request.Request(endpoint, headers={"Authorization": f"Bearer {config.api_key}"} if config.api_key else {})
+            endpoint = (
+                config.base_url.rstrip("/") + "/models"
+                if config.base_url.rstrip("/").endswith("/v1")
+                else config.base_url.rstrip("/") + "/v1/models"
+            )
+            request = urllib.request.Request(
+                endpoint,
+                headers={"Authorization": f"Bearer {config.api_key}"}
+                if config.api_key
+                else {},
+            )
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:
                     return {
@@ -229,22 +239,49 @@ class LLMSettingsService:
             if not config.base_url:
                 raise ValueError("Base URL is required for local_server")
             base_url = config.base_url.rstrip("/")
-            endpoint = f"{base_url}/models" if base_url.endswith("/v1") else f"{base_url}/v1/models"
-            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            endpoint = (
+                f"{base_url}/models"
+                if base_url.endswith("/v1")
+                else f"{base_url}/v1/models"
+            )
+            headers = (
+                {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            )
             request = urllib.request.Request(endpoint, headers=headers)
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:
                     data = json.loads(response.read().decode("utf-8"))
-                return {"ok": True, "provider": provider, "models": [item.get("id") for item in data.get("data", []) if isinstance(item, dict) and item.get("id")]}
-            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as error:
-                return {"ok": False, "provider": provider, "models": [], "message": f"Model discovery failed: {error}"}
-        return {"ok": True, "provider": provider, "models": [config.model] if config.model else []}
+                return {
+                    "ok": True,
+                    "provider": provider,
+                    "models": [
+                        item.get("id")
+                        for item in data.get("data", [])
+                        if isinstance(item, dict) and item.get("id")
+                    ],
+                }
+            except (
+                urllib.error.URLError,
+                urllib.error.HTTPError,
+                json.JSONDecodeError,
+            ) as error:
+                return {
+                    "ok": False,
+                    "provider": provider,
+                    "models": [],
+                    "message": f"Model discovery failed: {error}",
+                }
+        return {
+            "ok": True,
+            "provider": provider,
+            "models": [config.model] if config.model else [],
+        }
 
 
 __all__ = [
     "DEFAULT_PROVIDER",
+    "SUPPORTED_PROVIDERS",
     "LLMSettings",
     "LLMSettingsService",
     "LLMSettingsStore",
-    "SUPPORTED_PROVIDERS",
 ]
