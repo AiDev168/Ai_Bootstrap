@@ -7,6 +7,7 @@ import re
 from collections.abc import Callable
 from threading import Lock, Thread
 
+from ai_engineering_bootstrap.agent.intent_normalizer import IntentNormalizer
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser, ParsedIntent
 from ai_engineering_bootstrap.backend.session_service import (
     EnvironmentSessionService,
@@ -20,6 +21,7 @@ from ai_engineering_bootstrap.environment.session_models import (
     AgentDecision,
     SessionStatus,
 )
+from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,7 @@ class RuntimeSessionService(EnvironmentSessionService):
     ) -> None:
         super().__init__(**kwargs)
         self._intent_parser_factory = intent_parser_factory
+        self._intent_normalizer = IntentNormalizer(ToolCatalog())
         self._running: set[str] = set()
         self._running_lock = Lock()
 
@@ -48,6 +51,9 @@ class RuntimeSessionService(EnvironmentSessionService):
         parsed = None
         if self._intent_parser_factory and request.natural_language_goal.strip():
             parsed = self._intent_parser_factory().parse(request.natural_language_goal)
+            parsed = self._intent_normalizer.normalize(
+                request.natural_language_goal, parsed
+            )
             request = self._merge_request(request, parsed)
 
         result = super().create(request)
@@ -55,9 +61,7 @@ class RuntimeSessionService(EnvironmentSessionService):
             session = self.get(result.data["session_id"])
             if parsed.reasoning_summary.startswith("LLM-parsed"):
                 provider = "llm"
-            elif parsed.reasoning_summary.startswith(
-                "Deterministic fallback after LLM"
-            ):
+            elif parsed.reasoning_summary.startswith("Deterministic fallback after LLM"):
                 provider = "llm_fallback"
             else:
                 provider = "deterministic"
@@ -246,7 +250,7 @@ class RuntimeSessionService(EnvironmentSessionService):
             for token in re.split(
                 r"\s*(?:,|&|\band\b|\+)\s*", clause, flags=re.IGNORECASE
             ):
-                token = token.strip(" .;:()[]")
+                token = token.strip(" .;:()[]،")
                 if (
                     not token
                     or token.lower() in required
