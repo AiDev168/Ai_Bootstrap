@@ -3,455 +3,141 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Engineering Bootstrap - Environment Orchestrator</title>
+<title>AI Engineering Bootstrap</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#0b1020;color:#e8ecf4}
-body{margin:0;background:linear-gradient(135deg,#0b1020,#131a2d);min-height:100vh}
-main{max-width:1400px;margin:0 auto;padding:28px}
-h1{margin:0 0 8px;font-size:28px}.muted{color:#95a1b5}
-.tabs{display:flex;gap:8px;margin:20px 0;border-bottom:1px solid #26324d;padding-bottom:0}
-.tab{padding:10px 20px;background:transparent;border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;cursor:pointer;color:#95a1b5}
-.tab:hover{background:#151d32;color:#e8ecf4}
-.tab.active{background:#151d32;border-color:#26324d;color:#5c7cfa;font-weight:600}
-.tab-content{display:none}
-.tab-content.active{display:block}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:20px 0}
-.card{background:#151d32;border:1px solid #26324d;border-radius:16px;padding:18px;box-shadow:0 12px 30px #0003}
-.value{font-size:30px;font-weight:700;margin-top:10px}
-.ok{color:#61d095}.bad{color:#ff7d87}.warn{color:#f7c66b}
-button{background:#5c7cfa;color:white;border:0;border-radius:10px;padding:11px 18px;cursor:pointer;margin:6px 8px 6px 0;font-size:14px;font-weight:500;transition:all 0.2s}
-button:hover{filter:brightness(1.1);transform:translateY(-1px)}
-button.secondary{background:#26324d}
-button.success{background:#61d095;color:#0b1020}
-button.danger{background:#ff7d87;color:#0b1020}
-button:disabled{opacity:0.5;cursor:not-allowed;transform:none}
-pre{white-space:pre-wrap;background:#0a0f1d;padding:14px;border-radius:10px;overflow:auto;max-height:500px;font-size:13px}
-table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{padding:12px;border-bottom:1px solid #28344e;text-align:left;font-size:14px}
-th{color:#95a1b5;font-weight:500}
-input,textarea,select{background:#0a0f1d;border:1px solid #26324d;border-radius:8px;padding:12px;color:#e8ecf4;font-size:14px;width:100%;box-sizing:border-box;margin:8px 0}
-input:focus,textarea:focus,select:focus{outline:none;border-color:#5c7cfa}
-label{display:block;margin:16px 0 8px;color:#95a1b5;font-size:13px;font-weight:500}
-.badge{display:inline-block;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;margin-left:8px}
-.badge.ok{background:#61d09522;color:#61d095}
-.badge.bad{background:#ff7d8722;color:#ff7d87}
-.badge.warn{background:#f7c66b22;color:#f7c66b}
-.timeline{position:relative;padding-left:30px}
-.timeline::before{content:'';position:absolute;left:10px;top:0;bottom:0;width:2px;background:#26324d}
-.timeline-item{position:relative;padding:8px 0 8px 20px}
-.timeline-item::before{content:'';position:absolute;left:-24px;top:14px;width:12px;height:12px;border-radius:50%;background:#5c7cfa;border:3px solid #151d32}
-.timeline-item.done::before{background:#61d095}
-.timeline-item.error::before{background:#ff7d87}
-.action-card{background:#0a0f1d;border:1px solid #26324d;border-radius:12px;padding:16px;margin:12px 0}
-.action-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.action-title{font-weight:600;font-size:15px}
-.action-meta{font-size:12px;color:#95a1b5}
-.stat-value{font-size:36px;font-weight:700}
-.stat-label{color:#95a1b5;font-size:13px;margin-top:4px}
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#07101d;color:#e8eef7}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(135deg,#07101d,#0f1930 55%,#101827);min-height:100vh}
+main{max-width:1500px;margin:0 auto;padding:24px}
+h1{margin:0;font-size:28px}.muted{color:#91a0b6}.small{font-size:12px;color:#91a0b6}
+.header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}.header-right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.conn{padding:8px 12px;border:1px solid #263450;border-radius:999px;background:#0c1525;font-size:12px}.conn.ok{color:#62d49b}.conn.bad{color:#ff7f8b}.conn.busy{color:#f5c76b}
+.tabs{display:flex;gap:6px;margin:22px 0 16px;border-bottom:1px solid #263450}.tab{border:0;background:transparent;color:#91a0b6;padding:11px 16px;cursor:pointer;border-radius:10px 10px 0 0}.tab.active{background:#17233a;color:#8fa8ff;font-weight:700}
+.panel{display:none}.panel.active{display:block}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.card{background:#111c30;border:1px solid #263450;border-radius:16px;padding:18px;box-shadow:0 14px 40px #0004}.card h3{margin:0 0 12px}.metric{font-size:30px;font-weight:800;margin-top:8px}.ok{color:#62d49b}.bad{color:#ff7f8b}.warn{color:#f5c76b}.neutral{color:#8fa8ff}
+button{border:0;border-radius:10px;padding:10px 14px;cursor:pointer;background:#5d7cff;color:#fff;font-weight:650;transition:.15s}button:hover{transform:translateY(-1px);filter:brightness(1.05)}button:disabled{opacity:.45;cursor:not-allowed;transform:none}button.secondary{background:#263450}button.success{background:#62d49b;color:#07101d}button.warning{background:#f5c76b;color:#07101d}button.danger{background:#ff7f8b;color:#07101d}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+input,textarea,select{width:100%;background:#08111f;border:1px solid #2a3956;color:#e8eef7;border-radius:10px;padding:11px 12px;font:inherit}textarea{min-height:130px;resize:vertical}label{display:block;margin:12px 0 6px;font-size:13px;color:#a8b4c8}.checkgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.check{display:flex;gap:8px;align-items:center;padding:9px 10px;border:1px solid #263450;border-radius:10px;background:#0c1525}.check input{width:auto}
+.badge{display:inline-block;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:700}.badge.ok{background:#62d49b1f;color:#62d49b}.badge.bad{background:#ff7f8b1f;color:#ff7f8b}.badge.warn{background:#f5c76b1f;color:#f5c76b}.badge.neutral{background:#8fa8ff1f;color:#8fa8ff}
+table{width:100%;border-collapse:collapse}th,td{padding:11px 10px;border-bottom:1px solid #24314a;text-align:left;vertical-align:top;font-size:13px}th{color:#91a0b6;font-weight:650}
+.timeline{display:flex;flex-direction:column;gap:8px}.event{padding:10px 12px;border-left:3px solid #5d7cff;background:#0b1424;border-radius:8px}.event.ok{border-left-color:#62d49b}.event.bad{border-left-color:#ff7f8b}.event.warn{border-left-color:#f5c76b}
+.action-card{padding:14px;border:1px solid #263450;border-radius:12px;background:#0b1424;margin-top:10px}.action-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.action-id{font-weight:750}.meta{font-size:12px;color:#91a0b6}
+.alert{display:none;margin:14px 0;padding:12px 14px;border:1px solid #5a2d35;background:#29131a;color:#ffb1ba;border-radius:10px}.alert.show{display:block}
+pre{margin:0;white-space:pre-wrap;word-break:break-word;background:#08111f;border:1px solid #263450;border-radius:10px;padding:12px;max-height:420px;overflow:auto;font-size:12px}
+.request-log{max-height:360px;overflow:auto;display:flex;flex-direction:column;gap:8px}.req{padding:10px;border:1px solid #23324d;border-radius:10px;background:#0a1322}.req.ok{border-left:3px solid #62d49b}.req.bad{border-left:3px solid #ff7f8b}.req.busy{border-left:3px solid #f5c76b}
+.empty{padding:20px;text-align:center;color:#91a0b6}.hidden{display:none}
+@media (max-width:1050px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-2{grid-template-columns:1fr}}
+@media (max-width:680px){main{padding:14px}.grid{grid-template-columns:1fr}.checkgrid{grid-template-columns:1fr}.tab{padding:9px 10px;font-size:12px}}
 </style>
 </head>
 <body>
 <main>
-<h1>🤖 AI Engineering Bootstrap</h1>
-<div class="muted">Environment Orchestrator with LLM-assisted Planning</div>
+<div class="header">
+<div><h1>AI Engineering Bootstrap</h1><div class="muted">Environment orchestration • reconciliation • approval • execution • verification</div></div>
+<div class="header-right"><span id="server-status" class="conn busy">Server: checking…</span><span id="refresh-time" class="small">—</span></div>
+</div>
+<div id="global-alert" class="alert"></div>
 
 <div class="tabs">
-<div class="tab active" onclick="showTab('dashboard')">Dashboard</div>
-<div class="tab" onclick="showTab('session')">Create Session</div>
-<div class="tab" onclick="showTab('sessions')">Sessions</div>
-<div class="tab" onclick="showTab('settings')">LLM Settings</div>
+<button class="tab active" data-tab="dashboard">Dashboard</button>
+<button class="tab" data-tab="create">New Session</button>
+<button class="tab" data-tab="sessions">Sessions</button>
+<button class="tab" data-tab="console">Request Console</button>
 </div>
 
-<!-- DASHBOARD TAB -->
-<div id="dashboard" class="tab-content active">
+<section id="dashboard" class="panel active">
 <div class="grid">
+<div class="card"><div class="small">Backend Health</div><div id="m-health" class="metric">—</div></div>
+<div class="card"><div class="small">LLM</div><div id="m-llm" class="metric">—</div></div>
+<div class="card"><div class="small">Development Ready</div><div id="m-ready" class="metric">—</div></div>
+<div class="card"><div class="small">Sessions</div><div id="m-sessions" class="metric">—</div></div>
+</div>
+<div class="grid-2" style="margin-top:14px">
+<div class="card"><div class="toolbar"><h3>Environment Audit</h3><button id="audit-btn" onclick="refreshAudit()">Run Audit</button></div><div id="audit-table" class="empty">Loading…</div></div>
+<div class="card"><div class="toolbar"><h3>Engineering Tools</h3><button onclick="refreshEngineering()">Refresh</button></div><div id="engineering-table" class="empty">Loading…</div></div>
+</div>
+<div class="card" style="margin-top:14px"><div class="toolbar"><h3>Quick Actions</h3><div class="actions"><button onclick="refreshAll()">Refresh</button><button class="secondary" onclick="openTab('create')">Create Session</button></div></div><div class="muted">Every request made by the GUI is visible in Request Console.</div></div>
+</section>
+
+<section id="create" class="panel">
+<div class="grid-2">
 <div class="card">
-<div class="stat-label">System Health</div>
-<div id="health-status" class="value">—</div>
+<h3>Desired Environment</h3>
+<label for="goal">Natural-language goal</label>
+<textarea id="goal" placeholder="Example: Prepare this machine for Python AI development with Cursor, Docker, Ruff and Pytest."></textarea>
+<label>Required tools</label>
+<div class="checkgrid">
+<label class="check"><input type="checkbox" value="python">Python</label>
+<label class="check"><input type="checkbox" value="git">Git</label>
+<label class="check"><input type="checkbox" value="cursor">Cursor</label>
+<label class="check"><input type="checkbox" value="docker">Docker</label>
+<label class="check"><input type="checkbox" value="ruff">Ruff</label>
+<label class="check"><input type="checkbox" value="pytest">Pytest</label>
+</div>
+<label for="project-path">Project path</label>
+<input id="project-path" placeholder="/home/user/project">
+<div class="actions" style="margin-top:14px"><button id="create-btn" class="success" onclick="createSession()">Create Session</button><button class="secondary" onclick="resetCreate()">Reset</button></div>
 </div>
 <div class="card">
-<div class="stat-label">LLM Available</div>
-<div id="llm-status" class="value">—</div>
-</div>
-<div class="card">
-<div class="stat-label">Active Sessions</div>
-<div id="active-sessions" class="value">—</div>
-</div>
-<div class="card">
-<div class="stat-label">Environment Ready</div>
-<div id="env-ready" class="value">—</div>
+<h3>What happens next?</h3>
+<div class="timeline">
+<div class="event">1. Audit current environment</div>
+<div class="event">2. Reconcile Actual vs Desired State</div>
+<div class="event">3. Generate and validate Execution Plan</div>
+<div class="event">4. Review / approve individual actions</div>
+<div class="event">5. Execute through the canonical pipeline</div>
+<div class="event">6. Verify and record evidence</div>
 </div>
 </div>
+</div>
+</section>
 
-<div class="card">
-<h3 style="margin-top:0">Quick Actions</h3>
-<button onclick="refreshAll()">🔄 Refresh</button>
-<button onclick="showTab('session')">➕ New Session</button>
-<button onclick="runAudit()">🔍 Run Audit</button>
-</div>
+<section id="sessions" class="panel">
+<div class="card"><div class="toolbar"><h3>Sessions</h3><button onclick="loadSessions()">Refresh</button></div><div id="sessions-table" class="empty">Loading…</div></div>
+<div id="session-detail" class="card hidden" style="margin-top:14px"></div>
+</section>
 
-<div class="grid" style="margin-top:20px">
-<div class="card">
-<h3 style="margin-top:0">📊 System Audit</h3>
-<div id="audit-results">Loading...</div>
+<section id="console" class="panel">
+<div class="grid-2">
+<div class="card"><div class="toolbar"><h3>Request Console</h3><button class="secondary" onclick="clearRequestLog()">Clear</button></div><div id="request-log" class="request-log"><div class="empty">No requests yet.</div></div></div>
+<div class="card"><h3>Latest Response</h3><pre id="latest-response">—</pre></div>
 </div>
-<div class="card">
-<h3 style="margin-top:0">🛠️ Tool Status</h3>
-<div id="tool-status">Loading...</div>
-</div>
-</div>
-</div>
-
-<!-- CREATE SESSION TAB -->
-<div id="session" class="tab-content">
-<div class="card">
-<h3 style="margin-top:0">🎯 Create Environment Request</h3>
-<label for="goal-input">Describe your environment goal:</label>
-<textarea id="goal-input" rows="4" placeholder="Example: Prepare this machine for Python AI development with Cursor, Docker, Ruff, and Pytest"></textarea>
-
-<label>Required Tools:</label>
-<div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0">
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="python" style="width:auto;margin-right:6px">Python</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="git" style="width:auto;margin-right:6px">Git</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="cursor" style="width:auto;margin-right:6px">Cursor</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="docker" style="width:auto;margin-right:6px">Docker</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="ruff" style="width:auto;margin-right:6px">Ruff</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="pytest" style="width:auto;margin-right:6px">Pytest</label>
-</div>
-
-<label>Optional Tools:</label>
-<div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0">
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="black" style="width:auto;margin-right:6px">Black</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="github-cli" style="width:auto;margin-right:6px">GitHub CLI</label>
-<label style="display:inline-flex;align-items:center;margin:0"><input type="checkbox" value="nodejs" style="width:auto;margin-right:6px">Node.js</label>
-</div>
-
-<label for="project-path">Project Path (optional):</label>
-<input type="text" id="project-path" placeholder="/path/to/your/project">
-
-<button class="success" onclick="createSession()" style="margin-top:16px">🚀 Create Session</button>
-</div>
-
-<div id="session-result" class="card" style="margin-top:20px;display:none">
-<h3 style="margin-top:0">✅ Session Created</h3>
-<div id="session-details"></div>
-<button onclick="viewSession(currentSessionId)" style="margin-top:12px">View Session Details</button>
-</div>
-</div>
-
-<!-- SESSIONS LIST TAB -->
-<div id="sessions" class="tab-content">
-<div class="card">
-<h3 style="margin-top:0">📋 Active Sessions</h3>
-<button onclick="loadSessions()">🔄 Refresh</button>
-<div id="sessions-list" style="margin-top:16px">Loading...</div>
-</div>
-</div>
-
-<!-- SESSION DETAIL VIEW (hidden by default) -->
-<div id="session-detail" class="tab-content">
-<button class="secondary" onclick="showTab('sessions')" style="margin-bottom:16px">← Back to Sessions</button>
-<div id="session-detail-content">Loading...</div>
-</div>
-
-<!-- SETTINGS TAB -->
-<div id="settings" class="tab-content">
-<div class="card">
-<h3 style="margin-top:0">⚙️ LLM Configuration</h3>
-<label for="llm-provider">Provider:</label>
-<select id="llm-provider">
-<option value="lmstudio">LM Studio</option>
-<option value="ollama">Ollama</option>
-<option value="openai">OpenAI</option>
-<option value="anthropic">Anthropic</option>
-<option value="local">Local (Disabled)</option>
-</select>
-
-<label for="llm-model">Model Name:</label>
-<input type="text" id="llm-model" placeholder="e.g., qwen2.5-coder:7b, llama3.1:8b">
-
-<label for="llm-url">API Base URL:</label>
-<input type="text" id="llm-url" placeholder="http://localhost:1234/v1">
-
-<label for="llm-api-key">API Key (if required):</label>
-<input type="password" id="llm-api-key" placeholder="sk-...">
-
-<div style="margin-top:20px">
-<button class="success" onclick="saveLlmSettings()">💾 Save Settings</button>
-<button onclick="testLlmConnection()">🧪 Test Connection</button>
-</div>
-
-<div id="llm-test-result" style="margin-top:16px"></div>
-</div>
-
-<div class="card" style="margin-top:20px">
-<h3 style="margin-top:0">ℹ️ Current Status</h3>
-<div id="current-llm-status">Loading...</div>
-</div>
-</div>
-
+</section>
 </main>
-
 <script>
-let currentSessionId = null;
-let llmConfig = {provider:'lmstudio',model:'qwen2.5-coder:7b',baseUrl:'http://localhost:1234/v1',apiKey:''};
+const state={sessionId:null,pollTimer:null,requestLog:[]};
+const apiBase='/api/v1';
 
-// Tab navigation
-function showTab(tabId){
-document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
-document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
-document.getElementById(tabId).classList.add('active');
-if(tabId==='dashboard') refreshAll();
-if(tabId==='sessions') loadSessions();
-if(tabId==='settings') loadLlmSettings();
+function badge(value){
+ const ok=value===true||['ok','passed','available','healthy','completed','approved','success'].includes(String(value).toLowerCase());
+ const bad=value===false||['failed','missing','rejected','cancelled','error'].includes(String(value).toLowerCase());
+ const cls=ok?'ok':bad?'bad':'warn';
+ return `<span class="badge ${cls}">${String(value)}</span>`;
 }
-
-// Utility functions
-const api = async(path,method='GET',data=null)=>{
-const opts={method,headers:{'Content-Type':'application/json'}};
-if(data) opts.body=JSON.stringify(data);
-const res=await fetch(`/api/v1${path}`,opts);
-if(!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-return res.json();
-};
-
-function statusBadge(status){
-if(status===true||status==='passed'||status==='available'||status==='healthy') return '<span class="badge ok">OK</span>';
-if(status===false||status==='failed'||status==='missing') return '<span class="badge bad">FAILED</span>';
-return `<span class="badge warn">${status}</span>`;
-}
-
-// Dashboard refresh
-async function refreshAll(){
-try{
-const health=await api('/health');
-document.getElementById('health-status').innerHTML=statusBadge(health.data?.status);
-document.getElementById('llm-status').innerHTML=statusBadge(health.data?.llm_available);
-
-const sessions=await api('/sessions');
-document.getElementById('active-sessions').textContent=sessions.data?.length||0;
-
-const audit=await api('/audit');
-const score=audit.data?.readiness?.health_score||0;
-const ready=audit.data?.readiness?.development_ready;
-document.getElementById('env-ready').innerHTML=statusBadge(ready);
-
-// Audit results table
-let auditHtml='<table><tr><th>Check</th><th>Status</th><th>Details</th></tr>';
-(audit.data?.checks||[]).forEach(c=>{
-auditHtml+=`<tr><td>${c.name}</td><td>${statusBadge(c.status)}</td><td>${c.details||'-'}</td></tr>`;
-});
-auditHtml+='</table>';
-document.getElementById('audit-results').innerHTML=auditHtml;
-
-// Tool status
-const env=await api('/environment');
-let toolHtml='<table><tr><th>Tool</th><th>Status</th><th>Path</th></tr>';
-(env.data?.tools||[]).forEach(t=>{
-toolHtml+=`<tr><td>${t.name}</td><td>${statusBadge(t.available)}</td><td>${t.path||'-'}</td></tr>`;
-});
-toolHtml+='</table>';
-document.getElementById('tool-status').innerHTML=toolHtml;
-}catch(e){
-console.error('Refresh error:',e);
-document.getElementById('health-status').innerHTML='<span class="badge bad">Error</span>';
-}
-}
-
-async function runAudit(){
-try{
-await api('/audit',{method:'POST'});
-alert('Audit completed!');
-refreshAll();
-}catch(e){alert('Audit failed: '+e.message);}
-}
-
-// Session creation
-async function createSession(){
-const goal=document.getElementById('goal-input').value;
-const projectPath=document.getElementById('project-path').value;
-const requiredTools=[...document.querySelectorAll('#session input[type="checkbox"]:checked')].map(cb=>cb.value);
-
-if(!goal){alert('Please enter a goal');return;}
-
-try{
-const result=await api('/environment/request','POST',{
-natural_language_goal:goal,
-project_path:projectPath||null,
-required_tools:requiredTools,
-optional_tools:[]
-});
-currentSessionId=result.data?.session_id;
-document.getElementById('session-result').style.display='block';
-document.getElementById('session-details').innerHTML=`
-<p><strong>Session ID:</strong> ${currentSessionId}</p>
-<p><strong>Status:</strong> ${result.data?.status||'created'}</p>
-`;
-}catch(e){alert('Failed to create session: '+e.message);}
-}
-
-async function viewSession(sessionId){
-showTab('session-detail');
-currentSessionId=sessionId;
-try{
-const [session,state,plan]=await Promise.all([
-api(`/sessions/${sessionId}`),
-api(`/sessions/${sessionId}/state`),
-api(`/sessions/${sessionId}/plan`)
-]);
-
-let html=`
-<div class="card">
-<h3>Session ${sessionId}</h3>
-<p><strong>Status:</strong> ${session.data?.status}</p>
-<p><strong>Goal:</strong> ${session.data?.request?.natural_language_goal||'N/A'}</p>
-</div>
-`;
-
-if(state.data){
-html+='<div class="card" style="margin-top:16px"><h3>Environment Delta</h3>';
-if(state.data.delta?.tools?.length){
-html+='<table><tr><th>Tool</th><th>Action</th><th>From</th><th>To</th></tr>';
-state.data.delta.tools.forEach(d=>{
-html+=`<tr><td>${d.tool_id}</td><td><span class="badge warn">${d.action}</span></td><td>${d.actual_status||'N/A'}</td><td>${d.desired_status||'N/A'}</td></tr>`;
-});
-html+='</table>';
-}else{
-html+='<p>No changes required.</p>';
-}
-html+='</div>';
-}
-
-if(plan.data?.actions?.length){
-html+='<div class="card" style="margin-top:16px"><h3>Execution Plan</h3>';
-plan.data.actions.forEach((action,idx)=>{
-html+=`
-<div class="action-card">
-<div class="action-header">
-<span class="action-title">${idx+1}. ${action.action_id}</span>
-<span class="action-meta">${action.priority||'normal'} priority</span>
-</div>
-<p>${action.description||''}</p>
-<div style="margin-top:12px">
-<button class="success" onclick="approveAction('${sessionId}','${action.action_id}')">✓ Approve</button>
-<button class="secondary" onclick="skipAction('${sessionId}','${action.action_id}')">Skip</button>
-<button class="danger" onclick="rejectAction('${sessionId}','${action.action_id}')">✗ Reject</button>
-</div>
-</div>
-`;
-});
-html+='</div>';
-}
-
-document.getElementById('session-detail-content').innerHTML=html;
-}catch(e){
-document.getElementById('session-detail-content').innerHTML=`<p class="bad">Error loading session: ${e.message}</p>`;
-}
-}
-
-async function loadSessions(){
-try{
-const result=await api('/sessions');
-const sessions=result.data||[];
-if(!sessions.length){
-document.getElementById('sessions-list').innerHTML='<p class="muted">No active sessions.</p>';
-return;
-}
-let html='<table><tr><th>Session ID</th><th>Status</th><th>Goal</th><th>Actions</th></tr>';
-sessions.forEach(s=>{
-html+=`<tr>
-<td>${s.session_id}</td>
-<td>${statusBadge(s.status)}</td>
-<td>${s.request?.natural_language_goal||'N/A'}</td>
-<td><button onclick="viewSession('${s.session_id}')">View</button></td>
-</tr>`;
-});
-html+='</table>';
-document.getElementById('sessions-list').innerHTML=html;
-}catch(e){
-document.getElementById('sessions-list').innerHTML=`<p class="bad">Error: ${e.message}</p>`;
-}
-}
-
-async function approveAction(sessionId,actionId){
-try{
-await api(`/sessions/${sessionId}/actions/${actionId}/approve`,`POST`);
-alert('Action approved! Execution started.');
-viewSession(sessionId);
-}catch(e){alert('Failed to approve: '+e.message);}
-}
-
-async function skipAction(sessionId,actionId){
-try{
-await api(`/sessions/${sessionId}/actions/${actionId}/skip`,`POST`);
-alert('Action skipped.');
-viewSession(sessionId);
-}catch(e){alert('Failed to skip: '+e.message);}
-}
-
-async function rejectAction(sessionId,actionId){
-try{
-await api(`/sessions/${sessionId}/actions/${actionId}/reject`,`POST`);
-alert('Action rejected.');
-viewSession(sessionId);
-}catch(e){alert('Failed to reject: '+e.message);}
-}
-
-// LLM Settings
-async function loadLlmSettings(){
-document.getElementById('llm-provider').value=llmConfig.provider;
-document.getElementById('llm-model').value=llmConfig.model;
-document.getElementById('llm-url').value=llmConfig.baseUrl;
-document.getElementById('llm-api-key').value=llmConfig.apiKey||'';
-
-try{
-const health=await api('/health');
-document.getElementById('current-llm-status').innerHTML=`
-<p><strong>LLM Available:</strong> ${statusBadge(health.data?.llm_available)}</p>
-<p><strong>Provider:</strong> ${llmConfig.provider}</p>
-<p><strong>Model:</strong> ${llmConfig.model}</p>
-<p><strong>Base URL:</strong> ${llmConfig.baseUrl}</p>
-`;
-}catch(e){
-document.getElementById('current-llm-status').innerHTML='<p class="bad">Unable to fetch status</p>';
-}
-}
-
-async function saveLlmSettings(){
-llmConfig.provider=document.getElementById('llm-provider').value;
-llmConfig.model=document.getElementById('llm-model').value;
-llmConfig.baseUrl=document.getElementById('llm-url').value;
-llmConfig.apiKey=document.getElementById('llm-api-key').value;
-
-// In a real implementation, this would call an API endpoint
-// For now, we store in localStorage
-localStorage.setItem('llmConfig',JSON.stringify(llmConfig));
-alert('Settings saved locally. Note: Backend integration pending.');
-loadLlmSettings();
-}
-
-async function testLlmConnection(){
-const resultDiv=document.getElementById('llm-test-result');
-resultDiv.innerHTML='<p>Testing connection...</p>';
-try{
-// Try to call a simple endpoint to test connectivity
-const response=await fetch(llmConfig.baseUrl+'/models',{
-headers: llmConfig.apiKey ? {'Authorization': `Bearer ${llmConfig.apiKey}`} : {}
-}).then(r=>r.ok?r.json():Promise.reject(new Error(`HTTP ${r.status}`)));
-resultDiv.innerHTML=`<p class="ok">✓ Connection successful! Found ${response.data?.length||0} models.</p>`;
-}catch(e){
-resultDiv.innerHTML=`<p class="bad">✗ Connection failed: ${e.message}</p>`;
-}
-}
-
-// Load saved settings on startup
-try{
-const saved=localStorage.getItem('llmConfig');
-if(saved) llmConfig=JSON.parse(saved);
-}catch(e){}
-
-// Initial refresh
+function openTab(id){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===id));if(id==='dashboard')refreshAll();if(id==='sessions')loadSessions();}
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>openTab(b.dataset.tab)));
+function showError(message){const box=document.getElementById('global-alert');box.textContent=message;box.classList.add('show');setTimeout(()=>box.classList.remove('show'),5000)}
+function setBusy(id,busy,label){const b=document.getElementById(id);if(!b)return;b.disabled=busy;if(busy)b.dataset.old= b.textContent,b.textContent=label||'Working…';else if(b.dataset.old)b.textContent=b.dataset.old}
+function logRequest(method,path,status,duration,body){const item={method,path,status,duration,body,time:new Date().toLocaleTimeString()};state.requestLog.unshift(item);state.requestLog=state.requestLog.slice(0,50);renderRequestLog();document.getElementById('latest-response').textContent=JSON.stringify(body,null,2)}
+function renderRequestLog(){const el=document.getElementById('request-log');if(!state.requestLog.length){el.innerHTML='<div class="empty">No requests yet.</div>';return}el.innerHTML=state.requestLog.map(r=>`<div class="req ${r.status>=200&&r.status<300?'ok':'bad'}"><div><strong>${r.method}</strong> ${r.path} <span class="small">${r.status} • ${r.duration}ms • ${r.time}</span></div></div>`).join('')}
+function clearRequestLog(){state.requestLog=[];renderRequestLog();document.getElementById('latest-response').textContent='—'}
+async function api(path,method='GET',data=null){const started=performance.now();try{const opts={method,headers:{'Content-Type':'application/json'}};if(data!==null)opts.body=JSON.stringify(data);const res=await fetch(apiBase+path,opts);let payload=null;const text=await res.text();try{payload=text?JSON.parse(text):null}catch{payload=text}const duration=Math.round(performance.now()-started);logRequest(method,apiBase+path,res.status,duration,payload);if(!res.ok)throw new Error(payload?.error||payload?.detail||`HTTP ${res.status}`);return payload}catch(e){const duration=Math.round(performance.now()-started);logRequest(method,apiBase+path,0,duration,{error:e.message});throw e}}
+async function refreshHealth(){try{const data=await api('/health');document.getElementById('server-status').className='conn ok';document.getElementById('server-status').textContent='Server: connected';document.getElementById('m-health').innerHTML=badge(data.status);document.getElementById('m-llm').innerHTML=badge(data.data?.llm_available??'unknown')}catch(e){document.getElementById('server-status').className='conn bad';document.getElementById('server-status').textContent='Server: offline';document.getElementById('m-health').innerHTML=badge('error');showError(e.message)}}
+async function refreshAudit(){setBusy('audit-btn',true,'Auditing…');try{const data=await api('/audit');const r=data.readiness||data.data?.readiness||{};document.getElementById('m-ready').innerHTML=badge(r.development_ready??false);const checks=data.checks||data.data?.checks||[];document.getElementById('audit-table').innerHTML=`<table><tr><th>Check</th><th>Status</th><th>Details</th></tr>${checks.map(c=>`<tr><td>${c.name}</td><td>${badge(c.status)}</td><td>${c.details||'—'}</td></tr>`).join('')}</table>`}catch(e){document.getElementById('audit-table').innerHTML=`<div class="bad">${e.message}</div>`;showError(e.message)}finally{setBusy('audit-btn',false)}}
+async function refreshEngineering(){try{const data=await api('/engineering');const tools=data.tools||data.data?.tools||[];document.getElementById('engineering-table').innerHTML=tools.length?`<table><tr><th>Tool</th><th>Status</th><th>Path</th></tr>${tools.map(t=>`<tr><td>${t.name}</td><td>${badge(t.available)}</td><td>${t.path||'—'}</td></tr>`).join('')}</table>`:'<div class="empty">No tool data.</div>'}catch(e){document.getElementById('engineering-table').innerHTML=`<div class="bad">${e.message}</div>`;showError(e.message)}}
+async function refreshSessionsMetric(){try{const data=await api('/sessions');const sessions=data.sessions||data.data?.sessions||[];document.getElementById('m-sessions').textContent=sessions.length}catch(e){document.getElementById('m-sessions').textContent='—'}}
+async function refreshAll(){document.getElementById('refresh-time').textContent='Refreshing…';await Promise.all([refreshHealth(),refreshAudit(),refreshEngineering(),refreshSessionsMetric()]);document.getElementById('refresh-time').textContent='Updated '+new Date().toLocaleTimeString()}
+function selectedTools(){return [...document.querySelectorAll('#create input[type="checkbox"]:checked')].map(x=>x.value)}
+function resetCreate(){document.getElementById('goal').value='';document.getElementById('project-path').value='';document.querySelectorAll('#create input[type="checkbox"]').forEach(x=>x.checked=false)}
+async function createSession(){const goal=document.getElementById('goal').value.trim();if(!goal){showError('Enter an environment goal first.');return}setBusy('create-btn',true,'Creating…');try{const data=await api('/sessions','POST',{natural_language_goal:goal,project_path:document.getElementById('project-path').value.trim()||null,required_tools:selectedTools(),optional_tools:[],project_dependencies:[],constraints:{}});const id=data.session_id||data.data?.session_id;state.sessionId=id;openTab('sessions');await loadSessions();await viewSession(id)}catch(e){showError(e.message)}finally{setBusy('create-btn',false)}}
+async function loadSessions(){try{const data=await api('/sessions');const sessions=data.sessions||data.data?.sessions||[];document.getElementById('sessions-table').innerHTML=sessions.length?`<table><tr><th>Session</th><th>Status</th><th>Created</th><th></th></tr>${sessions.map(s=>`<tr><td>${s.session_id}</td><td>${badge(s.status)}</td><td>${new Date(s.created_at).toLocaleString()}</td><td><button onclick="viewSession('${s.session_id}')">Open</button></td></tr>`).join('')}</table>`:'<div class="empty">No sessions.</div>'}catch(e){document.getElementById('sessions-table').innerHTML=`<div class="bad">${e.message}</div>`;showError(e.message)}}
+function renderSessionDetail(session,stateData,planData,events,decisions){const s=session.data||session;const state=stateData.data||stateData;const plan=planData.plan||planData.data?.plan;const actions=plan?.actions||[];const delta=state.delta||{};const toolDeltas=delta.tool_deltas||[];const approvals=s.approval_states||{};let html=`<div class="toolbar"><div><h3 style="margin:0">Session ${s.session_id}</h3><div class="small">${s.request?.natural_language_goal||''}</div></div><div>${badge(s.status)}</div></div>`;html+=`<div class="grid" style="margin-top:14px"><div class="card"><div class="small">Actions</div><div class="metric">${actions.length}</div></div><div class="card"><div class="small">Environment changes</div><div class="metric">${toolDeltas.length}</div></div><div class="card"><div class="small">Agent decisions</div><div class="metric">${(decisions.decisions||[]).length}</div></div><div class="card"><div class="small">Plan</div><div class="metric">${plan?.plan_id||'—'}</div></div></div>`;html+=`<div class="grid-2" style="margin-top:14px"><div class="card"><h3>Environment Delta</h3>${toolDeltas.length?`<table><tr><th>Tool</th><th>Action</th><th>Current</th></tr>${toolDeltas.map(d=>`<tr><td>${d.tool_id}</td><td>${badge(d.action)}</td><td>${d.actual_status?.status||d.current_status||'missing'}</td></tr>`).join('')}</table>`:'<div class="empty">No changes required.</div>'}</div><div class="card"><h3>Execution Plan</h3>${actions.length?actions.map(a=>`<div class="action-card"><div class="action-head"><span class="action-id">${a.action_id}</span><span class="meta">P${a.priority}</span></div><div style="margin-top:6px">${a.description}</div><div class="small" style="margin-top:6px">Approval: ${approvals[a.action_id]?.status||'pending'}</div><div class="actions" style="margin-top:10px"><button class="success" onclick="actionDecision('${s.session_id}','${a.action_id}','approve')">Approve</button><button class="secondary" onclick="actionDecision('${s.session_id}','${a.action_id}','skip')">Skip</button><button class="danger" onclick="actionDecision('${s.session_id}','${a.action_id}','reject')">Reject</button></div></div>`).join(''):'<div class="empty">No plan.</div>'}</div></div>`;html+=`<div class="card" style="margin-top:14px"><div class="toolbar"><h3>Execution</h3><div class="actions"><button class="secondary" onclick="startSession('${s.session_id}','safe')">Start Safe</button><button class="warning" onclick="startSession('${s.session_id}','real')">Start Real</button><button class="danger" onclick="cancelSession('${s.session_id}')">Cancel</button></div></div><div class="small">REAL mode remains gated by the backend approval contract.</div></div>`;html+=`<div class="grid-2" style="margin-top:14px"><div class="card"><h3>Timeline</h3><div class="timeline">${(events.events||[]).map(e=>`<div class="event"><strong>${e.event_type}</strong><div class="small">${new Date(e.timestamp).toLocaleString()}</div><div style="margin-top:4px">${e.message}</div></div>`).join('')||'<div class="empty">No events.</div>'}</div></div><div class="card"><h3>Agent Decisions</h3>${(decisions.decisions||[]).map(d=>`<div class="action-card"><div><strong>${d.decision_type}</strong> <span class="badge neutral">${Number(d.confidence||0).toFixed(2)}</span></div><div class="small" style="margin-top:4px">${d.provider||'unknown'} • ${d.model||'unknown'}</div><div style="margin-top:8px">${d.reasoning_summary||'—'}</div></div>`).join('')||'<div class="empty">No recorded agent decisions.</div>'}</div></div>`;document.getElementById('session-detail').innerHTML=html;document.getElementById('session-detail').classList.remove('hidden')}
+async function viewSession(id){state.sessionId=id;openTab('sessions');try{const [session,stateData,plan,events,decisions]=await Promise.all([api(`/sessions/${id}`),api(`/sessions/${id}/state`),api(`/sessions/${id}/plan`),api(`/sessions/${id}/events`),api(`/sessions/${id}/agent-decisions`)]);renderSessionDetail(session,stateData,plan,events,decisions);startPolling(id)}catch(e){showError(e.message)}}
+function startPolling(id){if(state.pollTimer)clearInterval(state.pollTimer);state.pollTimer=setInterval(async()=>{if(state.sessionId!==id)return;try{const [session,stateData,plan,events,decisions]=await Promise.all([api(`/sessions/${id}`),api(`/sessions/${id}/state`),api(`/sessions/${id}/plan`),api(`/sessions/${id}/events`),api(`/sessions/${id}/agent-decisions`)]);renderSessionDetail(session,stateData,plan,events,decisions)}catch{}} ,2500)}
+async function actionDecision(sessionId,actionId,decision){try{await api(`/sessions/${sessionId}/actions/${actionId}/${decision}`,'POST');await viewSession(sessionId)}catch(e){showError(e.message)}}
+async function startSession(sessionId,mode){try{await api(`/sessions/${sessionId}/start?mode=${mode}`,'POST');await viewSession(sessionId)}catch(e){showError(e.message)}}
+async function cancelSession(sessionId){if(!confirm('Cancel this session?'))return;try{await api(`/sessions/${sessionId}/cancel`,'POST');await viewSession(sessionId)}catch(e){showError(e.message)}}
 refreshAll();
 </script>
 </body>
