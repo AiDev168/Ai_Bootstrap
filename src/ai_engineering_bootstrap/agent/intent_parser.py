@@ -26,11 +26,7 @@ class ParsedIntent:
     confidence: float = 0.0
     reasoning_summary: str = ""
 
-    def to_environment_request(
-        self,
-        project_path: str,
-        project_id: str | None = None,
-    ) -> EnvironmentRequest:
+    def to_environment_request(self, project_path: str, project_id: str | None = None) -> EnvironmentRequest:
         """Convert parsed intent into a structured EnvironmentRequest."""
         return EnvironmentRequest(
             request_id="",
@@ -56,31 +52,10 @@ class IntentParser:
         self.provider = provider
         self.tool_catalog = tool_catalog
         self._known_tools = {tool.tool_id for tool in tool_catalog.list_tools()} if tool_catalog else {
-            "python",
-            "git",
-            "cursor",
-            "docker",
-            "ruff",
-            "black",
-            "pytest",
-            "github-cli",
-            "nodejs",
-            "npm",
-            "uv",
-            "poetry",
+            "python", "git", "cursor", "docker", "ruff", "black", "pytest", "github-cli", "nodejs", "npm", "uv", "poetry"
         }
         self._known_frameworks = {
-            "fastapi",
-            "flask",
-            "django",
-            "pytorch",
-            "tensorflow",
-            "transformers",
-            "langchain",
-            "llama-index",
-            "react",
-            "vue",
-            "angular",
+            "fastapi", "flask", "django", "pytorch", "tensorflow", "transformers", "langchain", "llama-index", "react", "vue", "angular"
         }
 
     def is_llm_available(self) -> bool:
@@ -93,17 +68,24 @@ class IntentParser:
             return self._deterministic_parse(natural_language)
         try:
             return self._llm_parse(natural_language)
-        except Exception:  # noqa: BLE001 - intentional LLM fallback boundary
-            return self._deterministic_parse(natural_language)
+        except Exception as error:  # noqa: BLE001 - provider boundary must preserve a usable fallback
+            fallback = self._deterministic_parse(natural_language)
+            fallback.reasoning_summary = f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            fallback.confidence = min(fallback.confidence, 0.55)
+            return fallback
 
     def _llm_parse(self, natural_language: str) -> ParsedIntent:
         """Use the configured provider through the structured JSON bridge."""
-        prompt = self._build_prompt(natural_language)
-        decision = StrategyLLMProvider(self.provider).decide(prompt, [])
-        content = decision.reasoning_summary.strip()
-        parsed = json.loads(content)
+        decision = StrategyLLMProvider(
+            self.provider,
+            system_prompt=(
+                "You are an intent parser for engineering environment setup. "
+                "Return ONLY valid JSON matching the requested intent schema."
+            ),
+        ).decide(self._build_prompt(natural_language), [])
+        parsed = json.loads(decision.reasoning_summary.strip())
         if not isinstance(parsed, dict):
-            raise ValueError("LLM intent response must be a JSON object.")
+            raise TypeError("LLM intent response must be an object.")
         return ParsedIntent(
             natural_language_goal=parsed.get("natural_language_goal", natural_language),
             required_tools=[tool for tool in parsed.get("required_tools", []) if tool in self._known_tools],
@@ -126,7 +108,6 @@ class IntentParser:
         frameworks = [framework for framework in self._known_frameworks if framework in text_lower]
         dependencies: list[str] = []
         constraints: list[str] = []
-
         if "python" in text_lower:
             languages.append("python")
         if "javascript" in text_lower or " js " in f" {text_lower} ":
@@ -153,7 +134,6 @@ class IntentParser:
                 dependencies.append("uvicorn")
             if "pytest" not in required_tools:
                 required_tools.append("pytest")
-
         return ParsedIntent(
             natural_language_goal=natural_language,
             required_tools=required_tools,
