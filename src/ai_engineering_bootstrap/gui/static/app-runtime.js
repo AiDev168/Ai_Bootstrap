@@ -12,6 +12,7 @@
     const originalSaveLlm = window.saveLlm;
     const originalTestLlm = window.testLlm;
     const originalRenderSession = window.renderSession;
+    const originalCreateSession = window.createSession;
 
     function formPayload() {
         return {
@@ -49,6 +50,17 @@
         list.id = "llm-model-list";
         document.body.appendChild(list);
         modelInput.setAttribute("list", "llm-model-list");
+    }
+
+    function ensureInstallControl() {
+        if (document.getElementById("force-install")) return;
+        const projectPath = document.getElementById("project-path");
+        if (!projectPath) return;
+        const label = document.createElement("label");
+        label.className = "check";
+        label.style.marginTop = "12px";
+        label.innerHTML = '<input id="force-install" type="checkbox"> Install / repair selected tools even if currently detected';
+        projectPath.insertAdjacentElement("afterend", label);
     }
 
     function showResult(payload, success = payload?.ok === true) {
@@ -103,7 +115,7 @@
             message.dataset.noWork = "1";
             message.className = "muted";
             message.style.marginTop = "10px";
-            message.textContent = "No installation actions are required. The selected tools already satisfy the reconciled desired state.";
+            message.textContent = "No installation actions are required. Enable Install / repair selected tools when you explicitly want an installation action.";
             execution.appendChild(message);
         }
     }
@@ -128,6 +140,7 @@
             if (apiKeyInput) apiKeyInput.value = "";
             setProviderFields();
             ensureModelTools();
+            ensureInstallControl();
             const details = document.getElementById("llm-details");
             if (details) {
                 details.innerHTML = `<p><strong>Provider:</strong> ${settings.provider}</p><p><strong>Model:</strong> ${settings.model || "—"}</p><p><strong>Base URL:</strong> ${settings.base_url || "—"}</p><p><strong>Enabled:</strong> ${typeof window.badge === "function" ? window.badge(settings.enabled) : settings.enabled}</p><p><strong>API key:</strong> ${typeof window.badge === "function" ? window.badge(settings.api_key_configured) : settings.api_key_configured}</p>`;
@@ -162,6 +175,44 @@
         }
     };
 
+    window.createSession = async function createSessionRuntime() {
+        const goal = document.getElementById("goal")?.value.trim() || "";
+        const projectPath = document.getElementById("project-path")?.value.trim() || null;
+        const button = document.getElementById("create-btn");
+        if (!goal) {
+            showError("Enter an environment goal first.");
+            return;
+        }
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Creating…";
+        }
+        try {
+            const tools = typeof window.selectedTools === "function" ? window.selectedTools() : [];
+            const forceInstall = Boolean(document.getElementById("force-install")?.checked);
+            const payload = {
+                natural_language_goal: goal,
+                project_path: projectPath,
+                required_tools: tools,
+                optional_tools: [],
+                project_dependencies: [],
+                constraints: forceInstall ? { force_install: true } : {},
+            };
+            const result = await window.api("/sessions", "POST", payload);
+            window.state.sessionId = result.session_id;
+            window.openTab("sessions");
+            await window.loadSessions();
+            await window.viewSession(window.state.sessionId);
+        } catch (error) {
+            showError(error.message);
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = "Create Session";
+            }
+        }
+    };
+
     window.renderSession = function renderSessionRuntime(session, stateData, plan, events, decisions) {
         const scrollY = window.scrollY;
         originalRenderSession(session, stateData, plan, events, decisions);
@@ -175,8 +226,10 @@
     });
 
     ensureModelTools();
+    ensureInstallControl();
     setProviderFields();
     void originalLoadLlm;
     void originalSaveLlm;
     void originalTestLlm;
+    void originalCreateSession;
 })();
