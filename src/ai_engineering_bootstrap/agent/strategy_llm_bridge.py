@@ -14,6 +14,7 @@ from ai_engineering_bootstrap.agent.provider import (
     MockProvider,
 )
 
+
 _MOCK_STRATEGIES = {
     "cursor": "cursor_deb_linux",
     "git": "git_apt",
@@ -53,14 +54,31 @@ class StrategyLLMProvider(LLMProvider):
         return meta
 
 
-def _complete_json(
-    provider: LLMProvider, prompt: str, system_prompt: str
-) -> dict[str, Any]:
+def _decode_http_json(raw: bytes) -> dict[str, Any]:
+    """Decode an OpenAI-compatible response with a narrow legacy recovery path."""
+    text = raw.decode("utf-8")
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as error:
+        marker = '"content":"'
+        start = text.find(marker)
+        end = text.rfind('"}]}')
+        if start < 0 or end <= start + len(marker):
+            raise error
+        inner = text[start + len(marker) : end]
+        parsed = json.loads(inner)
+        if not isinstance(parsed, dict):
+            raise TypeError("Recovered provider JSON content must be an object.")
+        return {"choices": [{"message": {"content": json.dumps(parsed)}}]}
+    if not isinstance(data, dict):
+        raise TypeError("Provider HTTP response must be a JSON object.")
+    return data
+
+
+def _complete_json(provider: LLMProvider, prompt: str, system_prompt: str) -> dict[str, Any]:
     if isinstance(provider, MockProvider):
         strategies = []
-        for tool_id, _action in re.findall(
-            r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE
-        ):
+        for tool_id, _action in re.findall(r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE):
             strategy_id = _MOCK_STRATEGIES.get(tool_id.strip())
             if strategy_id:
                 strategies.append(
@@ -74,24 +92,18 @@ def _complete_json(
                     }
                 )
         if "intent parser" in system_prompt.lower():
-            tools = [
-                tool.strip()
-                for tool, _ in re.findall(
-                    r"^- ([^:]+): ([^\n]+)$", prompt, re.MULTILINE
-                )
-            ]
             return {
-                "natural_language_goal": prompt.split("User goal:", 1)[-1]
-                .split("/no_think", 1)[0]
-                .strip(),
-                "required_tools": [tool for tool in tools if tool in _MOCK_STRATEGIES],
+                "natural_language_goal": prompt.split("User goal:", 1)[-1].split("/no_think", 1)[0].strip(),
+                "required_tools": [],
                 "optional_tools": [],
+                "excluded_tools": [],
                 "languages": [],
                 "frameworks": [],
                 "project_dependencies": [],
+                "excluded_packages": [],
                 "constraints": [],
                 "platform_preferences": [],
-                "confidence": 1.0,
+                "confidence": 0.0,
             }
         return {"strategies": strategies, "confidence": 1.0}
 
@@ -130,7 +142,7 @@ def _complete_json(
         endpoint, data=json.dumps(payload).encode("utf-8"), headers=headers
     )
     with urllib.request.urlopen(request, timeout=config.timeout) as response:
-        data = json.loads(response.read().decode("utf-8"))
+        data = _decode_http_json(response.read())
     choices = data.get("choices")
     if not isinstance(choices, list) or not choices:
         raise ValueError("Provider returned no choices.")
