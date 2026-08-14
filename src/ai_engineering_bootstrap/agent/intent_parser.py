@@ -393,7 +393,9 @@ User goal:
     def _extract_negative_packages(text: str) -> list[str]:
         result: list[str] = []
         clauses = re.split(
-            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", text.replace("\u200c", " "), flags=re.IGNORECASE
+            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b",
+            text.replace("\u200c", " "),
+            flags=re.IGNORECASE,
         )
         for clause in clauses:
             if not _NEGATION.search(clause):
@@ -429,7 +431,10 @@ User goal:
     def _extract_install_packages(text: str, required_tools: list[str]) -> list[str]:
         required = {tool.lower() for tool in required_tools}
         result: list[str] = []
-        pattern = rf"{_INSTALL_VERB}\s+(.+?)(?=\s+(?:on|onto|into|for|using|در|روی|برای)\s+|$)"
+        signal_pattern = "|".join(
+            re.escape(token) for token in _INSTALL_SIGNAL_TOKENS
+        )
+        pattern = rf"(?:{signal_pattern})\s+(.+?)(?=\s+(?:on|onto|into|for|using|در|روی|برای)\s+|$)"
         normalized = text.replace("\u200c", " ")
         for match in re.finditer(pattern, normalized, flags=re.IGNORECASE):
             clause = re.sub(
