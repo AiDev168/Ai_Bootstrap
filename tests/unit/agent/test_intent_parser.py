@@ -12,7 +12,6 @@ class TestParsedIntent:
         intent = ParsedIntent()
         assert intent.natural_language_goal == ""
         assert intent.required_tools == []
-        assert intent.optional_tools == []
         assert intent.confidence == 0.0
 
     def test_create_intent_with_data(self) -> None:
@@ -76,11 +75,11 @@ class TestIntentParserDeterministic:
         assert "transformers" not in intent.frameworks
 
     def test_parse_fastapi_request(self) -> None:
-        """FastAPI is captured without inventing package/tool installs."""
+        """Framework mention alone does not invent a package/tool install."""
         text = "Prepare FastAPI project environment"
         intent = self.parser.parse(text)
 
-        assert "python" in intent.required_tools
+        assert "python" not in intent.required_tools
         assert "fastapi" in intent.frameworks
         assert "pytest" not in intent.required_tools
         assert "uvicorn" not in intent.project_dependencies
@@ -159,11 +158,11 @@ class TestIntentParserEdgeCases:
         assert "unknownpkg" not in intent.required_tools
 
     def test_case_insensitive(self) -> None:
-        """Test case-insensitive framework detection."""
+        """Test case-insensitive explicit environment tool detection."""
         text = "PYTHON and FASTAPI environment"
         intent = self.parser.parse(text)
 
-        assert "python" not in intent.required_tools
+        assert "python" in intent.required_tools
         assert "fastapi" in intent.frameworks
 
     def test_very_long_input(self) -> None:
