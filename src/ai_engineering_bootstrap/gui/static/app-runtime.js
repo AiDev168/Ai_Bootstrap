@@ -8,11 +8,7 @@
     const llmResult = document.getElementById("llm-result");
     const serverIndicator = document.getElementById("server");
     const originalApi = window.api;
-    const originalLoadLlm = window.loadLlm;
-    const originalSaveLlm = window.saveLlm;
-    const originalTestLlm = window.testLlm;
     const originalRenderSession = window.renderSession;
-    const originalCreateSession = window.createSession;
 
     function formPayload() {
         return {
@@ -129,6 +125,24 @@
         }
     }
 
+    function renderExecutionHistory(session) {
+        const detail = document.getElementById("session-detail");
+        if (!detail) return;
+        let card = detail.querySelector("[data-execution-evidence]");
+        if (!card) {
+            card = document.createElement("div");
+            card.dataset.executionEvidence = "1";
+            card.className = "card";
+            detail.appendChild(card);
+        }
+        const history = session?.execution_history || [];
+        const rows = history.map(item => {
+            const status = item.success ? "success" : "failed";
+            return `<div class="event ${status}"><strong>${item.action_id}</strong><br><span>${item.output || item.error || "No execution message."}</span><br><small>${item.timestamp || ""}</small></div>`;
+        }).join("");
+        card.innerHTML = `<h3>Execution Evidence</h3>${rows || '<div class="muted">No execution evidence recorded yet.</div>'}`;
+    }
+
     window.api = async function apiWithConnectionState(path, method = "GET", body = null) {
         try {
             const result = await originalApi(path, method, body);
@@ -225,6 +239,7 @@
         const scrollY = window.scrollY;
         originalRenderSession(session, stateData, plan, events, decisions);
         annotateNoWork(plan);
+        renderExecutionHistory(session);
         window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
     };
 
@@ -236,8 +251,4 @@
     ensureModelTools();
     ensureInstallControl();
     setProviderFields();
-    void originalLoadLlm;
-    void originalSaveLlm;
-    void originalTestLlm;
-    void originalCreateSession;
 })();
