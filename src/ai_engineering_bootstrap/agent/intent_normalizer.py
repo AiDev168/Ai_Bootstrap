@@ -34,7 +34,9 @@ _NEGATIVE_FA = re.compile(
     r"(.+?)\s*(?:را|رو)?\s*نصب\s*(?:نکن(?:ید|م)?|نشود)$",
     re.IGNORECASE,
 )
-_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.+-]*$")
+_TOKEN = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9_.+-]*(?:\s*(?:===|==|!=|~=|>=|<=|>|<)\s*[A-Za-z0-9][A-Za-z0-9+_.!-]*)?$"
+)
 
 
 class IntentNormalizer:
@@ -56,8 +58,14 @@ class IntentNormalizer:
 
         excluded_tool_set = {item.lower() for item in excluded_tools}
         excluded_package_set = {item.lower() for item in excluded_packages}
+        dependency_set = {item.lower() for item in dependencies}
+        required_set = {item.lower() for item in required}
 
-        clauses = re.split(r"\n|(?<!\d)[,؛;]|\bbut\b|\bاما\b|\bولی\b", goal, flags=re.IGNORECASE)
+        clauses = re.split(
+            r"\n|(?<!\d)[,؛;]|\bbut\b|\bاما\b|\bولی\b",
+            goal,
+            flags=re.IGNORECASE,
+        )
         for clause in clauses:
             clause = clause.strip()
             if not clause:
@@ -83,32 +91,34 @@ class IntentNormalizer:
                 if tool_id:
                     if tool_id.lower() not in excluded_tool_set and tool_id not in required:
                         required.append(tool_id)
-                elif candidate and _TOKEN.fullmatch(candidate):
-                    if (
-                        candidate.lower() not in excluded_package_set
-                        and candidate.lower() not in {item.lower() for item in required}
-                        and candidate.lower() not in {item.lower() for item in dependencies}
-                    ):
-                        dependencies.append(candidate)
+                        required_set.add(tool_id.lower())
+                elif (
+                    candidate
+                    and _TOKEN.fullmatch(candidate)
+                    and candidate.lower() not in excluded_package_set
+                    and candidate.lower() not in required_set
+                    and candidate.lower() not in dependency_set
+                ):
+                    dependencies.append(candidate)
+                    dependency_set.add(candidate.lower())
 
-        intent.required_tools = list(dict.fromkeys(
-            item for item in required if item.lower() not in excluded_tool_set
-        ))
+        intent.required_tools = list(
+            dict.fromkeys(item for item in required if item.lower() not in excluded_tool_set)
+        )
         intent.excluded_tools = list(dict.fromkeys(excluded_tools))
-        intent.project_dependencies = list(dict.fromkeys(
-            item for item in dependencies if item.lower() not in excluded_package_set
-        ))
+        intent.project_dependencies = list(
+            dict.fromkeys(item for item in dependencies if item.lower() not in excluded_package_set)
+        )
         intent.excluded_packages = list(dict.fromkeys(excluded_packages))
         return intent
 
     def _resolve_tool(self, candidate: str) -> str | None:
         lowered = candidate.lower().strip(" .:()[]،")
-        if lowered in {item.lower() for item in self.tool_ids}:
-            return next(item for item in self.tool_ids if item.lower() == lowered)
+        for tool_id in self.tool_ids:
+            if lowered == tool_id.lower():
+                return tool_id
         for tool_id, aliases in _TOOL_ALIASES.items():
-            if tool_id not in self.tool_ids:
-                continue
-            if lowered in {alias.lower() for alias in aliases}:
+            if tool_id in self.tool_ids and lowered in {alias.lower() for alias in aliases}:
                 return tool_id
         return None
 
@@ -124,9 +134,14 @@ class IntentNormalizer:
 
     @staticmethod
     def _split_targets(payload: str) -> list[str]:
-        payload = payload.strip(" .:()[]،")
-        payload = re.sub(r"\b(?:python\s+)?(?:package|packages)\b", "", payload, flags=re.IGNORECASE)
-        parts = re.split(r"\s*(?:,|&|\band\b|\band/or\b|\bو\b|\+)\s*", payload, flags=re.IGNORECASE)
+        payload = re.sub(
+            r"\b(?:python\s+)?(?:package|packages)\b", "", payload, flags=re.IGNORECASE
+        )
+        parts = re.split(
+            r"\s*(?:,|&|\band\b|\band/or\b|\bو\b|\+)\s*",
+            payload.strip(" .:()[]،"),
+            flags=re.IGNORECASE,
+        )
         result: list[str] = []
         for part in parts:
             candidate = part.strip(" .:()[]،")
