@@ -8,12 +8,11 @@ from typing import Any
 from ai_engineering_bootstrap.audit import default_audit_service
 from ai_engineering_bootstrap.backend.llm_settings import LLMSettingsService
 from ai_engineering_bootstrap.backend.session_service import EnvironmentSessionService
+from ai_engineering_bootstrap.backend.strategy_planner_runtime import RuntimeStrategyPlanner
 from ai_engineering_bootstrap.bootstrap import EnvironmentBootstrapService
 from ai_engineering_bootstrap.engineering import EngineeringEnvironmentService
 from ai_engineering_bootstrap.environment import EnvironmentRequest
-from ai_engineering_bootstrap.environment.session_repository import (
-    InMemorySessionRepository,
-)
+from ai_engineering_bootstrap.environment.session_repository import InMemorySessionRepository
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 from ai_engineering_bootstrap.pipeline import PipelineEngine, PipelineResult
 from ai_engineering_bootstrap.planner import PlannerEngine
@@ -141,10 +140,11 @@ class ApplicationBackend:
     VERSION = "v1"
 
     def __init__(self, session_service: EnvironmentSessionService | None = None) -> None:
-        self._session_service = session_service or EnvironmentSessionService(
-            repository=InMemorySessionRepository()
-        )
         self._llm_settings = LLMSettingsService()
+        self._session_service = session_service or EnvironmentSessionService(
+            repository=InMemorySessionRepository(),
+            strategy_planner=RuntimeStrategyPlanner(settings_service=self._llm_settings),
+        )
 
     def health(self) -> BackendResult:
         """Return backend health and safe LLM status."""
@@ -190,7 +190,7 @@ class ApplicationBackend:
         )
 
     def test_llm_connection(self) -> BackendResult:
-        """Probe the configured OpenAI-compatible LLM endpoint."""
+        """Probe the configured LLM endpoint."""
         return BackendResult(self._llm_settings.test_connection())
 
     def audit(self) -> BackendResult:
@@ -252,7 +252,9 @@ class ApplicationBackend:
             {
                 "session_id": session.session_id,
                 "status": session.status.value,
+                "current_action": session.current_action,
                 "request": self._session_service._request_dict(session.request),
+                "approval_states": {key: value.to_dict() for key, value in session.approval_states.items()},
                 "created_at": session.created_at.isoformat(),
                 "updated_at": session.updated_at.isoformat(),
             }
