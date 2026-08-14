@@ -19,7 +19,7 @@ _TOOL_ALIASES = {
     "git": {"git", "گیت"},
     "docker": {"docker", "داکر"},
     "ruff": {"ruff", "روف", "رووف", "راف"},
-    "pytest": {"pytest", "py test", "پایتست", "پای تست", "پی‌تست"},
+    "pytest": {"pytest", "py test", "پایتست", "پای تست", "پای‌تست", "پی‌تست"},
     "black": {"black", "بلک"},
     "github-cli": {"github-cli", "gh", "گیت هاب کلای"},
     "nodejs": {"node", "nodejs", "نود"},
@@ -37,6 +37,11 @@ _NEGATION = re.compile(
 )
 _TOKEN = re.compile(
     r"^[A-Za-z0-9][A-Za-z0-9_.+\-]*(?:\s*(?:===|==|!=|~=|>=|<=|>|<)\s*[A-Za-z0-9][A-Za-z0-9+_.!\-]*)?$"
+)
+_ENVIRONMENT_CONTEXT = re.compile(
+    r"(?:environment|project|development|need|prepare|set\s+up|setup|"
+    r"محیط|پروژه|توسعه|نیاز|آماده|راه[ -]?اندازی|برای)",
+    re.IGNORECASE,
 )
 
 
@@ -72,8 +77,7 @@ class ParsedIntent:
             languages=self.languages,
             frameworks=self.frameworks,
             project_dependencies=[
-                PythonPackageRequirement(name=name)
-                for name in self.project_dependencies
+                PythonPackageRequirement(name=name) for name in self.project_dependencies
             ],
             excluded_packages=self.excluded_packages,
             configurations={},
@@ -118,8 +122,14 @@ class IntentParser:
         """Return whether semantic LLM parsing is configured."""
         return self.provider is not None
 
+    def metadata(self) -> dict[str, object]:
+        """Return safe provider metadata for observability."""
+        if self.provider is None:
+            return {"provider": "deterministic"}
+        return StrategyLLMProvider(self.provider).metadata()
+
     def parse(self, natural_language: str) -> ParsedIntent:
-        """Parse intent; deterministic parsing is fallback-only and never infers installs."""
+        """Parse intent; deterministic parsing is fallback-only."""
         if not natural_language.strip():
             return ParsedIntent(reasoning_summary="Empty intent")
         if self.provider is None:
@@ -128,7 +138,9 @@ class IntentParser:
             return self._llm_parse(natural_language)
         except Exception as error:  # noqa: BLE001 - semantic provider fallback boundary
             fallback = self._deterministic_parse(natural_language)
-            fallback.reasoning_summary = f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            fallback.reasoning_summary = (
+                f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            )
             fallback.confidence = min(fallback.confidence, 0.55)
             return fallback
 
@@ -213,12 +225,17 @@ class IntentParser:
         )
 
     def _deterministic_parse(self, natural_language: str) -> ParsedIntent:
-        """Fallback parser for explicit English/Persian install and exclusion clauses."""
+        """Fallback parser for explicit installation/environment requests."""
         excluded_tools, excluded_packages = self._deterministic_exclusions(
             natural_language
         )
-        required_tools = self._deterministic_explicit_tool_mentions(
-            natural_language, excluded_tools
+        required_tools = self._merge_unique(
+            self._deterministic_explicit_tool_mentions(
+                natural_language, excluded_tools
+            ),
+            self._deterministic_environment_tool_mentions(
+                natural_language, excluded_tools
+            ),
         )
         packages = self._extract_install_packages(natural_language, required_tools)
         excluded_package_set = {package.lower() for package in excluded_packages}
@@ -254,7 +271,7 @@ class IntentParser:
 
         return ParsedIntent(
             natural_language_goal=natural_language,
-            required_tools=required_tools,
+            required_tools=list(dict.fromkeys(required_tools)),
             optional_tools=[],
             excluded_tools=excluded_tools,
             languages=languages,
@@ -302,6 +319,23 @@ User goal:
 {natural_language}
 /no_think"""
 
+    def _deterministic_environment_tool_mentions(
+        self, text: str, excluded_tools: list[str]
+    ) -> list[str]:
+        """Recognize tools named as part of an environment request."""
+        if not _ENVIRONMENT_CONTEXT.search(text):
+            return []
+        lowered = text.lower()
+        excluded = {tool.lower() for tool in excluded_tools}
+        result: list[str] = []
+        for tool_id in self._known_tools:
+            if tool_id.lower() in excluded:
+                continue
+            aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
+            if any(re.search(re.escape(alias.lower()), lowered) for alias in aliases):
+                result.append(tool_id)
+        return result
+
     def _deterministic_explicit_tool_mentions(
         self, text: str, excluded_tools: list[str]
     ) -> list[str]:
@@ -316,12 +350,9 @@ User goal:
                 continue
             for tool_id in self._known_tools:
                 aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
-                if (
-                    any(
-                        re.search(re.escape(alias.lower()), clause) for alias in aliases
-                    )
-                    and tool_id.lower() not in excluded
-                ):
+                if any(
+                    re.search(re.escape(alias.lower()), clause) for alias in aliases
+                ) and tool_id.lower() not in excluded:
                     result.append(tool_id)
         return self._merge_unique(result, [])
 
@@ -409,7 +440,9 @@ User goal:
         return list(dict.fromkeys(result))
 
     @staticmethod
-    def _normalise_strings(value: object, allowed: set[str] | None = None) -> list[str]:
+    def _normalise_strings(
+        value: object, allowed: set[str] | None = None
+    ) -> list[str]:
         if not isinstance(value, list):
             return []
         values = [str(item).strip() for item in value if str(item).strip()]
