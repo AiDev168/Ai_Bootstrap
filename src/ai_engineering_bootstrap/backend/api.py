@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,10 +42,7 @@ class EnvironmentRequestInput(BaseModel):
     constraints: dict[str, Any] = Field(default_factory=dict)
 
 
-T = TypeVar("T")
-
-
-def _call(operation: Callable[[], T]) -> T:
+def _call[T](operation: callable[[], T]) -> T:
     """Translate domain validation failures into HTTP 400 responses."""
     try:
         return operation()
@@ -204,7 +201,9 @@ def start_session(session_id: str, mode: str = "safe") -> dict[str, Any]:
     try:
         execution_mode = ExecutionMode(mode.lower())
     except ValueError as error:
-        raise HTTPException(status_code=400, detail=f"Invalid execution mode: {mode}") from error
+        raise HTTPException(
+            status_code=400, detail=f"Invalid execution mode: {mode}"
+        ) from error
     return _data(_call(lambda: backend.start_session(session_id, execution_mode)))
 
 
