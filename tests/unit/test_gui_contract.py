@@ -3,7 +3,6 @@
 import re
 from pathlib import Path
 
-
 HTML_PATH = Path(__file__).resolve().parents[2] / "src/ai_engineering_bootstrap/gui/static/index.html"
 
 
