@@ -159,6 +159,7 @@ class ApplicationBackend:
                     "model": settings.model,
                     "base_url": settings.base_url,
                     "api_key_configured": settings.api_key_configured,
+                    "enabled": settings.enabled,
                 },
             }
         )
@@ -177,7 +178,7 @@ class ApplicationBackend:
         )
 
     def update_llm_settings(self, payload: dict[str, Any]) -> BackendResult:
-        """Update process-local LLM configuration."""
+        """Update persistent LLM configuration."""
         settings = self._llm_settings.update(payload)
         return BackendResult(
             {
@@ -192,6 +193,10 @@ class ApplicationBackend:
     def test_llm_connection(self) -> BackendResult:
         """Probe the configured LLM endpoint."""
         return BackendResult(self._llm_settings.test_connection())
+
+    def list_llm_models(self) -> BackendResult:
+        """List models exposed by the configured provider."""
+        return BackendResult(self._llm_settings.models())
 
     def audit(self) -> BackendResult:
         return BackendResult(_audit_dict(default_audit_service().run()))
