@@ -42,7 +42,9 @@ class LLMSettingsStore:
 
     def __init__(self, path: Path | None = None) -> None:
         configured = os.getenv(self.ENV_FILE, "").strip()
-        self.path = path or Path(configured) if configured else path or DEFAULT_SETTINGS_FILE
+        self.path = (
+            path or Path(configured) if configured else path or DEFAULT_SETTINGS_FILE
+        )
 
     def load(self) -> dict[str, str]:
         if self.path.exists():
@@ -110,10 +112,9 @@ class LLMSettingsService:
         payload: dict[str, Any], current: dict[str, str] | None = None
     ) -> dict[str, str]:
         current = current or {}
-        provider = (
-            str(payload.get("provider", current.get("provider", DEFAULT_PROVIDER))).strip()
-            or current.get("provider", DEFAULT_PROVIDER)
-        )
+        provider = str(
+            payload.get("provider", current.get("provider", DEFAULT_PROVIDER))
+        ).strip() or current.get("provider", DEFAULT_PROVIDER)
         if provider not in SUPPORTED_PROVIDERS:
             raise ValueError(f"Unsupported LLM provider: {provider}")
         model = str(payload.get("model", current.get("model", ""))).strip()
@@ -242,8 +243,14 @@ class LLMSettingsService:
             if not config.base_url:
                 raise ValueError("Base URL is required for local_server")
             base_url = config.base_url.rstrip("/")
-            endpoint = f"{base_url}/models" if base_url.endswith("/v1") else f"{base_url}/v1/models"
-            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            endpoint = (
+                f"{base_url}/models"
+                if base_url.endswith("/v1")
+                else f"{base_url}/v1/models"
+            )
+            headers = (
+                {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            )
             request = urllib.request.Request(endpoint, headers=headers)
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:
@@ -257,7 +264,11 @@ class LLMSettingsService:
                         if isinstance(item, dict) and item.get("id")
                     ],
                 }
-            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as error:
+            except (
+                urllib.error.URLError,
+                urllib.error.HTTPError,
+                json.JSONDecodeError,
+            ) as error:
                 return {
                     "ok": False,
                     "provider": provider,

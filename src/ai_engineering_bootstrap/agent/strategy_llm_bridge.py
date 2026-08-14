@@ -132,7 +132,6 @@ def _complete_json(
         "temperature": float(config.options.get("temperature", 0.1)),
         "max_tokens": int(config.options.get("max_tokens", 900)),
         "stream": False,
-        "response_format": {"type": "json_object"},
     }
     headers = {"Content-Type": "application/json"}
     if config.api_key:

@@ -149,9 +149,7 @@ class IntentParser:
             return self._llm_parse(natural_language)
         except Exception as error:  # noqa: BLE001 - semantic provider fallback boundary
             fallback = self._deterministic_parse(natural_language)
-            fallback.reasoning_summary = (
-                f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
-            )
+            fallback.reasoning_summary = f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
             fallback.confidence = min(fallback.confidence, 0.55)
             return fallback
 
@@ -368,87 +366,121 @@ User goal:
         return self._merge_unique(result, [])
 
     def _deterministic_exclusions(self, text: str) -> tuple[list[str], list[str]]:
-        lowered = text.lower().replace("\u200c", " ")
-        excluded_tools: list[str] = []
+        """Detect exclusions per semantic clause, preserving nearby positive requests."""
+        normalized = text.lower().replace("\u200c", " ")
         clauses = re.split(
-            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", lowered, flags=re.IGNORECASE
+            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b|\s+و\s+",
+            normalized,
+            flags=re.IGNORECASE,
         )
+        excluded_tools: list[str] = []
+        excluded_packages: list[str] = []
         for clause in clauses:
-            if not _NEGATION.search(clause):
+            clause = clause.strip()
+            if not clause or not _NEGATION.search(clause):
                 continue
             for tool_id in self._known_tools:
                 aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
                 if any(
-                    re.search(
-                        re.escape(alias.lower().replace("\u200c", " ")), clause
-                    )
+                    re.search(re.escape(alias.lower().replace("\u200c", " ")), clause)
                     for alias in aliases
                 ):
                     excluded_tools.append(tool_id)
-        return self._merge_unique(excluded_tools, []), self._extract_negative_packages(
-            text
+            excluded_packages.extend(
+                self._extract_negative_packages_from_clause(clause)
+            )
+        return self._merge_unique(excluded_tools, []), self._merge_unique(
+            excluded_packages, []
         )
 
     @staticmethod
     def _extract_negative_packages(text: str) -> list[str]:
-        result: list[str] = []
+        """Extract explicitly excluded package names from negative clauses."""
         clauses = re.split(
-            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b",
+            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b|\s+و\s+",
             text.replace("\u200c", " "),
             flags=re.IGNORECASE,
         )
+        result: list[str] = []
         for clause in clauses:
-            if not _NEGATION.search(clause):
-                continue
+            if _NEGATION.search(clause):
+                result.extend(
+                    IntentParser._extract_negative_packages_from_clause(clause)
+                )
+        return list(dict.fromkeys(result))
+
+    @staticmethod
+    def _extract_negative_packages_from_clause(clause: str) -> list[str]:
+        """Extract package candidates from one exclusion clause."""
+        text = clause.replace("\u200c", " ").strip()
+        match = re.search(
+            r"(?:don't|do\s+not|dont|never|avoid)\s+(?:install|reinstall|setup|set\s+up|add)?\s*(.+)$",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            payload = match.group(1)
+        else:
             match = re.search(
-                r"(?:don't|do\s+not|dont|never|avoid)\s+(?:install\s+)?(.+)$",
-                clause,
+                r"(.+?)\s+(?:را\s+)?نصب\s+نکن(?:ید|م)?$|(.+?)\s+(?:را\s+)?نصب\s+نشود$",
+                text,
                 flags=re.IGNORECASE,
             )
-            payload = match.group(1) if match else clause
-            payload = re.sub(
-                r".*?(?:نصب\s+نکن(?:ید|م)?|نصب\s+نشود)\s*",
+            payload = (
+                next((group for group in match.groups() if group), "") if match else ""
+            )
+        known_aliases = {
+            alias.lower().replace("\u200c", " ")
+            for aliases in _TOOL_ALIASES.values()
+            for alias in aliases
+        }
+        result: list[str] = []
+        for token in re.split(
+            r"\s*(?:,|&|\band\b|\bو\b|\+)\s*",
+            payload,
+            flags=re.IGNORECASE,
+        ):
+            candidate = re.sub(
+                r"(?:را|رو)\s*$",
                 "",
-                payload,
+                token.strip(" .;:()[]،"),
                 flags=re.IGNORECASE,
-            )
-            for token in re.split(
-                r"\s*(?:,|&|\band\b|\bو\b|\+)\s*",
-                payload,
-                flags=re.IGNORECASE,
-            ):
-                candidate = re.sub(
-                    r"(?:را|رو)\s*$",
-                    "",
-                    token.strip(" .;:()[]،"),
-                    flags=re.IGNORECASE,
-                ).strip()
-                if candidate and _TOKEN.fullmatch(candidate):
-                    result.append(candidate)
+            ).strip()
+            if not candidate or not _TOKEN.fullmatch(candidate):
+                continue
+            if candidate.lower().replace("\u200c", " ") in known_aliases:
+                continue
+            result.append(candidate)
         return list(dict.fromkeys(result))
 
     @staticmethod
     def _extract_install_packages(text: str, required_tools: list[str]) -> list[str]:
+        """Extract positive package install targets without swallowing exclusions."""
         required = {tool.lower() for tool in required_tools}
-        result: list[str] = []
-        signal_pattern = "|".join(
-            re.escape(token) for token in _INSTALL_SIGNAL_TOKENS
-        )
-        pattern = rf"(?:{signal_pattern})\s+(.+?)(?=\s+(?:on|onto|into|for|using|در|روی|برای)\s+|$)"
         normalized = text.replace("\u200c", " ")
-        for match in re.finditer(pattern, normalized, flags=re.IGNORECASE):
-            clause = re.sub(
-                r"\bpython\s+(?:package|packages)\b",
-                "",
-                match.group(1),
-                flags=re.IGNORECASE,
-            )
-            if _NEGATION.search(match.group(0)):
+        result: list[str] = []
+        positive_clauses = re.split(
+            r"[.;،]|\bbut\b|\bاما\b|\bولی\b|(?i:(?=don't\s+install)|(?=do\s+not\s+install)|(?=نصب\s+نکن))",
+            normalized,
+        )
+        for clause in positive_clauses:
+            if _NEGATION.search(clause):
                 continue
-            for token in re.split(
-                r"\s*(?:,|&|\band\b|\bو\b|\+)\s*",
+            match = re.search(
+                r"(?:install|reinstall|setup|set\s+up|add)\s+(.+)$",
                 clause,
                 flags=re.IGNORECASE,
+            )
+            if not match:
+                continue
+            payload = re.split(
+                r"\s+(?:on|onto|into|for|using)\s+",
+                match.group(1),
+                maxsplit=1,
+                flags=re.IGNORECASE,
+            )[0]
+            for token in re.split(
+                r"\s*(?:,|&|\band\b|\bو\b|\+)\s*", payload, flags=re.IGNORECASE
             ):
                 candidate = token.strip(" .;:()[]،")
                 if (
@@ -460,9 +492,7 @@ User goal:
         return list(dict.fromkeys(result))
 
     @staticmethod
-    def _normalise_strings(
-        value: object, allowed: set[str] | None = None
-    ) -> list[str]:
+    def _normalise_strings(value: object, allowed: set[str] | None = None) -> list[str]:
         if not isinstance(value, list):
             return []
         values = [str(item).strip() for item in value if str(item).strip()]

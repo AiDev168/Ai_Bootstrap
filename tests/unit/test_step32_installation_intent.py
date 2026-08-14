@@ -151,3 +151,18 @@ def test_gui_supports_install_intent_and_editable_api_key() -> None:
     assert "Install / repair selected tools" in runtime
     assert "constraints: forceInstall ? { force_install: true } : {}" in runtime
     assert '.filter(input => input.id !== "force-install")' in runtime
+
+
+def test_deterministic_parser_preserves_package_install_and_tool_exclusion() -> None:
+    parsed = IntentParser(tool_catalog=ToolCatalog()).parse(
+        "install colorama, don't install ruff"
+    )
+
+    assert "ruff" in parsed.excluded_tools
+    assert "ruff" not in parsed.required_tools
+    assert "colorama" in parsed.project_dependencies
+    assert "colorama" not in parsed.excluded_packages
+
+    desired = parsed.to_environment_request("/tmp/test-project").to_desired_state()
+    assert "ruff" not in desired.tools
+    assert [item.name for item in desired.python_packages] == ["colorama"]
