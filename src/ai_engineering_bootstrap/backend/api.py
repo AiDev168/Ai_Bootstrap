@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
 from ai_engineering_bootstrap.backend.service import ApplicationBackend
@@ -41,14 +42,19 @@ class EnvironmentRequestInput(BaseModel):
     constraints: dict[str, Any] = Field(default_factory=dict)
 
 
+T = TypeVar("T")
+
+
+def _call(operation: Callable[[], T]) -> T:
+    """Translate domain validation failures into HTTP 400 responses."""
+    try:
+        return operation()
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 def _data(result: Any) -> dict[str, Any]:
     return result.data
-
-
-def _raise_http(error: Exception) -> None:
-    if isinstance(error, ValueError):
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    raise HTTPException(status_code=500, detail=str(error)) from error
 
 
 def _serve_index() -> HTMLResponse:
@@ -64,215 +70,132 @@ def _serve_index() -> HTMLResponse:
 
 @app.get("/", response_class=HTMLResponse)
 def serve_gui() -> HTMLResponse:
-    """Serve the canonical GUI."""
     return _serve_index()
 
 
 @app.get("/app-runtime.js")
-def serve_runtime_script() -> Any:
-    """Serve runtime GUI behavior."""
-    from fastapi.responses import Response
-
+def serve_runtime_script() -> Response:
     script = (GUI_ROOT / "app-runtime.js").read_text(encoding="utf-8")
     return Response(script, media_type="application/javascript")
 
 
 @app.get("/api/v1/health")
 def health() -> dict[str, Any]:
-    try:
-        return _data(backend.health())
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(backend.health))
 
 
 @app.get("/api/v1/audit")
 def audit() -> dict[str, Any]:
-    try:
-        return _data(backend.audit())
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(backend.audit))
 
 
 @app.get("/api/v1/plan")
 def plan() -> dict[str, Any]:
-    try:
-        return _data(backend.plan())
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(backend.plan))
 
 
 @app.get("/api/v1/engineering")
 def engineering() -> dict[str, Any]:
-    try:
-        return _data(backend.engineering())
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(backend.engineering))
 
 
 @app.get("/api/v1/llm/settings")
 def get_llm_settings() -> dict[str, Any]:
-    try:
-        return _data(backend.get_llm_settings())
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(backend.get_llm_settings))
 
 
 @app.post("/api/v1/llm/settings")
 def update_llm_settings(payload: dict[str, Any]) -> dict[str, Any]:
-    try:
-        return _data(backend.update_llm_settings(payload))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.update_llm_settings(payload)))
 
 
 @app.get("/api/v1/llm/models")
 def get_llm_models() -> dict[str, Any]:
-    try:
-        return _data(backend.list_llm_models())
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(backend.list_llm_models))
 
 
 @app.post("/api/v1/llm/models")
 def post_llm_models(payload: dict[str, Any]) -> dict[str, Any]:
-    try:
-        return _data(backend.list_llm_models(payload))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.list_llm_models(payload)))
 
 
 @app.post("/api/v1/llm/test")
 def test_llm(payload: dict[str, Any] | None = None) -> dict[str, Any]:
-    try:
-        return _data(backend.test_llm_connection(payload))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.test_llm_connection(payload)))
 
 
 @app.post("/api/v1/environment/request")
 def preview_environment_request(payload: EnvironmentRequestInput) -> dict[str, Any]:
-    """Return the normalized request without executing it."""
-    try:
-        request = EnvironmentRequest(
-            project_path=Path(payload.project_path) if payload.project_path else None,
-            natural_language_goal=payload.natural_language_goal,
-            required_tools=list(payload.required_tools),
-            optional_tools=list(payload.optional_tools),
-            project_dependencies=list(payload.project_dependencies),
-            constraints=dict(payload.constraints),
-        )
-        return {"request": request.to_desired_state().to_dict()}
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    """Return the normalized desired state without executing it."""
+    request = EnvironmentRequest(
+        project_path=Path(payload.project_path) if payload.project_path else None,
+        natural_language_goal=payload.natural_language_goal,
+        required_tools=list(payload.required_tools),
+        optional_tools=list(payload.optional_tools),
+        project_dependencies=list(payload.project_dependencies),
+        constraints=dict(payload.constraints),
+    )
+    desired = request.to_desired_state()
+    return {"request": asdict(desired)}
 
 
 @app.get("/api/v1/sessions")
 def list_sessions() -> dict[str, Any]:
-    try:
-        return _data(backend.list_sessions())
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(backend.list_sessions))
 
 
 @app.post("/api/v1/sessions")
 def create_session(payload: EnvironmentRequestInput) -> dict[str, Any]:
     """Create a session through the canonical LLM-aware runtime service."""
-    try:
-        request = EnvironmentRequest(
-            project_path=Path(payload.project_path) if payload.project_path else None,
-            natural_language_goal=payload.natural_language_goal,
-            required_tools=list(payload.required_tools),
-            optional_tools=list(payload.optional_tools),
-            project_dependencies=list(payload.project_dependencies),
-            constraints=dict(payload.constraints),
-        )
-        return _data(backend.create_session(request))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    request = EnvironmentRequest(
+        project_path=Path(payload.project_path) if payload.project_path else None,
+        natural_language_goal=payload.natural_language_goal,
+        required_tools=list(payload.required_tools),
+        optional_tools=list(payload.optional_tools),
+        project_dependencies=list(payload.project_dependencies),
+        constraints=dict(payload.constraints),
+    )
+    return _data(_call(lambda: backend.create_session(request)))
 
 
 @app.get("/api/v1/sessions/{session_id}")
 def get_session(session_id: str) -> dict[str, Any]:
-    try:
-        return _data(backend.get_session(session_id))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.get_session(session_id)))
 
 
 @app.get("/api/v1/sessions/{session_id}/state")
 def get_session_state(session_id: str) -> dict[str, Any]:
-    try:
-        return _data(backend.get_session_state(session_id))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.get_session_state(session_id)))
 
 
 @app.get("/api/v1/sessions/{session_id}/plan")
 def get_session_plan(session_id: str) -> dict[str, Any]:
-    try:
-        return _data(backend.get_session_plan(session_id))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.get_session_plan(session_id)))
 
 
 @app.get("/api/v1/sessions/{session_id}/events")
 def get_session_events(session_id: str) -> dict[str, Any]:
-    try:
-        return _data(backend.get_session_events(session_id))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.get_session_events(session_id)))
 
 
 @app.get("/api/v1/sessions/{session_id}/agent-decisions")
 def get_agent_decisions(session_id: str) -> dict[str, Any]:
-    try:
-        return _data(backend.get_agent_decisions(session_id))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.get_agent_decisions(session_id)))
 
 
 @app.post("/api/v1/sessions/{session_id}/actions/{action_id}/approve")
 def approve_action(session_id: str, action_id: str) -> dict[str, Any]:
-    try:
-        return _data(backend.approve_action(session_id, action_id))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.approve_action(session_id, action_id)))
 
 
 @app.post("/api/v1/sessions/{session_id}/actions/{action_id}/reject")
 def reject_action(session_id: str, action_id: str) -> dict[str, Any]:
-    try:
-        return _data(backend.reject_action(session_id, action_id))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.reject_action(session_id, action_id)))
 
 
 @app.post("/api/v1/sessions/{session_id}/actions/{action_id}/skip")
 def skip_action(session_id: str, action_id: str) -> dict[str, Any]:
-    try:
-        return _data(backend.skip_action(session_id, action_id))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.skip_action(session_id, action_id)))
 
 
 @app.post("/api/v1/sessions/{session_id}/start")
@@ -280,19 +203,14 @@ def start_session(session_id: str, mode: str = "safe") -> dict[str, Any]:
     """Execute the approved plan through the canonical runtime service."""
     try:
         execution_mode = ExecutionMode(mode.lower())
-        return _data(backend.start_session(session_id, execution_mode))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=f"Invalid execution mode: {mode}") from error
+    return _data(_call(lambda: backend.start_session(session_id, execution_mode)))
 
 
 @app.post("/api/v1/sessions/{session_id}/cancel")
 def cancel_session(session_id: str) -> dict[str, Any]:
-    try:
-        return _data(backend.cancel_session(session_id))
-    except Exception as error:
-        _raise_http(error)
-        raise AssertionError("unreachable")
+    return _data(_call(lambda: backend.cancel_session(session_id)))
 
 
 __all__ = ["app", "backend"]
