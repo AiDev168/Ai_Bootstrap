@@ -8,7 +8,10 @@ from dataclasses import dataclass, field
 
 from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.agent.strategy_llm_bridge import StrategyLLMProvider
-from ai_engineering_bootstrap.environment.models import EnvironmentRequest, PythonPackageRequirement
+from ai_engineering_bootstrap.environment.models import (
+    EnvironmentRequest,
+    PythonPackageRequirement,
+)
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 
 _TOOL_ALIASES = {
@@ -68,7 +71,9 @@ class ParsedIntent:
             excluded_tools=self.excluded_tools,
             languages=self.languages,
             frameworks=self.frameworks,
-            project_dependencies=[PythonPackageRequirement(name=name) for name in self.project_dependencies],
+            project_dependencies=[
+                PythonPackageRequirement(name=name) for name in self.project_dependencies
+            ],
             excluded_packages=self.excluded_packages,
             configurations={},
             constraints={constraint: True for constraint in self.constraints},
@@ -153,7 +158,9 @@ class IntentParser:
 
         excluded_tools = self._merge_unique(
             deterministic_excluded_tools,
-            self._normalise_strings(parsed.get("excluded_tools", []), self._known_tools),
+            self._normalise_strings(
+                parsed.get("excluded_tools", []), self._known_tools
+            ),
         )
         excluded_packages = self._merge_unique(
             deterministic_excluded_packages,
@@ -163,7 +170,9 @@ class IntentParser:
         excluded_package_set = {package.lower() for package in excluded_packages}
 
         required_tools = self._merge_unique(
-            self._normalise_strings(parsed.get("required_tools", []), self._known_tools),
+            self._normalise_strings(
+                parsed.get("required_tools", []), self._known_tools
+            ),
             lexical_tools,
         )
         required_tools = [
@@ -179,12 +188,16 @@ class IntentParser:
 
         project_dependencies = [
             package
-            for package in self._normalise_packages(parsed.get("project_dependencies", []))
+            for package in self._normalise_packages(
+                parsed.get("project_dependencies", [])
+            )
             if package.lower() not in excluded_package_set
         ]
 
         return ParsedIntent(
-            natural_language_goal=str(parsed.get("natural_language_goal", natural_language)),
+            natural_language_goal=str(
+                parsed.get("natural_language_goal", natural_language)
+            ),
             required_tools=required_tools,
             optional_tools=optional_tools,
             excluded_tools=excluded_tools,
@@ -227,7 +240,11 @@ class IntentParser:
             framework for framework in self._known_frameworks if framework in text_lower
         ]
         constraints = []
-        if "no sudo" in text_lower or "without root" in text_lower or "بدون روت" in text_lower:
+        if (
+            "no sudo" in text_lower
+            or "without root" in text_lower
+            or "بدون روت" in text_lower
+        ):
             constraints.append("no_root_required")
         if "virtualenv" in text_lower or "venv" in text_lower:
             constraints.append("use_virtualenv")
@@ -290,34 +307,45 @@ User goal:
         lowered = text.lower()
         excluded = {tool.lower() for tool in excluded_tools}
         result: list[str] = []
-        clauses = re.split(r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", lowered, flags=re.IGNORECASE)
+        clauses = re.split(
+            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", lowered, flags=re.IGNORECASE
+        )
         for clause in clauses:
             if not re.search(_INSTALL_VERB, clause, flags=re.IGNORECASE):
                 continue
             for tool_id in self._known_tools:
                 aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
-                if any(re.search(re.escape(alias.lower()), clause) for alias in aliases):
-                    if tool_id.lower() not in excluded:
-                        result.append(tool_id)
+                if any(
+                    re.search(re.escape(alias.lower()), clause) for alias in aliases
+                ) and tool_id.lower() not in excluded:
+                    result.append(tool_id)
         return self._merge_unique(result, [])
 
     def _deterministic_exclusions(self, text: str) -> tuple[list[str], list[str]]:
         lowered = text.lower()
         excluded_tools: list[str] = []
-        clauses = re.split(r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", lowered, flags=re.IGNORECASE)
+        clauses = re.split(
+            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", lowered, flags=re.IGNORECASE
+        )
         for clause in clauses:
             if not _NEGATION.search(clause):
                 continue
             for tool_id in self._known_tools:
                 aliases = _TOOL_ALIASES.get(tool_id, {tool_id})
-                if any(re.search(re.escape(alias.lower()), clause) for alias in aliases):
+                if any(
+                    re.search(re.escape(alias.lower()), clause) for alias in aliases
+                ):
                     excluded_tools.append(tool_id)
-        return self._merge_unique(excluded_tools, []), self._extract_negative_packages(text)
+        return self._merge_unique(excluded_tools, []), self._extract_negative_packages(
+            text
+        )
 
     @staticmethod
     def _extract_negative_packages(text: str) -> list[str]:
         result: list[str] = []
-        clauses = re.split(r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", text, flags=re.IGNORECASE)
+        clauses = re.split(
+            r"[\n.;،]|\bbut\b|\bاما\b|\bولی\b", text, flags=re.IGNORECASE
+        )
         for clause in clauses:
             if not _NEGATION.search(clause):
                 continue
@@ -333,8 +361,17 @@ User goal:
                 payload,
                 flags=re.IGNORECASE,
             )
-            for token in re.split(r"\s*(?:,|&|\band\b|\bو\b|\+)\s*", payload, flags=re.IGNORECASE):
-                candidate = re.sub(r"(?:را|رو)\s*$", "", token.strip(" .;:()[]،"), flags=re.IGNORECASE).strip()
+            for token in re.split(
+                r"\s*(?:,|&|\band\b|\bو\b|\+)\s*",
+                payload,
+                flags=re.IGNORECASE,
+            ):
+                candidate = re.sub(
+                    r"(?:را|رو)\s*$",
+                    "",
+                    token.strip(" .;:()[]،"),
+                    flags=re.IGNORECASE,
+                ).strip()
                 if candidate and _TOKEN.fullmatch(candidate):
                     result.append(candidate)
         return list(dict.fromkeys(result))
@@ -353,7 +390,11 @@ User goal:
             )
             if _NEGATION.search(match.group(0)):
                 continue
-            for token in re.split(r"\s*(?:,|&|\band\b|\bو\b|\+)\s*", clause, flags=re.IGNORECASE):
+            for token in re.split(
+                r"\s*(?:,|&|\band\b|\bو\b|\+)\s*",
+                clause,
+                flags=re.IGNORECASE,
+            ):
                 candidate = token.strip(" .;:()[]،")
                 if (
                     candidate
@@ -364,7 +405,9 @@ User goal:
         return list(dict.fromkeys(result))
 
     @staticmethod
-    def _normalise_strings(value: object, allowed: set[str] | None = None) -> list[str]:
+    def _normalise_strings(
+        value: object, allowed: set[str] | None = None
+    ) -> list[str]:
         if not isinstance(value, list):
             return []
         values = [str(item).strip() for item in value if str(item).strip()]
