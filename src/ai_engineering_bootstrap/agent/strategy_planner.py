@@ -9,10 +9,7 @@ from typing import Any
 from ai_engineering_bootstrap.agent.decision_validator import StrategyDecisionValidator
 from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.environment.models import EnvironmentDelta
-from ai_engineering_bootstrap.environment.tool_catalog import (
-    ToolCatalog,
-    ToolDefinition,
-)
+from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog, ToolDefinition
 
 
 @dataclass
@@ -74,8 +71,11 @@ class StrategyPlanner:
             return self._deterministic_plan(install_deltas, platform, architecture)
         try:
             return self._llm_plan(install_deltas, platform, architecture)
-        except Exception:  # noqa: BLE001 - intentional LLM fallback boundary
-            return self._deterministic_plan(install_deltas, platform, architecture)
+        except Exception as error:  # noqa: BLE001 - intentional LLM fallback boundary
+            fallback = self._deterministic_plan(install_deltas, platform, architecture)
+            fallback.reasoning_summary = f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            fallback.overall_confidence = min(fallback.overall_confidence, 0.55)
+            return fallback
 
     def _llm_plan(self, deltas: list[Any], platform: str | None, architecture: str | None) -> StrategyPlan:
         decision = self.provider.decide(self._build_prompt(deltas, platform, architecture), [])
@@ -217,11 +217,17 @@ class StrategyPlanner:
             return strategy
         return None
 
-    @staticmethod
-    def _build_prompt(deltas: list[Any], platform: str | None, architecture: str | None) -> str:
-        tools_info = "\n".join(
-            f"- {delta.tool_id}: {delta.action.value}" for delta in deltas
-        )
+    def _build_prompt(self, deltas: list[Any], platform: str | None, architecture: str | None) -> str:
+        tool_lines: list[str] = []
+        for delta in deltas:
+            tool_def = self.tool_catalog.get(delta.tool_id)
+            if tool_def is None:
+                continue
+            strategies = ", ".join(strategy.strategy_id for strategy in tool_def.installation_strategies)
+            tool_lines.append(
+                f"- {delta.tool_id}: {delta.action.value}; registered strategies: [{strategies}]"
+            )
+        tools_info = "\n".join(tool_lines)
         return f"""You are a strategy planner for tool installation.
 
 Tools requiring installation:
@@ -230,7 +236,7 @@ Tools requiring installation:
 Platform: {platform or 'auto-detect'}
 Architecture: {architecture or 'auto-detect'}
 
-Use only strategies registered in the tool catalog. Never invent a shell command,
+Use ONLY the registered strategies listed above. Never invent a shell command,
 source domain, artifact URL, or strategy name. Prefer official sources.
 
 Return ONLY valid JSON:
