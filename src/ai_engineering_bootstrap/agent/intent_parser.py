@@ -8,11 +8,9 @@ from dataclasses import dataclass, field
 
 from ai_engineering_bootstrap.agent.provider import LLMProvider
 from ai_engineering_bootstrap.agent.strategy_llm_bridge import StrategyLLMProvider
-from ai_engineering_bootstrap.environment.models import (
-    EnvironmentRequest,
-    PythonPackageRequirement,
-)
+from ai_engineering_bootstrap.environment.models import EnvironmentRequest
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
+
 
 _TOOL_ALIASES = {
     "cursor": {"cursor"},
@@ -53,7 +51,7 @@ class ParsedIntent:
     excluded_tools: list[str] = field(default_factory=list)
     languages: list[str] = field(default_factory=list)
     frameworks: list[str] = field(default_factory=list)
-    project_dependencies: list[PythonPackageRequirement] = field(default_factory=list)
+    project_dependencies: list[str] = field(default_factory=list)
     excluded_packages: list[str] = field(default_factory=list)
     constraints: list[str] = field(default_factory=list)
     platform_preferences: list[str] = field(default_factory=list)
@@ -128,7 +126,9 @@ class IntentParser:
             return self._llm_parse(natural_language)
         except Exception as error:  # noqa: BLE001 - provider boundary must preserve a usable fallback
             fallback = self._deterministic_parse(natural_language)
-            fallback.reasoning_summary = f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            fallback.reasoning_summary = (
+                f"Deterministic fallback after LLM failure: {type(error).__name__}: {error}"
+            )
             fallback.confidence = min(fallback.confidence, 0.55)
             return fallback
 
@@ -161,9 +161,7 @@ class IntentParser:
         )
         excluded_tools = self._merge_unique(
             excluded_tools,
-            self._normalise_strings(
-                parsed.get("excluded_tools", []), self._known_tools
-            ),
+            self._normalise_strings(parsed.get("excluded_tools", []), self._known_tools),
         )
         required_tools = [
             tool
@@ -188,7 +186,7 @@ class IntentParser:
         project_dependencies = [
             package
             for package in project_dependencies
-            if package.name.lower() not in excluded_package_set
+            if package.lower() not in excluded_package_set
         ]
 
         return ParsedIntent(
@@ -210,9 +208,7 @@ class IntentParser:
 
     def _deterministic_parse(self, natural_language: str) -> ParsedIntent:
         """High-recall deterministic fallback for common English/Persian requests."""
-        excluded_tools, excluded_packages = self._deterministic_exclusions(
-            natural_language
-        )
+        excluded_tools, excluded_packages = self._deterministic_exclusions(natural_language)
         required_tools = self._deterministic_tool_mentions(
             natural_language, excluded_tools
         )
@@ -222,7 +218,9 @@ class IntentParser:
         frameworks = [
             framework for framework in self._known_frameworks if framework in text_lower
         ]
-        dependencies = self._extract_install_packages(natural_language, required_tools)
+        dependencies = self._extract_install_packages(
+            natural_language, required_tools
+        )
         dependencies = [
             package
             for package in dependencies
@@ -248,7 +246,13 @@ class IntentParser:
             constraints.append("isolated_environment")
         if any(
             value in text_lower
-            for value in ("ai", "ml", "machine learning", "هوش مصنوعی", "یادگیری ماشین")
+            for value in (
+                "ai",
+                "ml",
+                "machine learning",
+                "هوش مصنوعی",
+                "یادگیری ماشین",
+            )
         ):
             if "python" not in required_tools:
                 required_tools.append("python")
@@ -271,12 +275,10 @@ class IntentParser:
             excluded_tools=excluded_tools,
             languages=languages,
             frameworks=frameworks,
-            project_dependencies=[
-                PythonPackageRequirement(name=item) for item in dependencies
-            ],
+            project_dependencies=dependencies,
             excluded_packages=excluded_packages,
             constraints=constraints,
-            confidence=0.65,
+            confidence=0.7,
             reasoning_summary="Deterministic high-recall fallback parsing",
         )
 
@@ -365,40 +367,30 @@ User goal:
         for clause in clauses:
             if not _NEGATION.search(clause) or not _POSITIVE_VERBS.search(clause):
                 continue
+            match = re.search(
+                r"(?:don't|do not|dont|never|avoid)\s+(?:install|reinstall|setup|set up|add)\s+(.+)$",
+                clause,
+                flags=re.IGNORECASE,
+            )
+            payload = match.group(1) if match else clause
+            payload = re.sub(
+                r".*?\b(?:نصب\s+نکن(?:ید|م)?|نصب\s+نشود)\b\s*",
+                "",
+                payload,
+                flags=re.IGNORECASE,
+            )
             for token in re.split(
                 r"\s*(?:,|&|\band\b|\band/or\b|\bو\b|\+)\s*",
-                clause,
+                payload,
                 flags=re.IGNORECASE,
             ):
                 candidate = token.strip(" .;:()[]،")
                 candidate = re.sub(
-                    r"^(?:don't|do not|dont|never|avoid)\s+",
-                    "",
-                    candidate,
-                    flags=re.IGNORECASE,
-                )
-                candidate = re.sub(
-                    r"(?:را|رو|را?ی?)\s*$", "", candidate, flags=re.IGNORECASE
+                    r"(?:را|رو)\s*$", "", candidate, flags=re.IGNORECASE
                 ).strip()
-                if (
-                    candidate
-                    and _TOKEN.fullmatch(candidate)
-                    and candidate.lower()
-                    not in {
-                        "install",
-                        "reinstall",
-                        "setup",
-                        "set",
-                        "up",
-                        "نصب",
-                        "کن",
-                        "کنید",
-                        "نکن",
-                        "نکنید",
-                    }
-                ):
+                if candidate and _TOKEN.fullmatch(candidate):
                     result.append(candidate)
-        return result
+        return list(dict.fromkeys(result))
 
     @staticmethod
     def _extract_install_packages(text: str, required_tools: list[str]) -> list[str]:
@@ -440,24 +432,20 @@ User goal:
         return list(dict.fromkeys(values))
 
     @staticmethod
-    def _normalise_packages(value: object) -> list[PythonPackageRequirement]:
+    def _normalise_packages(value: object) -> list[str]:
         if not isinstance(value, list):
             return []
-        result: list[PythonPackageRequirement] = []
+        result: list[str] = []
         for item in value:
             if isinstance(item, str):
                 name = item.strip()
-                version = None
             elif isinstance(item, dict):
                 name = str(item.get("name", "")).strip()
-                version = str(item.get("version_constraint", "")).strip() or None
             else:
                 continue
             if name:
-                result.append(
-                    PythonPackageRequirement(name=name, version_constraint=version)
-                )
-        return result
+                result.append(name)
+        return list(dict.fromkeys(result))
 
     @staticmethod
     def _merge_unique(left: list[str], right: list[str]) -> list[str]:
