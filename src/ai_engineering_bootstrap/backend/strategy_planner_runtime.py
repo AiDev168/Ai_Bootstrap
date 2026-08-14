@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from ai_engineering_bootstrap.agent.exceptions import (
+    ProviderConnectionError,
+    ProviderResponseError,
+    ProviderTimeoutError,
+)
 from ai_engineering_bootstrap.agent.provider import build_provider
 from ai_engineering_bootstrap.agent.strategy_llm_bridge import StrategyLLMProvider
 from ai_engineering_bootstrap.agent.strategy_planner import StrategyPlan, StrategyPlanner
@@ -32,7 +37,7 @@ class RuntimeStrategyPlanner(StrategyPlanner):
             provider = StrategyLLMProvider(build_provider(self.settings_service.provider_config()))
             planner = StrategyPlanner(self.tool_catalog, provider=provider)
             return planner.plan_strategies(delta, platform, architecture)
-        except (ValueError, RuntimeError):
+        except (ProviderConnectionError, ProviderResponseError, ProviderTimeoutError, ValueError, RuntimeError):
             return self.deterministic.plan_strategies(delta, platform, architecture)
 
 
