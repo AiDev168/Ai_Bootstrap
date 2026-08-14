@@ -244,6 +244,24 @@ class EnvironmentSessionService:
                 if not self._requires_approval(action) or action.action_id in approved
             ]
             excluded_actions = sorted(skipped)
+        elif approved:
+            execution_actions = [
+                action
+                for action in session.plan.actions
+                if action.action_id in approved
+            ]
+            excluded_actions = sorted(
+                action.action_id
+                for action in session.plan.actions
+                if action.action_id not in approved
+            )
+        elif skipped:
+            execution_actions = [
+                action
+                for action in session.plan.actions
+                if action.action_id not in skipped
+            ]
+            excluded_actions = sorted(skipped)
         else:
             approved = set()
             execution_actions = list(session.plan.actions)
