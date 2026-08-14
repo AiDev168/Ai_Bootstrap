@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 """
 AI Engineering Bootstrap - Backend API Service
@@ -616,7 +616,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             
     except WebSocketDisconnect:
         pass
-    except Exception:  # noqa: BLE001 - API/WebSocket boundary
+    except Exception:
         logger.exception("Unexpected WebSocket failure for session %s", session_id)
 
 # LLM Settings endpoints

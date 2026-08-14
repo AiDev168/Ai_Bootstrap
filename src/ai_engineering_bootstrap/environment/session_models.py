@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 """
 Session models for environment orchestration.
@@ -52,7 +52,7 @@ class AgentDecision:
     selected_capabilities: list[str] = field(default_factory=list)
     selected_strategy: dict[str, Any] = field(default_factory=dict)
     input_evidence_ids: list[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -77,7 +77,7 @@ class SessionEvent:
     """Represents an event in the session timeline."""
     
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     event_type: str = ""  # audit_started, plan_created, approval_requested, action_executed, etc.
     message: str = ""
     details: dict[str, Any] = field(default_factory=dict)
@@ -124,7 +124,7 @@ class ExecutionEvidence:
     error: str | None = None
     verification_result: dict[str, Any] | None = None
     artifacts: dict[str, Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -151,7 +151,7 @@ class RecoveryRecord:
     approved: bool = False
     executed: bool = False
     success: bool = False
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -189,8 +189,8 @@ class EnvironmentSession:
     recovery_history: list[RecoveryRecord] = field(default_factory=list)
     events: list[SessionEvent] = field(default_factory=list)
     agent_decisions: list[AgentDecision] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     
     def add_event(self, event_type: str, message: str, details: dict[str, Any] | None = None) -> SessionEvent:

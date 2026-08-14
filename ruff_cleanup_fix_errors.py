@@ -35,6 +35,8 @@ for path in [
     text = re.sub(r'^from datetime import .*\n', '', text, flags=re.MULTILINE)
     text = 'from datetime import datetime, timezone\n' + text
     text = text.replace('datetime.utcnow()', 'datetime.now(timezone.utc)')
+    text = text.replace('datetime.now(UTC)', 'datetime.now(timezone.utc)')
+    text = text.replace('default_factory=datetime.utcnow', 'default_factory=lambda: datetime.now(timezone.utc)')
     p.write_text(text, encoding='utf-8')
 
 # Async endpoint must not perform blocking file I/O.
@@ -55,7 +57,7 @@ for path in {
     'src/ai_engineering_bootstrap/agent/strategy_planner.py': [
         '        except Exception:\n',
     ],
-}.keys():
+}:
     p = ROOT / path
     text = p.read_text(encoding='utf-8')
     text = text.replace('        except Exception:\n', '        except Exception:  # noqa: BLE001 - intentional LLM fallback boundary\n')
@@ -74,7 +76,11 @@ text = text.replace('except Exception:\n', 'except Exception:  # noqa: BLE001 - 
 text = text.replace('            data = await websocket.receive_text()\n', '            await websocket.receive_text()\n')
 text = text.replace(
     '    except Exception:  # noqa: BLE001 - API/WebSocket boundary\n        pass\n',
-    '    except Exception:  # noqa: BLE001 - API/WebSocket boundary\n        logger.exception("Unexpected WebSocket failure for session %s", session_id)\n'
+    '    except Exception:\n        logger.exception("Unexpected WebSocket failure for session %s", session_id)\n'
+)
+text = text.replace(
+    '    except Exception: # noqa: BLE001 - API/WebSocket boundary\n        logger.exception("Unexpected WebSocket failure for session %s", session_id)\n',
+    '    except Exception:\n        logger.exception("Unexpected WebSocket failure for session %s", session_id)\n'
 )
 text = text.replace('        api_url = settings.get("api_url", "")\n', '')
 p.write_text(text, encoding='utf-8')
