@@ -10,13 +10,14 @@ from ai_engineering_bootstrap.environment.models import EnvironmentDelta
 from ai_engineering_bootstrap.environment.tool_catalog import ToolCatalog
 
 
-class RuntimeStrategyPlanner:
-    """Select the configured provider at plan time and fail closed to deterministic planning."""
+class RuntimeStrategyPlanner(StrategyPlanner):
+    """Select the configured provider at plan time and fall back safely."""
 
     def __init__(self, catalog: ToolCatalog | None = None, settings_service: LLMSettingsService | None = None) -> None:
-        self.catalog = catalog or ToolCatalog()
+        catalog = catalog or ToolCatalog()
+        super().__init__(catalog)
         self.settings_service = settings_service or LLMSettingsService()
-        self.deterministic = StrategyPlanner(self.catalog)
+        self.deterministic = StrategyPlanner(catalog)
 
     def plan_strategies(
         self,
@@ -29,7 +30,7 @@ class RuntimeStrategyPlanner:
             return self.deterministic.plan_strategies(delta, platform, architecture)
         try:
             provider = StrategyLLMProvider(build_provider(self.settings_service.provider_config()))
-            planner = StrategyPlanner(self.catalog, provider=provider)
+            planner = StrategyPlanner(self.tool_catalog, provider=provider)
             return planner.plan_strategies(delta, platform, architecture)
         except (ValueError, RuntimeError):
             return self.deterministic.plan_strategies(delta, platform, architecture)
