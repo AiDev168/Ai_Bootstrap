@@ -27,6 +27,7 @@ from ai_engineering_bootstrap.generation import (
     default_template_catalog,
 )
 from ai_engineering_bootstrap.models import GenerationRequest
+from ai_engineering_bootstrap.pipeline import PipelineEngine
 from ai_engineering_bootstrap.planner import PlannerEngine
 
 app = typer.Typer(
@@ -160,15 +161,10 @@ def create_project(
 @app.command()
 def doctor() -> None:
     """Run a read-only environment health check (Environment Doctor V3)."""
-    audit_service = default_audit_service()
-    report = audit_service.run()
-
+    report = default_audit_service().run()
     grouped_checks: dict[str, list] = {}
     for check in report.checks:
-        cat = check.category.value
-        if cat not in grouped_checks:
-            grouped_checks[cat] = []
-        grouped_checks[cat].append(check)
+        grouped_checks.setdefault(check.category.value, []).append(check)
 
     for category, checks in grouped_checks.items():
         table = Table(title=f"[bold cyan]{category}[/bold cyan]")
@@ -195,60 +191,41 @@ def doctor() -> None:
 @app.command()
 def plan() -> None:
     """Generate an execution plan based on the latest audit."""
-    audit_service = default_audit_service()
-    report = audit_service.run()
-    engine = PlannerEngine()
-    plan = engine.generate_plan(report)
-    if not plan.is_actionable:
+    report = default_audit_service().run()
+    plan_result = PlannerEngine().generate_plan(report)
+    if not plan_result.is_actionable:
         console.print("[green]✓ Environment is healthy. No actions required.[/green]")
         return
 
     console.print("[bold]Execution Plan:[/bold]\n")
-    for i, action in enumerate(plan.actions, 1):
+    for i, action in enumerate(plan_result.actions, 1):
         console.print(f"{i}. [cyan]{action.description}[/cyan]")
         console.print(
             f"   [dim]ID: {action.action_id} | Priority: {action.priority}[/dim]"
         )
-        console.print()
 
 
 @app.command()
 def execute() -> None:
     """Execute the generated plan in SAFE MODE / DRY RUN."""
-    audit_service = default_audit_service()
-    report = audit_service.run()
-    planner = PlannerEngine()
-    plan = planner.generate_plan(report)
-
-    if not plan.is_actionable:
+    report = default_audit_service().run()
+    plan_result = PlannerEngine().generate_plan(report)
+    if not plan_result.is_actionable:
         console.print("[green]✓ Environment is healthy. No actions to execute.[/green]")
         return
 
     console.print("[yellow bold]⚠️ SAFE MODE ACTIVE[/yellow bold]")
-    console.print("The following actions would be taken, but are currently simulated:")
-    console.print()
-
-    executor = ExecutorEngine()
-    result = executor.execute(plan)
-
-    for res in result.results:
-        status_color = (
+    result = ExecutorEngine().execute(plan_result)
+    for item in result.results:
+        color = (
             "green"
-            if res.status.value == "success"
-            else ("red" if res.status.value == "failed" else "yellow")
+            if item.status.value == "success"
+            else "red"
+            if item.status.value == "failed"
+            else "yellow"
         )
-        status_str = res.status.value.upper()
-        console.print(
-            f"[{status_color}]• [{status_str}] {res.action_id}[/{status_color}]"
-        )
-        console.print(f"  [dim]{res.message}[/dim]")
-
-    console.print()
-    final_color = "green" if result.is_success else "red"
-    console.print(f"[{final_color} bold]{result.summary}[/{final_color} bold]")
-    console.print(
-        "\n[dim]Note: Real system modification handlers are not yet implemented.[/dim]"
-    )
+        console.print(f"[{color}]• [{item.status.value.upper()}] {item.action_id}[/{color}]")
+        console.print(f"  [dim]{item.message}[/dim]")
 
 
 @app.command()
@@ -258,6 +235,55 @@ def serve_gui(
 ) -> None:
     """Run the stable backend API and web GUI."""
     serve(host, port)
+
+
+@app.command()
+def run_pipeline(
+    real_execution: bool = typer.Option(
+        False, "--real-execution", help="Enable REAL execution mode."
+    ),
+    interactive_approval: bool = typer.Option(
+        False,
+        "--interactive-approval",
+        help="Prompt for required human approvals before REAL execution.",
+    ),
+) -> None:
+    """Run the canonical audit -> plan -> validate -> execute -> verify pipeline."""
+    from ai_engineering_bootstrap.executor.mode import ExecutionMode
+
+    mode = ExecutionMode.REAL if real_execution else ExecutionMode.SAFE
+    if interactive_approval and not real_execution:
+        raise typer.BadParameter("--interactive-approval requires --real-execution")
+
+    recovery_agent = _build_recovery_agent()
+    if interactive_approval:
+        from ai_engineering_bootstrap.approval.provider import InMemoryApprovalProvider
+
+        approval_provider = InMemoryApprovalProvider()
+        bootstrap_result = EnvironmentBootstrapService().run(
+            mode=mode,
+            approval_provider=approval_provider,
+            approval_callback=lambda request: typer.confirm(
+                f"Approve {request.reason or request.action_id} ({request.risk_level})?",
+                default=False,
+            ),
+            run_id="cli-run",
+            agent_planning_service=recovery_agent,
+        )
+        result = getattr(bootstrap_result, "pipeline_result", bootstrap_result)
+    else:
+        result = PipelineEngine().run(
+            mode=mode,
+            run_id="cli-run",
+            agent_planning_service=recovery_agent,
+        )
+
+    if result is None:
+        raise typer.Exit(code=1)
+    if result.is_success:
+        console.print("[green]Pipeline completed successfully.[/green]")
+        return
+    raise typer.Exit(code=1)
 
 
 @app.command()
