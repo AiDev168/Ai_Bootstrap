@@ -14,6 +14,8 @@ def test_session_endpoints_return_serializable_data() -> None:
     plan = backend.get_session_plan(session_id)
 
     assert session.data["session_id"] == session_id
+    assert "request" in session.data
+    assert "approval_states" in session.data
     assert state.data["session_id"] == session_id
     assert isinstance(state.data["actual"], dict)
     assert isinstance(state.data["desired"], dict)
@@ -26,15 +28,22 @@ def test_llm_settings_round_trip_is_secret_safe() -> None:
     backend = ApplicationBackend()
     result = backend.update_llm_settings(
         {
-            "provider": "local_server",
+            "provider": "remote_api",
             "model": "test-model",
-            "base_url": "http://127.0.0.1:1234/v1",
+            "base_url": "https://example.invalid/v1",
             "api_key": "secret-value",
         }
     )
 
-    assert result.data["provider"] == "local_server"
+    assert result.data["provider"] == "remote_api"
     assert result.data["model"] == "test-model"
     assert result.data["api_key_configured"] is True
     assert "secret-value" not in str(result.data)
-    assert backend.get_llm_settings().data["base_url"] == "http://127.0.0.1:1234/v1"
+    assert backend.get_llm_settings().data["base_url"] == "https://example.invalid/v1"
+
+
+def test_supported_llm_provider_modes_are_exposed() -> None:
+    backend = ApplicationBackend()
+    for provider in ("local_server", "remote_api", "mock", "in_process"):
+        result = backend.update_llm_settings({"provider": provider, "model": "test-model", "base_url": "http://127.0.0.1:1234/v1"})
+        assert result.data["provider"] == provider
