@@ -3,10 +3,7 @@
 import re
 from pathlib import Path
 
-HTML_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "src/ai_engineering_bootstrap/gui/static/index.html"
-)
+HTML_PATH = Path(__file__).resolve().parents[2] / "src/ai_engineering_bootstrap/gui/static/index.html"
 RUNTIME_PATH = HTML_PATH.with_name("app-runtime.js")
 
 
@@ -45,5 +42,11 @@ def test_dashboard_has_request_console_live_refresh_and_llm_settings() -> None:
         "Promise.allSettled",
         "/llm/models",
         "Load Models",
+        "Pause Latest",
+        "Resume Latest",
+        "request-filter",
+        "requestFilter",
+        "latestPaused",
+        "status >= 400",
     ):
         assert text in source
