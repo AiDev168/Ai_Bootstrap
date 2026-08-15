@@ -63,18 +63,17 @@ jobs:
 
           p = Path("src/ai_engineering_bootstrap/gui/static/app-runtime.js")
           text = p.read_text(encoding="utf-8")
-          replace_once(
-              str(p),
-              'filter.innerHTML = \'<option value="ALL">All</option><option value="GET">GET</option><option value="POST">POST</option>\';',
-              'filter.innerHTML = \'<option value="ALL">All</option><option value="GET">GET</option><option value="POST">POST</option><option value="ERROR">Errors</option>\';',
+          text = text.replace(
+              '<option value="ALL">All</option><option value="GET">GET</option><option value="POST">POST</option>',
+              '<option value="ALL">All</option><option value="GET">GET</option><option value="POST">POST</option><option value="ERROR">Errors</option>',
+              1,
           )
-          replace_once(
-              str(p),
+          text = text.replace(
               'const rows = state.requests.filter((item) => filter === "ALL" || item.method === filter);',
               'const rows = state.requests.filter((item) => filter === "ALL" || (filter === "ERROR" ? !(item.status >= 200 && item.status < 300) : item.method === filter));',
+              1,
           )
-          replace_once(
-              str(p),
+          text = text.replace(
               '.filter((input) => input.id !== "force-install")',
               '.filter(input => input.id !== "force-install")',
           )
@@ -88,7 +87,7 @@ jobs:
           test = test_path.read_text(encoding="utf-8")
           test = test.replace(
               '                    action_results=[],\n                )',
-              '                    action_results=[],\n                    pipeline_result=SimpleNamespace(verification_result=[]),\n                )',
+              '                    action_results=[SimpleNamespace(is_success=True, results=[])],\n                    pipeline_result=SimpleNamespace(verification_result=[]),\n                )',
               1,
           )
           test_path.write_text(test, encoding="utf-8")
