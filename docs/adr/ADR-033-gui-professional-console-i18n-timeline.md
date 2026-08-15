@@ -1,22 +1,22 @@
 # ADR-033: Professional GUI Console, Localization, and Timeline Semantics
 
 ## Status
-Accepted for feature/gui-professional-console-i18n-timeline.
+Accepted.
 
 ## Context
-The GUI is operationally useful only when request history, execution actions, and lifecycle events remain inspectable. Polling must not erase debugging evidence. Per-action controls must remain isolated. The dashboard must accurately report LLM connectivity. The interface also needs English/Persian localization without translating package, tool, command, or protocol identifiers.
+The GUI must be an operational interface, not a transient status page. Request history must remain inspectable while polling continues. Per-action controls must remain isolated. LLM health must be reported from the backend rather than inferred from page load. The interface must support English/Persian without translating identifiers such as package names, tool IDs, commands, URLs, model IDs, or API routes.
 
 ## Decisions
 
-1. Request Console keeps a bounded in-memory history of the most recent 100 requests. No refresh operation clears history. Filtering is a view operation only.
-2. The Latest Response panel supports Pause/Resume. Pausing stops automatic replacement of the selected response while request history continues to accumulate.
-3. Clicking any request-console entry selects that entry and renders its exact response/error in Latest Response.
-4. Request entries are classified as GET/POST/OTHER. HTTP failures and network failures use a red visual state.
-5. Dashboard/server health is authoritative per successful health probe. LLM availability is shown from the backend health payload and is not inferred from page load.
-6. GUI localization uses an explicit language selector. User-facing labels are translated; package names, tool IDs, action IDs, commands, URLs, model IDs, and protocol paths remain unchanged.
-7. Timeline events have semantic categories (session, intent, plan, approval, execution, verification, recovery, error). Each category has a distinct visual marker/color and a legend.
-8. Safe execution remains a dry-run/preview path. Real execution is the canonical installation path. GUI labels must communicate this distinction clearly.
-9. All GUI behavior above is covered by contract tests that assert semantics, not incidental implementation names.
+1. Request Console keeps a bounded history of the most recent 100 requests. Polling and normal refresh operations never clear that history. The existing Clear action remains an explicit user action.
+2. The Latest Response panel has Pause/Resume. Pause freezes automatic replacement of the selected response while new request records continue to accumulate.
+3. Clicking any Request Console entry selects that exact request and displays its response or error in Latest Response.
+4. Request records are filterable by All, GET, POST, or Errors. HTTP failures and network failures have a red visual state.
+5. Dashboard LLM status is based on a live backend probe. A cached or merely configured provider must not be shown as connected.
+6. The GUI has an explicit EN/FA language switch. User-facing UI strings are translated; package names, tool IDs, action IDs, commands, URLs, model IDs, and protocol paths are preserved verbatim.
+7. Session Timeline events are classified by lifecycle stage: session, intent, plan, approval, execution, verification, recovery, and error. Each stage has a distinct visual marker and a legend.
+8. Safe mode is explicitly communicated as a dry-run/preview and Real mode as canonical installation/execution.
+9. GUI contract tests validate semantic behavior rather than depending on incidental implementation names.
 
 ## Consequences
-The GUI becomes a debugging console rather than a transient status dashboard. Request history remains inspectable, localization is deterministic, and lifecycle events can be correlated to pipeline stages. This intentionally increases frontend state handling but reduces operational ambiguity.
+The GUI becomes a persistent operational debugging surface. Request history, exact responses/errors, language state, and lifecycle stages remain visible while polling continues. This adds client-side state but materially improves diagnosability and user trust.
