@@ -38,6 +38,8 @@ class ExecutionPlanBuilder:
     ) -> ExecutionPlan:
         """Build an executor plan and fail closed on unsupported actions."""
         actions: list[ExecutionPlanAction] = []
+        action_ids: set[str] = set()
+
         for decision in strategy_plan.decisions:
             executor_action_id = self._resolve_action_id(
                 decision.tool_id, decision.strategy_name
@@ -58,29 +60,35 @@ class ExecutionPlanBuilder:
                         decision.tool_id, decision.strategy_args, decision.version
                     )
                 )
-            actions.append(
-                ExecutionPlanAction(
-                    action_id=self._instance_action_id(
-                        executor_action_id, decision.tool_id
-                    ),
-                    description=f"Prepare {decision.tool_id} using {decision.strategy_name}",
-                    priority=self._priority(decision.risk_level),
-                    context=context,
-                )
+            action = ExecutionPlanAction(
+                action_id=self._instance_action_id(
+                    executor_action_id, decision.tool_id
+                ),
+                description=f"Prepare {decision.tool_id} using {decision.strategy_name}",
+                priority=self._priority(decision.risk_level),
+                context=context,
             )
+            if action.action_id not in action_ids:
+                actions.append(action)
+                action_ids.add(action.action_id)
 
         for package_delta in delta.package_deltas:
             if package_delta.action not in {DeltaAction.INSTALL, DeltaAction.UPGRADE}:
                 continue
             executor_action_id = "install_python_package"
             self._require_capability(executor_action_id)
-            package = package_delta.package_name
+            package = package_delta.package_name.strip()
+            if not package:
+                continue
+            action_id = self._instance_action_id(executor_action_id, package)
+            if action_id in action_ids:
+                continue
             requirement = package
             if package_delta.desired_version:
                 requirement = f"{package}{package_delta.desired_version}"
             actions.append(
                 ExecutionPlanAction(
-                    action_id=self._instance_action_id(executor_action_id, package),
+                    action_id=action_id,
                     description=f"Install Python package {package}",
                     priority=2,
                     context={
@@ -94,8 +102,8 @@ class ExecutionPlanBuilder:
                     },
                 )
             )
+            action_ids.add(action_id)
 
-        actions = self._deduplicate(actions)
         summary = (
             "No actions required."
             if not actions
@@ -140,18 +148,6 @@ class ExecutionPlanBuilder:
     @staticmethod
     def _priority(risk_level: str) -> int:
         return {"critical": 1, "high": 2, "medium": 3, "low": 4}.get(risk_level, 5)
-
-    @staticmethod
-    def _deduplicate(actions: list[ExecutionPlanAction]) -> list[ExecutionPlanAction]:
-        seen: set[tuple[str, str]] = set()
-        result: list[ExecutionPlanAction] = []
-        for action in actions:
-            key = (action.action_id, str(action.context))
-            if key in seen:
-                continue
-            seen.add(key)
-            result.append(action)
-        return result
 
 
 __all__ = ["ExecutionPlanBuilder"]

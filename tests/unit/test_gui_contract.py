@@ -24,32 +24,36 @@ def test_dashboard_uses_active_backend_routes() -> None:
         assert re.search(route, html), f"Missing GUI route pattern: {route}"
 
 
-def test_dashboard_has_request_console_live_refresh_and_llm_settings() -> None:
-    html = HTML_PATH.read_text(encoding="utf-8")
-    runtime = RUNTIME_PATH.read_text(encoding="utf-8")
-    source = f"{html}\n{runtime}"
-    for text in (
+def test_dashboard_has_professional_console_i18n_and_timeline_controls() -> None:
+    source = f"{HTML_PATH.read_text(encoding='utf-8')}\n{RUNTIME_PATH.read_text(encoding='utf-8')}"
+    required = (
         "Request Console",
-        "logRequest",
-        "startPolling",
-        "Approve",
-        "Start Real",
-        "LLM Connection",
+        "window.logRequest",
+        "request-filter",
+        "requestFilter",
+        "Pause Latest",
+        "Resume Latest",
+        "selectedRequestIndex",
+        "getRequestLimit = 50",
+        "POST and errors",
+        "Select a request from the console to inspect its response.",
+        "language-switch",
+        "gui-language",
+        "stage-intent",
+        "stage-plan",
+        "stage-approval",
+        "stage-execution",
+        "stage-verification",
+        "stage-recovery",
+        "stage-error",
+        'data-start="safe"',
         "/llm/settings",
         "/llm/test",
+        "/llm/models",
         "local_server",
         "remote_api",
         "mock",
         "in_process",
-        "function viewSession",
-        "Promise.allSettled",
-        "/llm/models",
-        "Load Models",
-        "Pause Latest",
-        "Resume Latest",
-        "request-filter",
-        "requestFilter",
-        "latestPaused",
-        "status >= 400",
-    ):
-        assert text in source
+    )
+    for text in required:
+        assert text in source, f"Missing GUI contract token: {text}"
