@@ -1,10 +1,13 @@
-from ai_engineering_bootstrap.agent.strategy_planner import StrategyDecision, StrategyPlan
+from ai_engineering_bootstrap.agent.strategy_planner import (
+    StrategyDecision,
+    StrategyPlan,
+)
 from ai_engineering_bootstrap.backend.execution_plan_builder import ExecutionPlanBuilder
 from ai_engineering_bootstrap.environment.models import (
     DeltaAction,
     EnvironmentDelta,
-    PackageDelta,
     EnvironmentRequest,
+    PackageDelta,
     PythonPackageRequirement,
 )
 
@@ -20,7 +23,10 @@ def test_desired_state_deduplicates_python_packages_case_insensitively() -> None
 
     state = request.to_desired_state()
 
-    assert [item.name for item in state.python_packages] == ["colorama", "requests"]
+    assert [item.name for item in state.python_packages] == [
+        "colorama",
+        "requests",
+    ]
 
 
 def test_execution_plan_does_not_duplicate_strategy_and_package_action() -> None:
