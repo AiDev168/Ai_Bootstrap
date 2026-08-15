@@ -52,8 +52,9 @@ def test_real_start_executes_only_approved_action_instances() -> None:
                 is_success=True,
                 environment_ready=True,
                 rejected_actions=[],
-                action_results=[],
-            )
+                action_results=[SimpleNamespace(is_success=True, results=[])],
+                    pipeline_result=SimpleNamespace(verification_result=[]),
+                )
 
     service = RuntimeSessionService(
         repository=InMemorySessionRepository(),
