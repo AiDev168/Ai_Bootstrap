@@ -87,7 +87,7 @@ class LLMSettingsStore:
                 "model": "",
                 "base_url": "",
                 "api_key": "",
-                "enabled": "true" if DEFAULT_PROVIDER == "mock" else "false",
+                "enabled": "false",
             }
         return {
             "provider": provider or DEFAULT_PROVIDER,
@@ -122,7 +122,9 @@ class LLMSettingsService:
             raise ValueError(f"Unsupported LLM provider: {provider}")
         model = str(payload.get("model", current.get("model", ""))).strip()
         base_url = str(payload.get("base_url", current.get("base_url", ""))).strip()
-        api_key = str(payload.get("api_key", "")).strip() or current.get("api_key", "")
+        api_key = str(payload.get("api_key", "")).strip() or current.get(
+            "api_key", ""
+        )
         enabled = bool(model or base_url) and provider != "mock"
         if provider == "in_process":
             enabled = bool(model)
@@ -200,7 +202,9 @@ class LLMSettingsService:
             },
         )
 
-    def test_connection(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    def test_connection(
+        self, payload: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         values = self._normalize_values(payload or {}, self.store.load())
         provider = values["provider"]
         if provider == "mock":
@@ -229,7 +233,9 @@ class LLMSettingsService:
                 else f"{base_url}/v1/models"
             )
             headers = (
-                {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+                {"Authorization": f"Bearer {config.api_key}"}
+                if config.api_key
+                else {}
             )
             request = urllib.request.Request(endpoint, headers=headers)
             try:
@@ -290,7 +296,9 @@ class LLMSettingsService:
                 else f"{base_url}/v1/models"
             )
             headers = (
-                {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+                {"Authorization": f"Bearer {config.api_key}"}
+                if config.api_key
+                else {}
             )
             request = urllib.request.Request(endpoint, headers=headers)
             try:
