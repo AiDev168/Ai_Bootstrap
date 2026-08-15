@@ -29,6 +29,8 @@ class LLMSettings:
     base_url: str = ""
     api_key_configured: bool = False
     enabled: bool = False
+    connection_ok: bool | None = None
+    connection_message: str = "Not tested yet."
 
 
 class LLMSettingsStore:
@@ -42,9 +44,7 @@ class LLMSettingsStore:
 
     def __init__(self, path: Path | None = None) -> None:
         configured = os.getenv(self.ENV_FILE, "").strip()
-        self.path = (
-            path or Path(configured) if configured else path or DEFAULT_SETTINGS_FILE
-        )
+        self.path = path or Path(configured) if configured else path or DEFAULT_SETTINGS_FILE
 
     def load(self) -> dict[str, str]:
         if self.path.exists():
@@ -85,7 +85,7 @@ class LLMSettingsStore:
                 "model": "",
                 "base_url": "",
                 "api_key": "",
-                "enabled": "false",
+                "enabled": "true" if DEFAULT_PROVIDER == "mock" else "false",
             }
         return {
             "provider": provider or DEFAULT_PROVIDER,
@@ -106,6 +106,7 @@ class LLMSettingsService:
 
     def __init__(self, store: LLMSettingsStore | None = None) -> None:
         self.store = store or LLMSettingsStore()
+        self._last_probe: dict[str, Any] | None = None
 
     @staticmethod
     def _normalize_values(
@@ -122,11 +123,11 @@ class LLMSettingsService:
         api_key = str(payload.get("api_key", "")).strip()
         if not api_key:
             api_key = current.get("api_key", "")
-        enabled = provider != "mock" and bool(model or base_url)
+        enabled = provider == "mock" or bool(model or base_url)
         if provider == "in_process":
             enabled = bool(model)
         if provider == "remote_api":
-            enabled = bool(api_key)
+            enabled = bool(api_key and base_url)
         return {
             "provider": provider,
             "model": model,
@@ -135,6 +136,25 @@ class LLMSettingsService:
             "enabled": str(enabled).lower(),
         }
 
+    @staticmethod
+    def _fingerprint(values: dict[str, str]) -> tuple[str, str, str, bool]:
+        return (
+            values.get("provider", DEFAULT_PROVIDER),
+            values.get("model", ""),
+            values.get("base_url", ""),
+            bool(values.get("api_key", "")),
+        )
+
+    def _record_probe(
+        self, values: dict[str, str], result: dict[str, Any]
+    ) -> dict[str, Any]:
+        self._last_probe = {
+            "fingerprint": self._fingerprint(values),
+            "ok": bool(result.get("ok")),
+            "message": str(result.get("message", "")),
+        }
+        return result
+
     def get(self) -> LLMSettings:
         values = self.store.load()
         provider = values.get("provider", DEFAULT_PROVIDER)
@@ -142,23 +162,27 @@ class LLMSettingsService:
         base_url = values.get("base_url", "")
         api_key = values.get("api_key", "")
         enabled = values.get("enabled", "false").lower() == "true"
-        enabled = enabled and provider != "mock"
-        if provider == "in_process":
-            enabled = enabled and bool(model)
-        if provider == "remote_api":
-            enabled = enabled and bool(api_key)
+        probe = self._last_probe
+        connection_ok = None
+        connection_message = "Not tested yet."
+        if probe and probe.get("fingerprint") == self._fingerprint(values):
+            connection_ok = bool(probe.get("ok"))
+            connection_message = str(probe.get("message", ""))
         return LLMSettings(
             provider=provider,
             model=model,
             base_url=base_url,
             api_key_configured=bool(api_key),
             enabled=enabled,
+            connection_ok=connection_ok,
+            connection_message=connection_message,
         )
 
     def update(self, payload: dict[str, Any]) -> LLMSettings:
         current = self.store.load()
         values = self._normalize_values(payload, current)
         self.store.save(values)
+        self._last_probe = None
         return self.get()
 
     def provider_config(self) -> ProviderConfig:
@@ -180,11 +204,14 @@ class LLMSettingsService:
         values = self._normalize_values(payload or {}, self.store.load())
         provider = values["provider"]
         if provider == "mock":
-            return {
-                "ok": False,
-                "provider": provider,
-                "message": "Mock provider is test-only and is not a runtime LLM.",
-            }
+            return self._record_probe(
+                values,
+                {
+                    "ok": True,
+                    "provider": provider,
+                    "message": "Mock provider is available offline.",
+                },
+            )
         config = ProviderConfig(
             provider_type=provider,
             model=values.get("model") or None,
@@ -192,40 +219,49 @@ class LLMSettingsService:
             api_key=values.get("api_key") or None,
             options={},
         )
-        if provider == "local_server":
+        if provider in {"local_server", "remote_api"}:
             if not config.base_url:
-                raise ValueError("Base URL is required for local_server")
+                raise ValueError(f"Base URL is required for {provider}")
+            base_url = config.base_url.rstrip("/")
             endpoint = (
-                config.base_url.rstrip("/") + "/models"
-                if config.base_url.rstrip("/").endswith("/v1")
-                else config.base_url.rstrip("/") + "/v1/models"
+                f"{base_url}/models" if base_url.endswith("/v1") else f"{base_url}/v1/models"
             )
-            request = urllib.request.Request(
-                endpoint,
-                headers={"Authorization": f"Bearer {config.api_key}"}
-                if config.api_key
-                else {},
-            )
+            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            request = urllib.request.Request(endpoint, headers=headers)
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:
-                    return {
-                        "ok": 200 <= response.status < 300,
+                    ok = 200 <= response.status < 300
+                return self._record_probe(
+                    values,
+                    {
+                        "ok": ok,
                         "provider": provider,
                         "url": endpoint,
-                        "message": "Local server is reachable.",
-                    }
+                        "message": "LLM server is reachable."
+                        if ok
+                        else "LLM server returned a non-success status.",
+                    },
+                )
             except (urllib.error.URLError, urllib.error.HTTPError) as error:
-                return {
-                    "ok": False,
-                    "provider": provider,
-                    "url": endpoint,
-                    "message": f"Connection failed: {error}",
-                }
-        return {
-            "ok": True,
-            "provider": provider,
-            "message": "Provider configuration accepted.",
-        }
+                return self._record_probe(
+                    values,
+                    {
+                        "ok": False,
+                        "provider": provider,
+                        "url": endpoint,
+                        "message": f"Connection failed: {error}",
+                    },
+                )
+        return self._record_probe(
+            values,
+            {
+                "ok": bool(config.model),
+                "provider": provider,
+                "message": "Provider configuration accepted."
+                if config.model
+                else "Model is not configured.",
+            },
+        )
 
     def models(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         values = self._normalize_values(payload or {}, self.store.load())
@@ -244,9 +280,7 @@ class LLMSettingsService:
                 raise ValueError("Base URL is required for local_server")
             base_url = config.base_url.rstrip("/")
             endpoint = (
-                f"{base_url}/models"
-                if base_url.endswith("/v1")
-                else f"{base_url}/v1/models"
+                f"{base_url}/models" if base_url.endswith("/v1") else f"{base_url}/v1/models"
             )
             headers = (
                 {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
