@@ -42,6 +42,40 @@
 
     window.selectedTools = selectedTools;
 
+    function humanSessionLabel(session) {
+        return session?.label || session?.request?.natural_language_goal || "Environment Bootstrap";
+    }
+
+    function replaceSessionIdsWithLabels(sessions) {
+        const root = document.getElementById("sessions-list");
+        if (!root) return;
+        const labels = new Map((sessions || []).map(item => [item.session_id, humanSessionLabel(item)]));
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        for (const node of nodes) {
+            let value = node.nodeValue || "";
+            for (const [sessionId, label] of labels) {
+                if (value.includes(sessionId)) value = value.split(sessionId).join(label);
+            }
+            node.nodeValue = value;
+        }
+    }
+
+    const originalLoadSessions = window.loadSessions;
+    if (typeof originalLoadSessions === "function") {
+        window.loadSessions = async function loadSessionsWithLabels() {
+            const result = await originalLoadSessions();
+            try {
+                const payload = await window.api("/sessions");
+                replaceSessionIdsWithLabels(payload.sessions || []);
+            } catch (_) {
+                // Preserve the original session view if relabeling fails.
+            }
+            return result;
+        };
+    }
+
     function ensureModelTools() {
         if (!modelInput || document.getElementById("load-models-btn")) return;
         const button = document.createElement("button");
