@@ -64,7 +64,9 @@ class LLMSettingsStore:
 
     def save(self, values: dict[str, str]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_name = tempfile.mkstemp(prefix=".llm-settings-", dir=self.path.parent)
+        fd, temp_name = tempfile.mkstemp(
+            prefix=".llm-settings-", dir=self.path.parent
+        )
         try:
             os.chmod(temp_name, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
@@ -122,9 +124,7 @@ class LLMSettingsService:
             raise ValueError(f"Unsupported LLM provider: {provider}")
         model = str(payload.get("model", current.get("model", ""))).strip()
         base_url = str(payload.get("base_url", current.get("base_url", ""))).strip()
-        api_key = str(payload.get("api_key", "")).strip() or current.get(
-            "api_key", ""
-        )
+        api_key = str(payload.get("api_key", "")).strip() or current.get("api_key", "")
         enabled = bool(model or base_url) and provider != "mock"
         if provider == "in_process":
             enabled = bool(model)
@@ -232,11 +232,7 @@ class LLMSettingsService:
                 if base_url.endswith("/v1")
                 else f"{base_url}/v1/models"
             )
-            headers = (
-                {"Authorization": f"Bearer {config.api_key}"}
-                if config.api_key
-                else {}
-            )
+            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
             request = urllib.request.Request(endpoint, headers=headers)
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:
@@ -295,11 +291,7 @@ class LLMSettingsService:
                 if base_url.endswith("/v1")
                 else f"{base_url}/v1/models"
             )
-            headers = (
-                {"Authorization": f"Bearer {config.api_key}"}
-                if config.api_key
-                else {}
-            )
+            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
             request = urllib.request.Request(endpoint, headers=headers)
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:
