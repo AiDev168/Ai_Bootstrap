@@ -1,0 +1,48 @@
+name: Step32 session labels
+
+on:
+  push:
+    branches:
+      - feature/step32-final-validation
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch GUI session labels
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/ai_engineering_bootstrap/gui/static/app-runtime.js")
+          text = path.read_text(encoding="utf-8")
+          marker = '    window.selectedTools = selectedTools;\n'
+          addition = '''\n    function humanSessionLabel(session) {\n        return session?.label || session?.request?.natural_language_goal || "Environment Bootstrap";\n    }\n\n    function replaceSessionIdsWithLabels(sessions) {\n        const root = document.getElementById("sessions-list");\n        if (!root) return;\n        const labels = new Map((sessions || []).map(item => [item.session_id, humanSessionLabel(item)]));\n        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);\n        const nodes = [];\n        while (walker.nextNode()) nodes.push(walker.currentNode);\n        for (const node of nodes) {\n            let value = node.nodeValue || "";\n            for (const [sessionId, label] of labels) {\n                if (value.includes(sessionId)) value = value.split(sessionId).join(label);\n            }\n            node.nodeValue = value;\n        }\n    }\n\n    const originalLoadSessions = window.loadSessions;\n    if (typeof originalLoadSessions === "function") {\n        window.loadSessions = async function loadSessionsWithLabels() {\n            const result = await originalLoadSessions();\n            try {\n                const payload = await window.api("/sessions");\n                replaceSessionIdsWithLabels(payload.sessions || []);\n            } catch (_) {\n                // Preserve the original session view if relabeling fails.\n            }\n            return result;\n        };\n    }\n'''
+          if marker not in text:
+              raise SystemExit("selectedTools marker not found")
+          if "replaceSessionIdsWithLabels" not in text:
+              text = text.replace(marker, marker + addition, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+      - name: Validate
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          python -m ruff check .
+          python -m ruff format --check .
+          python -m compileall -q src tests
+          pytest -q
+      - name: Commit and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/ai_engineering_bootstrap/gui/static/app-runtime.js .github/workflows/step32-session-labels.yml
+          git rm .github/workflows/step32-session-labels.yml
+          git commit -m "fix: display human-readable session labels [skip ci]"
+          git push
