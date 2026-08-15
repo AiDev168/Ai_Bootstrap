@@ -23,14 +23,8 @@ class ValidationResult:
 
 
 class ExecutionPlanValidator:
-    """
-    Validates an ExecutionPlan before it reaches the Executor.
+    """Validate execution plans before they reach the executor."""
 
-    This acts as a Safety Gate to prevent invalid or unsafe plans from executing.
-    It performs structural validation and allowlist checking.
-    """
-
-    # لیست سفید اکشن‌های شناخته‌شده و ایمن (استفاده از ClassVar برای رفع خطای RUF012)
     ALLOWED_ACTIONS: ClassVar[set[str]] = {
         "fix_venv",
         "fix_editable",
@@ -44,40 +38,33 @@ class ExecutionPlanValidator:
         "install_project_dependencies",
     }
 
-    def validate(self, plan: ExecutionPlan) -> ValidationResult:
-        """
-        Validate the given execution plan.
+    @staticmethod
+    def canonical_action_id(action_id: str) -> str:
+        """Map per-instance action IDs to their canonical executor action IDs."""
+        prefix, separator, _subject = action_id.partition(":")
+        return prefix if separator and prefix == "install_python_package" else action_id
 
-        Returns ValidationResult with is_valid=True if safe to execute.
-        Returns ValidationResult with is_valid=False if plan should be rejected.
-        """
+    def validate(self, plan: ExecutionPlan) -> ValidationResult:
+        """Validate structure, canonical action allowlist and typed security context."""
         errors: list[str] = []
         warnings: list[str] = []
 
         if not plan.is_intact():
-            errors.append(
-                "Execution plan integrity check failed: plan contents changed after creation."
-            )
+            errors.append("Execution plan integrity check failed: plan contents changed after creation.")
 
-        # طرح خالی معتبر است
         if not plan.actions:
-            return ValidationResult(
-                is_valid=not errors,
-                errors=errors,
-                warnings=warnings,
-            )
+            return ValidationResult(is_valid=not errors, errors=errors, warnings=warnings)
 
         seen_actions: set[tuple[str, str]] = set()
 
         for action in plan.actions:
-            # 1. بررسی خالی نبودن action_id
             if not action.action_id or not action.action_id.strip():
                 errors.append("Action ID cannot be empty.")
                 continue
 
-            # 2. بررسی تکراری نبودن
+            canonical_id = self.canonical_action_id(action.action_id)
             package = str(action.context.get("package", "")).strip().lower()
-            duplicate_key = (action.action_id, package)
+            duplicate_key = (canonical_id, package or action.action_id)
             if duplicate_key in seen_actions:
                 errors.append(
                     f"Duplicate action found: '{action.action_id}'"
@@ -85,24 +72,20 @@ class ExecutionPlanValidator:
                 )
             seen_actions.add(duplicate_key)
 
-            # 3. بررسی عضویت در لیست سفید (Allowlist)
-            if action.action_id not in self.ALLOWED_ACTIONS:
+            if canonical_id not in self.ALLOWED_ACTIONS:
                 errors.append(
-                    f"Action ID '{action.action_id}' is not recognized/implemented "
-                    "and is blocked by Safety Gate."
+                    f"Action ID '{action.action_id}' is not recognized/implemented and is blocked by Safety Gate."
                 )
 
             context = action.context if isinstance(action.context, dict) else {}
-            if action.action_id == "install_python_package":
+            if canonical_id == "install_python_package":
                 errors.extend(validate_python_package_context(context))
-            elif action.action_id == "install_project_dependencies":
+            elif canonical_id == "install_project_dependencies":
                 errors.extend(validate_project_dependency_context(context))
-            elif action.action_id == "create_virtualenv":
+            elif canonical_id == "create_virtualenv":
                 errors.extend(validate_virtualenv_context(context))
 
-            # 4. بررسی توضیحات (تولید هشدار اگر خالی باشد، اما خطا نیست)
             if not action.description or not action.description.strip():
                 warnings.append(f"Action '{action.action_id}' has no description.")
 
-        is_valid = len(errors) == 0
-        return ValidationResult(is_valid=is_valid, errors=errors, warnings=warnings)
+        return ValidationResult(is_valid=not errors, errors=errors, warnings=warnings)
