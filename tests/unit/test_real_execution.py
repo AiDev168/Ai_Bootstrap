@@ -61,7 +61,9 @@ def test_real_mode_executes_python_package_instance(monkeypatch) -> None:
 
 def test_registry_supports_real_python_package_instances() -> None:
     registry = ActionRegistry()
-    assert registry.is_supported("install_python_package:ruff", ExecutionMode.REAL) is True
+    assert (
+        registry.is_supported("install_python_package:ruff", ExecutionMode.REAL) is True
+    )
 
 
 def test_real_mode_rejects_unapproved_action() -> None:
@@ -90,4 +92,6 @@ def test_registry_separation() -> None:
     registry = ActionRegistry()
     assert registry.is_supported("install_git", ExecutionMode.SAFE) is True
     assert registry.is_supported("install_git", ExecutionMode.REAL) is False
-    assert registry.is_supported("check_python_version_real", ExecutionMode.REAL) is True
+    assert (
+        registry.is_supported("check_python_version_real", ExecutionMode.REAL) is True
+    )

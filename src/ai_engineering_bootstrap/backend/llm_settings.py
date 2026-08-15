@@ -15,7 +15,9 @@ from ai_engineering_bootstrap.agent.provider import ProviderConfig
 
 SUPPORTED_PROVIDERS = frozenset({"local_server", "remote_api", "in_process", "mock"})
 DEFAULT_PROVIDER = "mock"
-DEFAULT_SETTINGS_FILE = Path.home() / ".config" / "ai-engineering-bootstrap" / "llm-settings.json"
+DEFAULT_SETTINGS_FILE = (
+    Path.home() / ".config" / "ai-engineering-bootstrap" / "llm-settings.json"
+)
 
 
 @dataclass(frozen=True)
@@ -42,7 +44,9 @@ class LLMSettingsStore:
 
     def __init__(self, path: Path | None = None) -> None:
         configured = os.getenv(self.ENV_FILE, "").strip()
-        self.path = path or Path(configured) if configured else path or DEFAULT_SETTINGS_FILE
+        self.path = (
+            path or Path(configured) if configured else path or DEFAULT_SETTINGS_FILE
+        )
 
     def load(self) -> dict[str, str]:
         if self.path.exists():
@@ -107,9 +111,13 @@ class LLMSettingsService:
         self._last_probe: dict[str, Any] | None = None
 
     @staticmethod
-    def _normalize_values(payload: dict[str, Any], current: dict[str, str] | None = None) -> dict[str, str]:
+    def _normalize_values(
+        payload: dict[str, Any], current: dict[str, str] | None = None
+    ) -> dict[str, str]:
         current = current or {}
-        provider = str(payload.get("provider", current.get("provider", DEFAULT_PROVIDER))).strip() or current.get("provider", DEFAULT_PROVIDER)
+        provider = str(
+            payload.get("provider", current.get("provider", DEFAULT_PROVIDER))
+        ).strip() or current.get("provider", DEFAULT_PROVIDER)
         if provider not in SUPPORTED_PROVIDERS:
             raise ValueError(f"Unsupported LLM provider: {provider}")
         model = str(payload.get("model", current.get("model", ""))).strip()
@@ -120,13 +128,26 @@ class LLMSettingsService:
             enabled = bool(model)
         if provider == "remote_api":
             enabled = bool(api_key and base_url)
-        return {"provider": provider, "model": model, "base_url": base_url, "api_key": api_key, "enabled": str(enabled).lower()}
+        return {
+            "provider": provider,
+            "model": model,
+            "base_url": base_url,
+            "api_key": api_key,
+            "enabled": str(enabled).lower(),
+        }
 
     @staticmethod
     def _fingerprint(values: dict[str, str]) -> tuple[str, str, str, bool]:
-        return (values.get("provider", DEFAULT_PROVIDER), values.get("model", ""), values.get("base_url", ""), bool(values.get("api_key", "")))
+        return (
+            values.get("provider", DEFAULT_PROVIDER),
+            values.get("model", ""),
+            values.get("base_url", ""),
+            bool(values.get("api_key", "")),
+        )
 
-    def _record_probe(self, values: dict[str, str], result: dict[str, Any]) -> dict[str, Any]:
+    def _record_probe(
+        self, values: dict[str, str], result: dict[str, Any]
+    ) -> dict[str, Any]:
         self._last_probe = {
             "fingerprint": self._fingerprint(values),
             "ok": bool(result.get("ok")),
@@ -174,7 +195,8 @@ class LLMSettingsService:
             options={
                 "temperature": float(values.get("temperature", "0.1")),
                 "max_tokens": int(values.get("max_tokens", "900")),
-                "enable_thinking": values.get("enable_thinking", "false").lower() == "true",
+                "enable_thinking": values.get("enable_thinking", "false").lower()
+                == "true",
             },
         )
 
@@ -201,38 +223,110 @@ class LLMSettingsService:
             if not config.base_url:
                 raise ValueError(f"Base URL is required for {provider}")
             base_url = config.base_url.rstrip("/")
-            endpoint = f"{base_url}/models" if base_url.endswith("/v1") else f"{base_url}/v1/models"
-            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            endpoint = (
+                f"{base_url}/models"
+                if base_url.endswith("/v1")
+                else f"{base_url}/v1/models"
+            )
+            headers = (
+                {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            )
             request = urllib.request.Request(endpoint, headers=headers)
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:
                     ok = 200 <= response.status < 300
-                return self._record_probe(values, {"ok": ok, "provider": provider, "url": endpoint, "message": "LLM server is reachable." if ok else "LLM server returned a non-success status."})
+                return self._record_probe(
+                    values,
+                    {
+                        "ok": ok,
+                        "provider": provider,
+                        "url": endpoint,
+                        "message": "LLM server is reachable."
+                        if ok
+                        else "LLM server returned a non-success status.",
+                    },
+                )
             except (urllib.error.URLError, urllib.error.HTTPError) as error:
-                return self._record_probe(values, {"ok": False, "provider": provider, "url": endpoint, "message": f"Connection failed: {error}"})
+                return self._record_probe(
+                    values,
+                    {
+                        "ok": False,
+                        "provider": provider,
+                        "url": endpoint,
+                        "message": f"Connection failed: {error}",
+                    },
+                )
         ok = bool(config.model)
-        return self._record_probe(values, {"ok": ok, "provider": provider, "message": "Provider configuration accepted." if ok else "Model is not configured."})
+        return self._record_probe(
+            values,
+            {
+                "ok": ok,
+                "provider": provider,
+                "message": "Provider configuration accepted."
+                if ok
+                else "Model is not configured.",
+            },
+        )
 
     def models(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         values = self._normalize_values(payload or {}, self.store.load())
         provider = values["provider"]
-        config = ProviderConfig(provider_type=provider, model=values.get("model") or None, base_url=values.get("base_url") or None, api_key=values.get("api_key") or None, options={})
+        config = ProviderConfig(
+            provider_type=provider,
+            model=values.get("model") or None,
+            base_url=values.get("base_url") or None,
+            api_key=values.get("api_key") or None,
+            options={},
+        )
         if provider == "mock":
             return {"ok": True, "provider": provider, "models": ["mock"]}
         if provider == "local_server":
             if not config.base_url:
                 raise ValueError("Base URL is required for local_server")
             base_url = config.base_url.rstrip("/")
-            endpoint = f"{base_url}/models" if base_url.endswith("/v1") else f"{base_url}/v1/models"
-            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            endpoint = (
+                f"{base_url}/models"
+                if base_url.endswith("/v1")
+                else f"{base_url}/v1/models"
+            )
+            headers = (
+                {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            )
             request = urllib.request.Request(endpoint, headers=headers)
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:
                     data = json.loads(response.read().decode("utf-8"))
-                return {"ok": True, "provider": provider, "models": [item.get("id") for item in data.get("data", []) if isinstance(item, dict) and item.get("id")]}
-            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as error:
-                return {"ok": False, "provider": provider, "models": [], "message": f"Model discovery failed: {error}"}
-        return {"ok": True, "provider": provider, "models": [config.model] if config.model else []}
+                return {
+                    "ok": True,
+                    "provider": provider,
+                    "models": [
+                        item.get("id")
+                        for item in data.get("data", [])
+                        if isinstance(item, dict) and item.get("id")
+                    ],
+                }
+            except (
+                urllib.error.URLError,
+                urllib.error.HTTPError,
+                json.JSONDecodeError,
+            ) as error:
+                return {
+                    "ok": False,
+                    "provider": provider,
+                    "models": [],
+                    "message": f"Model discovery failed: {error}",
+                }
+        return {
+            "ok": True,
+            "provider": provider,
+            "models": [config.model] if config.model else [],
+        }
 
 
-__all__ = ["DEFAULT_PROVIDER", "SUPPORTED_PROVIDERS", "LLMSettings", "LLMSettingsService", "LLMSettingsStore"]
+__all__ = [
+    "DEFAULT_PROVIDER",
+    "SUPPORTED_PROVIDERS",
+    "LLMSettings",
+    "LLMSettingsService",
+    "LLMSettingsStore",
+]

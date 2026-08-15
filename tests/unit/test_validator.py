@@ -5,7 +5,9 @@ from ai_engineering_bootstrap.planner.models import ExecutionPlan, ExecutionPlan
 
 
 def _make_plan(actions: list[ExecutionPlanAction]) -> ExecutionPlan:
-    return ExecutionPlan(is_actionable=len(actions) > 0, actions=actions, summary="Test")
+    return ExecutionPlan(
+        is_actionable=len(actions) > 0, actions=actions, summary="Test"
+    )
 
 
 def test_validate_empty_plan() -> None:
@@ -16,7 +18,9 @@ def test_validate_empty_plan() -> None:
 
 
 def test_validate_valid_action() -> None:
-    action = ExecutionPlanAction(action_id="install_git", description="Install Git", priority=1)
+    action = ExecutionPlanAction(
+        action_id="install_git", description="Install Git", priority=1
+    )
     result = ExecutionPlanValidator().validate(_make_plan([action]))
     assert result.is_valid is True
     assert len(result.errors) == 0
@@ -109,7 +113,9 @@ def test_validate_missing_description_warning() -> None:
 
 def test_validate_deterministic_order() -> None:
     actions = [
-        ExecutionPlanAction(action_id=f"action_{i}", description=f"Desc {i}", priority=i)
+        ExecutionPlanAction(
+            action_id=f"action_{i}", description=f"Desc {i}", priority=i
+        )
         for i in range(3)
     ]
     validator = ExecutionPlanValidator()

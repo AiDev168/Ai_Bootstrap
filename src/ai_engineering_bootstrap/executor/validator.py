@@ -50,10 +50,14 @@ class ExecutionPlanValidator:
         warnings: list[str] = []
 
         if not plan.is_intact():
-            errors.append("Execution plan integrity check failed: plan contents changed after creation.")
+            errors.append(
+                "Execution plan integrity check failed: plan contents changed after creation."
+            )
 
         if not plan.actions:
-            return ValidationResult(is_valid=not errors, errors=errors, warnings=warnings)
+            return ValidationResult(
+                is_valid=not errors, errors=errors, warnings=warnings
+            )
 
         seen_actions: set[tuple[str, str]] = set()
 

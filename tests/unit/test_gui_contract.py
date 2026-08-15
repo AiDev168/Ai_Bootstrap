@@ -3,7 +3,10 @@
 import re
 from pathlib import Path
 
-HTML_PATH = Path(__file__).resolve().parents[2] / "src/ai_engineering_bootstrap/gui/static/index.html"
+HTML_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "src/ai_engineering_bootstrap/gui/static/index.html"
+)
 RUNTIME_PATH = HTML_PATH.with_name("app-runtime.js")
 
 
