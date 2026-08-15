@@ -64,9 +64,7 @@ class LLMSettingsStore:
 
     def save(self, values: dict[str, str]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_name = tempfile.mkstemp(
-            prefix=".llm-settings-", dir=self.path.parent
-        )
+        fd, temp_name = tempfile.mkstemp(prefix=".llm-settings-", dir=self.path.parent)
         try:
             os.chmod(temp_name, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
@@ -202,9 +200,7 @@ class LLMSettingsService:
             },
         )
 
-    def test_connection(
-        self, payload: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    def test_connection(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         values = self._normalize_values(payload or {}, self.store.load())
         provider = values["provider"]
         if provider == "mock":
@@ -232,7 +228,9 @@ class LLMSettingsService:
                 if base_url.endswith("/v1")
                 else f"{base_url}/v1/models"
             )
-            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            headers = (
+                {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            )
             request = urllib.request.Request(endpoint, headers=headers)
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:
@@ -291,7 +289,9 @@ class LLMSettingsService:
                 if base_url.endswith("/v1")
                 else f"{base_url}/v1/models"
             )
-            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            headers = (
+                {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}
+            )
             request = urllib.request.Request(endpoint, headers=headers)
             try:
                 with urllib.request.urlopen(request, timeout=10) as response:
