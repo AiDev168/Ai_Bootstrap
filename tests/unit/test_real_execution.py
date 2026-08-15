@@ -3,7 +3,9 @@
 from types import SimpleNamespace
 
 from ai_engineering_bootstrap.executor.engine import ExecutorEngine
-from ai_engineering_bootstrap.executor.handlers.dependency_handlers import InstallPythonPackageHandler
+from ai_engineering_bootstrap.executor.handlers.dependency_handlers import (
+    InstallPythonPackageHandler,
+)
 from ai_engineering_bootstrap.executor.handlers.real_handlers import REAL_HANDLERS
 from ai_engineering_bootstrap.executor.mode import ExecutionMode
 from ai_engineering_bootstrap.executor.models import ExecutionStatus
@@ -20,7 +22,9 @@ def test_safe_mode_default_behavior() -> None:
 
 
 def test_real_mode_approved_action() -> None:
-    action = ExecutionPlanAction(action_id="check_python_version_real", description="Check Py", priority=1)
+    action = ExecutionPlanAction(
+        action_id="check_python_version_real", description="Check Py", priority=1
+    )
     plan = ExecutionPlan(is_actionable=True, actions=[action], summary="Test")
     result = ExecutorEngine(mode=ExecutionMode.REAL).execute(plan)
     assert len(result.results) == 1
@@ -71,7 +75,9 @@ def test_real_mode_rejects_unapproved_action() -> None:
 
 
 def test_real_mode_rejects_unknown_action() -> None:
-    action = ExecutionPlanAction(action_id="sudo_rm_rf_root", description="Bad", priority=1)
+    action = ExecutionPlanAction(
+        action_id="sudo_rm_rf_root", description="Bad", priority=1
+    )
     plan = ExecutionPlan(is_actionable=True, actions=[action], summary="Test")
     result = ExecutorEngine(mode=ExecutionMode.REAL).execute(plan)
     assert len(result.results) == 1
