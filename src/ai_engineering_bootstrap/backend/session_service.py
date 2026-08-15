@@ -319,18 +319,57 @@ class EnvironmentSessionService:
                         else action_result.message,
                     )
                 )
+        targeted_success = bool(result.action_results) and all(
+            item.is_success for item in result.action_results
+        )
+        pipeline_result = getattr(result, "pipeline_result", None)
+        verification_results = (
+            tuple(pipeline_result.verification_result)
+            if pipeline_result is not None
+            and getattr(pipeline_result, "verification_result", None) is not None
+            else ()
+        )
+        if any(
+            getattr(item.status, "value", None) == "failed"
+            for item in verification_results
+        ):
+            targeted_success = False
         session.status = (
-            SessionStatus.COMPLETED if result.is_success else SessionStatus.FAILED
+            SessionStatus.COMPLETED if targeted_success else SessionStatus.FAILED
         )
         session.completed_at = utcnow()
+        execution_evidence = [
+            {
+                "action_id": item.action_id,
+                "status": item.status.value,
+                "message": item.message,
+                "details": dict(item.details),
+            }
+            for execution in result.action_results
+            for item in execution.results
+        ]
+        verification_evidence = [
+            {
+                "action_id": item.action_id,
+                "status": item.status.value,
+                "message": item.message,
+                "expected": item.expected,
+                "observed": item.observed,
+                "details": dict(item.details),
+            }
+            for item in verification_results
+        ]
         session.add_event(
-            "session_completed" if result.is_success else "session_failed",
+            "session_completed" if targeted_success else "session_failed",
             "Session execution completed."
-            if result.is_success
+            if targeted_success
             else "Session execution failed.",
             {
                 "environment_ready": result.environment_ready,
+                "targeted_success": targeted_success,
                 "excluded_actions": excluded_actions,
+                "execution": execution_evidence,
+                "verification": verification_evidence,
             },
         )
         self.repository.update(session)
@@ -339,6 +378,9 @@ class EnvironmentSessionService:
                 "session_id": session_id,
                 "status": session.status.value,
                 "environment_ready": result.environment_ready,
+                "targeted_success": targeted_success,
+                "execution": execution_evidence,
+                "verification": verification_evidence,
                 "rejected_actions": excluded_actions + list(result.rejected_actions),
             }
         )

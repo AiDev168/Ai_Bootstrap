@@ -177,13 +177,15 @@ class ApplicationBackend:
             {
                 "status": "ok",
                 "version": self.VERSION,
-                "llm_available": settings.enabled,
+                "llm_available": settings.connection_ok is True,
                 "llm": {
                     "provider": settings.provider,
                     "model": settings.model,
                     "base_url": settings.base_url,
                     "api_key_configured": settings.api_key_configured,
                     "enabled": settings.enabled,
+                    "connection_ok": settings.connection_ok,
+                    "connection_message": settings.connection_message,
                 },
             }
         )
@@ -197,6 +199,8 @@ class ApplicationBackend:
                 "base_url": settings.base_url,
                 "api_key_configured": settings.api_key_configured,
                 "enabled": settings.enabled,
+                "connection_ok": settings.connection_ok,
+                "connection_message": settings.connection_message,
             }
         )
 

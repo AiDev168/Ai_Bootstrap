@@ -39,7 +39,7 @@
 
     function selectedTools() {
         return [...document.querySelectorAll('#create input[type="checkbox"]:checked')]
-            .filter((input) => input.id !== "force-install")
+            .filter(input => input.id !== "force-install")
             .map((input) => input.value?.trim())
             .filter(Boolean);
     }
@@ -81,7 +81,7 @@
             const filter = document.createElement("select");
             filter.id = "request-filter";
             filter.style.width = "auto";
-            filter.innerHTML = '<option value="ALL">All</option><option value="GET">GET</option><option value="POST">POST</option>';
+            filter.innerHTML = '<option value="ALL">All</option><option value="GET">GET</option><option value="POST">POST</option><option value="ERROR">Errors</option>';
             filter.addEventListener("change", () => {
                 state.requestFilter = filter.value;
                 renderLog();
@@ -104,7 +104,7 @@
         const root = document.getElementById("request-log");
         if (!root) return;
         const filter = state.requestFilter || "ALL";
-        const rows = state.requests.filter((item) => filter === "ALL" || item.method === filter);
+        const rows = state.requests.filter((item) => filter === "ALL" || (filter === "ERROR" ? !(item.status >= 200 && item.status < 300) : item.method === filter));
         if (!rows.length) {
             root.innerHTML = '<div class="muted">No matching requests.</div>';
             return;
@@ -275,6 +275,42 @@
             }
             node.nodeValue = value;
         }
+    }
+
+    const originalCreateSession = window.createSession;
+    if (typeof originalCreateSession === "function") {
+        window.createSession = async function createSessionRuntime() {
+            const goal = document.getElementById("goal")?.value.trim() || "";
+            const projectPath = document.getElementById("project-path")?.value.trim() || null;
+            const forceInstall = Boolean(document.getElementById("force-install")?.checked);
+            if (!goal) {
+                if (typeof window.showError === "function") window.showError("Enter an environment goal first.");
+                return null;
+            }
+            const button = document.getElementById("create-btn");
+            if (button) { button.disabled = true; button.textContent = "Creating…"; }
+            try {
+                const payload = {
+                    natural_language_goal: goal,
+                    project_path: projectPath,
+                    required_tools: typeof window.selectedTools === "function" ? window.selectedTools() : [],
+                    optional_tools: [],
+                    project_dependencies: [],
+                    constraints: forceInstall ? { force_install: true } : {}
+                };
+                const created = await window.api("/sessions", "POST", payload);
+                window.state.sessionId = created.session_id;
+                if (typeof window.openTab === "function") window.openTab("sessions");
+                if (typeof window.loadSessions === "function") await window.loadSessions();
+                if (typeof window.viewSession === "function") await window.viewSession(created.session_id);
+                return created;
+            } catch (error) {
+                if (typeof window.showError === "function") window.showError(error.message);
+                return null;
+            } finally {
+                if (button) { button.disabled = false; button.textContent = "Create Session"; }
+            }
+        };
     }
 
     const originalLoadSessions = window.loadSessions;
