@@ -332,4 +332,9 @@
     });
 
     ensureControls();
+    setTimeout(() => {
+        if (typeof window.refreshAll === "function") {
+            window.refreshAll().catch(() => {});
+        }
+    }, 0);
 })();
