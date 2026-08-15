@@ -1,376 +1,65 @@
 "use strict";
 
 (() => {
-    const modelInput = document.getElementById("model");
-    const baseUrlInput = document.getElementById("base-url");
-    const apiKeyInput = document.getElementById("api-key");
-    const providerInput = document.getElementById("provider");
-    const llmResult = document.getElementById("llm-result");
-    const serverIndicator = document.getElementById("server");
-    const originalApi = window.api;
-    const originalRenderSession = window.renderSession;
-    const state = window.state || {};
-    state.requestFilter = state.requestFilter || "ALL";
-    state.latestPaused = Boolean(state.latestPaused);
-    state.requests = state.requests || [];
+  const state = window.state || {};
+  state.requests = Array.isArray(state.requests) ? state.requests : [];
+  state.requestFilter = state.requestFilter || "ALL";
+  state.latestPaused = Boolean(state.latestPaused);
+  state.selectedRequestIndex = Number.isInteger(state.selectedRequestIndex) ? state.selectedRequestIndex : -1;
+  state.maxRequests = 100;
+  window.state = state;
 
-    window.state = state;
+  const originalRefreshAll = window.refreshAll;
+  const originalRefreshHealth = window.refreshHealth;
+  const originalRenderSession = window.renderSession;
+  const originalLoadLlm = window.loadLlm;
+  const apiBase = window.apiBase || "/api/v1";
+  const providerInput = document.getElementById("provider");
+  const modelInput = document.getElementById("model");
+  const baseUrlInput = document.getElementById("base-url");
+  const apiKeyInput = document.getElementById("api-key");
+  const llmResult = document.getElementById("llm-result");
 
-    function formPayload() {
-        return {
-            provider: providerInput?.value || "mock",
-            model: modelInput?.value.trim() || "",
-            base_url: baseUrlInput?.value.trim() || "",
-            api_key: apiKeyInput?.value || "",
-        };
-    }
+  const textMap = {"Dashboard":"داشبورد","New Session":"جلسه جدید","Sessions":"جلسه‌ها","LLM Settings":"تنظیمات LLM","Request Console":"کنسول درخواست‌ها","Backend Health":"سلامت Backend","Development Ready":"آمادگی توسعه","Environment Audit":"ممیزی محیط","Run Audit":"اجرای ممیزی","Engineering Tools":"ابزارهای مهندسی","Refresh":"به‌روزرسانی","Quick Actions":"اقدامات سریع","Every request and response is visible in Request Console.":"همه درخواست‌ها و پاسخ‌ها در کنسول درخواست‌ها قابل مشاهده‌اند.","Desired Environment":"محیط مطلوب","Natural-language goal":"هدف به زبان طبیعی","Required tools":"ابزارهای موردنیاز","Project path":"مسیر پروژه","Create Session":"ایجاد جلسه","Reset":"بازنشانی","Lifecycle":"چرخه اجرا","Audit current environment":"۱. ممیزی محیط فعلی","Reconcile Actual vs Desired State":"۲. تطبیق وضعیت فعلی و مطلوب","Generate and validate Execution Plan":"۳. تولید و اعتبارسنجی برنامه اجرا","Review / approve actions":"۴. بازبینی و تأیید اقدامات","Execute through canonical pipeline":"۵. اجرا از طریق پایپ‌لاین اصلی","Verify and record evidence":"۶. تأیید و ثبت شواهد","LLM Connection":"اتصال LLM","Model":"مدل","API key":"کلید API","Save Settings":"ذخیره تنظیمات","Test Connection":"تست اتصال","LLM Status":"وضعیت LLM","Load Models":"بارگذاری مدل‌ها","Latest Response":"آخرین پاسخ","Clear":"پاک‌کردن","All":"همه","Errors":"خطاها","Pause Latest":"توقف آخرین پاسخ","Resume Latest":"ادامه آخرین پاسخ","Execution":"اجرا","Start Safe":"اجرای ایمن","Start Real":"اجرای واقعی","Cancel":"لغو","Timeline":"خط زمانی","Agent Decisions":"تصمیم‌های Agent","Execution Evidence":"شواهد اجرا","Install / repair selected tools even if currently detected":"نصب/ترمیم ابزارهای انتخاب‌شده حتی اگر شناسایی شده باشند","No requests yet.":"هنوز درخواستی ثبت نشده است.","No matching requests.":"درخواستی مطابق فیلتر وجود ندارد.","No sessions.":"جلسه‌ای وجود ندارد.","No recorded agent decisions.":"تصمیم ثبت‌شده‌ای وجود ندارد.","No execution evidence recorded yet.":"هنوز شواهد اجرایی ثبت نشده است.","No changes required.":"تغییری لازم نیست.","No executable actions.":"اقدام اجرایی وجود ندارد.","Server: connected":"سرور: متصل","Server: offline":"سرور: قطع","Server: checking…":"سرور: در حال بررسی…"};
 
-    function setServerState(online) {
-        if (!serverIndicator) return;
-        serverIndicator.className = online ? "conn ok" : "conn bad";
-        serverIndicator.textContent = online ? "Server: connected" : "Server: offline";
-    }
+  const css = document.createElement("style");
+  css.textContent = `.request-console-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.request-console-toolbar select{width:auto;min-width:110px}.request{cursor:pointer}.request.selected{outline:2px solid #8fa8ff;outline-offset:1px}.request.bad{color:#ff9da6}.request.ok{color:#89e7b7}.request.busy{color:#f7d58d}.latest-paused{border-color:#f5c76b!important}.timeline-legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.timeline-key{padding:4px 8px;border-radius:999px;font-size:11px;background:#0b1424}.timeline-event{border-left:3px solid #5d7cff}.timeline-event.stage-session{border-color:#8fa8ff}.timeline-event.stage-intent{border-color:#b58cff}.timeline-event.stage-plan{border-color:#5d7cff}.timeline-event.stage-approval{border-color:#f5c76b}.timeline-event.stage-execution{border-color:#62d49b}.timeline-event.stage-verification{border-color:#4fc3f7}.timeline-event.stage-recovery{border-color:#ffb454}.timeline-event.stage-error{border-color:#ff7f8b;background:#21121a}.lang-switch{display:flex;gap:4px;align-items:center;margin-left:auto}.lang-switch button{padding:6px 9px;font-size:11px}body.rtl{direction:rtl}body.rtl .event,body.rtl .action{border-left:0;border-right:3px solid #5d7cff}`;
+  document.head.appendChild(css);
 
-    function setProviderFields() {
-        if (baseUrlInput) baseUrlInput.disabled = false;
-        if (apiKeyInput) apiKeyInput.disabled = false;
-        if (modelInput) modelInput.disabled = false;
-    }
+  function escapeHtml(value){return String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+  function isError(item){return item.status===0||item.status<200||item.status>=400;}
+  function filteredRequests(){const filter=state.requestFilter||"ALL";return state.requests.filter(item=>filter==="ALL"?true:filter==="ERROR"?isError(item):item.method===filter);}
 
-    function selectedTools() {
-        return [...document.querySelectorAll('#create input[type="checkbox"]:checked')]
-            .filter(input => input.id !== "force-install")
-            .map((input) => input.value?.trim())
-            .filter(Boolean);
-    }
+  function renderLatestSelected(){const latest=document.getElementById("latest");if(!latest)return;const item=state.selectedRequestIndex>=0?state.requests[state.selectedRequestIndex]:null;if(!item)return;latest.textContent=JSON.stringify(item.response??item.error??{},null,2);latest.classList.toggle("error-box",isError(item));latest.classList.toggle("success-box",!isError(item)&&item.status>=200&&item.status<300);latest.classList.toggle("latest-paused",state.latestPaused);}
 
-    window.selectedTools = selectedTools;
+  function renderLog(){const root=document.getElementById("request-log");if(!root)return;const rows=filteredRequests();if(!rows.length){root.innerHTML=`<div class="muted">${state.requestFilter==="ERROR"?"No errors.":"No matching requests."}</div>`;return;}root.innerHTML=rows.map(item=>{const index=state.requests.indexOf(item);const cssClass=isError(item)?"bad":item.status>=200&&item.status<300?"ok":"busy";const selected=index===state.selectedRequestIndex?" selected":"";return `<div class="request ${cssClass}${selected}" data-request-index="${index}"><strong>${escapeHtml(item.method)}</strong> ${escapeHtml(item.path)}<div class="small">${item.status||"network"} • ${item.ms}ms • ${escapeHtml(item.time)}</div></div>`;}).join("");root.querySelectorAll("[data-request-index]").forEach(row=>row.addEventListener("click",()=>{state.selectedRequestIndex=Number(row.dataset.requestIndex);renderLog();renderLatestSelected();}));}
 
-    function ensureModelTools() {
-        if (!modelInput || document.getElementById("load-models-btn")) return;
-        const button = document.createElement("button");
-        button.id = "load-models-btn";
-        button.type = "button";
-        button.className = "secondary";
-        button.textContent = "Load Models";
-        button.addEventListener("click", loadModels);
-        modelInput.insertAdjacentElement("afterend", button);
-        const list = document.createElement("datalist");
-        list.id = "llm-model-list";
-        document.body.appendChild(list);
-        modelInput.setAttribute("list", "llm-model-list");
-    }
+  function updatePauseButton(){const button=document.getElementById("pause-latest");const latest=document.getElementById("latest");if(button)button.textContent=state.latestPaused?"Resume Latest":"Pause Latest";if(latest)latest.classList.toggle("latest-paused",state.latestPaused);}
 
-    function ensureInstallControl() {
-        if (document.getElementById("force-install")) return;
-        const projectPath = document.getElementById("project-path");
-        if (!projectPath) return;
-        const label = document.createElement("label");
-        label.className = "check";
-        label.style.marginTop = "12px";
-        label.innerHTML = '<input id="force-install" type="checkbox" value="force-install"> Install / repair selected tools even if currently detected';
-        projectPath.insertAdjacentElement("afterend", label);
-    }
+  function ensureConsole(){const panel=document.getElementById("console");const root=document.getElementById("request-log");const latest=document.getElementById("latest");if(!panel||!root||!latest)return;const toolbar=panel.querySelector(".toolbar");if(!toolbar)return;let tools=toolbar.querySelector(".request-console-toolbar");if(!tools){tools=document.createElement("div");tools.className="request-console-toolbar";toolbar.appendChild(tools);}let filter=document.getElementById("request-filter");if(!filter){filter=document.createElement("select");filter.id="request-filter";filter.innerHTML='<option value="ALL">All</option><option value="GET">GET</option><option value="POST">POST</option><option value="ERROR">Errors</option>';filter.addEventListener("change",()=>{state.requestFilter=filter.value;renderLog();});tools.appendChild(filter);}let pause=document.getElementById("pause-latest");if(!pause){pause=document.createElement("button");pause.id="pause-latest";pause.className="secondary";pause.type="button";pause.addEventListener("click",()=>{state.latestPaused=!state.latestPaused;updatePauseButton();});tools.appendChild(pause);}updatePauseButton();renderLog();}
 
-    function ensureConsoleTools() {
-        const consolePanel = document.getElementById("console");
-        const latest = document.getElementById("latest");
-        if (!consolePanel || !latest) return;
-        const toolbar = consolePanel.querySelector(".toolbar");
-        if (toolbar && !document.getElementById("request-filter")) {
-            const filter = document.createElement("select");
-            filter.id = "request-filter";
-            filter.style.width = "auto";
-            filter.innerHTML = '<option value="ALL">All</option><option value="GET">GET</option><option value="POST">POST</option><option value="ERROR">Errors</option>';
-            filter.addEventListener("change", () => {
-                state.requestFilter = filter.value;
-                renderLog();
-            });
-            toolbar.appendChild(filter);
-            const pause = document.createElement("button");
-            pause.id = "pause-latest";
-            pause.className = "secondary";
-            pause.type = "button";
-            pause.textContent = "Pause Latest";
-            pause.addEventListener("click", () => {
-                state.latestPaused = !state.latestPaused;
-                pause.textContent = state.latestPaused ? "Resume Latest" : "Pause Latest";
-            });
-            toolbar.appendChild(pause);
-        }
-    }
+  window.logRequest=function logRequest(method,path,status,ms,response){const entry={method,path,status:Number(status)||0,ms,time:new Date().toLocaleTimeString(),response:Number(status)>=200&&Number(status)<400?response:null,error:Number(status)<200||Number(status)>=400?response:null};state.requests.push(entry);if(state.requests.length>state.maxRequests)state.requests.splice(0,state.requests.length-state.maxRequests);if(!state.latestPaused)state.selectedRequestIndex=state.requests.length-1;renderLog();if(!state.latestPaused)renderLatestSelected();};
 
-    function renderLog() {
-        const root = document.getElementById("request-log");
-        if (!root) return;
-        const filter = state.requestFilter || "ALL";
-        const rows = state.requests.filter((item) => filter === "ALL" || (filter === "ERROR" ? !(item.status >= 200 && item.status < 300) : item.method === filter));
-        if (!rows.length) {
-            root.innerHTML = '<div class="muted">No matching requests.</div>';
-            return;
-        }
-        root.innerHTML = rows.map((item) => {
-            const isError = item.status === 0 || item.status < 200 || item.status >= 400;
-            const className = isError ? "bad" : item.status >= 200 && item.status < 300 ? "ok" : "busy";
-            return `<div class="request ${className}"><strong>${item.method}</strong> ${item.path}<div class="small">${item.status || "network"} • ${item.ms}ms • ${item.time}</div></div>`;
-        }).join("");
-    }
+  window.api=async function apiEnhanced(path,method="GET",body=null){const started=performance.now();const options={method,headers:{"Content-Type":"application/json"}};if(body!==null)options.body=JSON.stringify(body);try{const response=await fetch(apiBase+path,options);const text=await response.text();let payload;try{payload=text?JSON.parse(text):null;}catch{payload=text;}window.logRequest(method,apiBase+path,response.status,Math.round(performance.now()-started),payload);if(!response.ok)throw new Error(payload?.error||payload?.message||payload?.detail||`HTTP ${response.status}`);return payload;}catch(error){window.logRequest(method,apiBase+path,0,Math.round(performance.now()-started),{error:error.message});throw error;}};
+  window.clearLog=function(){state.requests=[];state.selectedRequestIndex=-1;renderLog();const latest=document.getElementById("latest");if(latest)latest.textContent="—";};
 
-    function logRequest(method, path, status, ms, response) {
-        state.requests.unshift({ method, path, status, ms, time: new Date().toLocaleTimeString() });
-        state.requests = state.requests.slice(0, 120);
-        renderLog();
-        const latest = document.getElementById("latest");
-        if (!latest || state.latestPaused) return;
-        latest.textContent = JSON.stringify(response, null, 2);
-        latest.classList.toggle("error-box", status === 0 || status >= 400);
-    }
+  function addLanguageSwitch(){if(document.getElementById("language-switch"))return;const server=document.getElementById("server");const header=server?.closest(".header");if(!header)return;const wrapper=document.createElement("div");wrapper.id="language-switch";wrapper.className="lang-switch";wrapper.innerHTML='<button type="button" data-lang="en">EN</button><button type="button" data-lang="fa" class="secondary">FA</button>';header.appendChild(wrapper);wrapper.querySelectorAll("button").forEach(button=>button.addEventListener("click",()=>setLanguage(button.dataset.lang)));}
+  function translatePage(lang){document.querySelectorAll("body *").forEach(element=>{if(element.children.length||element.closest("pre,code,input,textarea,select,option"))return;const original=element.dataset.i18nOriginal||element.textContent;if(!element.dataset.i18nOriginal)element.dataset.i18nOriginal=original;element.textContent=lang==="fa"?(textMap[original]||original):original;});document.querySelectorAll("input,textarea").forEach(input=>{if(!input.placeholder)return;if(!input.dataset.i18nPlaceholder)input.dataset.i18nPlaceholder=input.placeholder;const p=input.dataset.i18nPlaceholder;if(lang==="fa"){const map={"Prepare this machine for Python AI development with Cursor, Docker, Ruff and Pytest.":"این ماشین را برای توسعه هوش مصنوعی پایتون با Cursor، Docker، Ruff و Pytest آماده کن.","Model ID returned by provider":"شناسه مدل برگشتی از Provider"};input.placeholder=map[p]||p;}else input.placeholder=p;});document.documentElement.lang=lang==="fa"?"fa":"en";document.body.classList.toggle("rtl",lang==="fa");localStorage.setItem("gui-language",lang);document.querySelectorAll("#language-switch button").forEach(button=>{button.classList.toggle("success",button.dataset.lang===lang);button.classList.toggle("secondary",button.dataset.lang!==lang);});}
+  function setLanguage(lang){translatePage(lang);renderLog();}
 
-    window.api = async function apiWithObservability(path, method = "GET", body = null) {
-        const started = performance.now();
-        try {
-            const options = { method, headers: { "Content-Type": "application/json" } };
-            if (body !== null) options.body = JSON.stringify(body);
-            const response = await fetch((window.apiBase || "/api/v1") + path, options);
-            const text = await response.text();
-            let payload = null;
-            try {
-                payload = text ? JSON.parse(text) : null;
-            } catch {
-                payload = text;
-            }
-            const ms = Math.round(performance.now() - started);
-            logRequest(method, (window.apiBase || "/api/v1") + path, response.status, ms, payload);
-            setServerState(true);
-            if (!response.ok) throw new Error(payload?.error || payload?.message || `HTTP ${response.status}`);
-            return payload;
-        } catch (error) {
-            const ms = Math.round(performance.now() - started);
-            if (!state.requests.length || state.requests[0].path !== (window.apiBase || "/api/v1") + path || state.requests[0].status !== 0) {
-                logRequest(method, (window.apiBase || "/api/v1") + path, 0, ms, { error: error.message });
-            }
-            setServerState(false);
-            throw error;
-        }
-    };
+  function classifyTimelineText(text){const value=String(text||"").toLowerCase();if(value.includes("intent"))return"intent";if(value.includes("plan"))return"plan";if(value.includes("approval")||value.includes("approved")||value.includes("rejected")||value.includes("skipped"))return"approval";if(value.includes("verification")||value.includes("verified"))return"verification";if(value.includes("recovery")||value.includes("retry"))return"recovery";if(value.includes("failed")||value.includes("error"))return"error";if(value.includes("started")||value.includes("execution")||value.includes("completed"))return"execution";return"session";}
+  function decorateTimeline(root){const timeline=root?.querySelector?.(".timeline");if(!timeline)return;if(!timeline.querySelector(".timeline-legend")){const legend=document.createElement("div");legend.className="timeline-legend";legend.innerHTML=["session","intent","plan","approval","execution","verification","recovery","error"].map(key=>`<span class="timeline-key stage-${key}">${key}</span>`).join("");timeline.prepend(legend);}timeline.querySelectorAll(".event").forEach(event=>event.classList.add("timeline-event",`stage-${classifyTimelineText(event.textContent)}`));}
+  function addSafeModeHint(){document.querySelectorAll('[data-start="safe"]').forEach(button=>{button.title="Safe mode is a dry-run / preview. It does not perform real installation.";});}
 
-    window.refreshHealth = async function refreshHealthRuntime() {
-        try {
-            const health = await window.api("/health");
-            let connection = { ok: false, message: "Not tested." };
-            try {
-                connection = await window.api("/llm/test");
-            } catch (error) {
-                connection = { ok: false, message: error.message };
-            }
-            document.getElementById("health").innerHTML = typeof window.badge === "function" ? window.badge(health.status) : health.status;
-            document.getElementById("llm").innerHTML = typeof window.badge === "function" ? window.badge(connection.ok === true) : String(connection.ok === true);
-            document.getElementById("server").textContent = "Server: connected";
-            document.getElementById("server").className = "conn ok";
-            const data = health.llm || {};
-            const details = document.getElementById("llm-details");
-            if (details) {
-                details.innerHTML = `<p><strong>Provider:</strong> ${data.provider || "—"}</p><p><strong>Model:</strong> ${data.model || "—"}</p><p><strong>Base URL:</strong> ${data.base_url || "—"}</p><p><strong>Enabled:</strong> ${typeof window.badge === "function" ? window.badge(data.enabled) : data.enabled}</p><p><strong>Connection:</strong> ${typeof window.badge === "function" ? window.badge(connection.ok === true) : connection.ok}</p><p><strong>API key:</strong> ${typeof window.badge === "function" ? window.badge(data.api_key_configured) : data.api_key_configured}</p><p class="small">${connection.message || ""}</p>`;
-            }
-            return health;
-        } catch (error) {
-            setServerState(false);
-            throw error;
-        }
-    };
+  function ensureForceInstall(){if(document.getElementById("force-install"))return;const projectPath=document.getElementById("project-path");if(!projectPath)return;const label=document.createElement("label");label.className="check";label.innerHTML='<input id="force-install" type="checkbox" value="force-install"> Install / repair selected tools even if currently detected';projectPath.insertAdjacentElement("afterend",label);}
+  function ensureModels(){if(!modelInput||document.getElementById("load-models-btn"))return;const button=document.createElement("button");button.id="load-models-btn";button.type="button";button.className="secondary";button.textContent="Load Models";button.addEventListener("click",async()=>{button.disabled=true;try{const payload=await window.api("/llm/models","POST",{provider:providerInput?.value||"mock",model:modelInput?.value.trim()||"",base_url:baseUrlInput?.value.trim()||"",api_key:apiKeyInput?.value||""});modelInput.value=payload.models?.[0]||modelInput.value;if(llmResult)llmResult.innerHTML=`<div class="success-box">${payload.models?.length||0} model(s) discovered. Select or enter one, then save.</div>`;}catch(error){if(llmResult)llmResult.innerHTML=`<div class="error-box">${error.message}</div>`;}finally{button.disabled=false;}});modelInput.insertAdjacentElement("afterend",button);}
+  function enableProviderFields(){if(baseUrlInput)baseUrlInput.disabled=false;if(modelInput)modelInput.disabled=false;if(apiKeyInput)apiKeyInput.disabled=false;}
 
-    window.loadLlm = async function loadLlmRuntime() {
-        try {
-            const settings = await window.api("/llm/settings");
-            if (providerInput) providerInput.value = settings.provider || "mock";
-            if (modelInput) modelInput.value = settings.model || "";
-            if (baseUrlInput) baseUrlInput.value = settings.base_url || "";
-            if (apiKeyInput) apiKeyInput.value = "";
-            setProviderFields();
-            ensureModelTools();
-            ensureInstallControl();
-            ensureConsoleTools();
-            const details = document.getElementById("llm-details");
-            if (details) {
-                details.innerHTML = `<p><strong>Provider:</strong> ${settings.provider}</p><p><strong>Model:</strong> ${settings.model || "—"}</p><p><strong>Base URL:</strong> ${settings.base_url || "—"}</p><p><strong>Enabled:</strong> ${typeof window.badge === "function" ? window.badge(settings.enabled) : settings.enabled}</p><p><strong>API key:</strong> ${typeof window.badge === "function" ? window.badge(settings.api_key_configured) : settings.api_key_configured}</p>`;
-            }
-        } catch (error) {
-            const details = document.getElementById("llm-details");
-            if (details) details.innerHTML = `<div class="error-box">${error.message}</div>`;
-        }
-    };
+  window.loadLlm=async function(){const result=await originalLoadLlm();enableProviderFields();ensureModels();ensureForceInstall();return result;};
+  window.refreshAll=async function(){const result=await originalRefreshAll();renderLog();decorateTimeline(document.getElementById("session-detail"));addSafeModeHint();enableProviderFields();return result;};
+  window.refreshHealth=async function(){const result=await originalRefreshHealth();try{const probe=await window.api("/llm/test","POST",{});const llm=document.getElementById("llm");if(llm)llm.innerHTML=typeof window.badge==="function"?window.badge(probe.ok===true):String(probe.ok===true);}catch{const llm=document.getElementById("llm");if(llm)llm.innerHTML=typeof window.badge==="function"?window.badge(false):"false";}return result;};
+  window.renderSession=function(...args){const scrollY=window.scrollY;originalRenderSession(...args);decorateTimeline(document.getElementById("session-detail"));addSafeModeHint();window.scrollTo({top:scrollY,left:0,behavior:"auto"});};
 
-    window.saveLlm = async function saveLlmRuntime() {
-        try {
-            const payload = await window.api("/llm/settings", "POST", formPayload());
-            if (llmResult) llmResult.innerHTML = '<div class="success-box">Settings saved. New sessions will use this provider configuration.</div>';
-            if (apiKeyInput) apiKeyInput.value = "";
-            await window.loadLlm();
-            await window.refreshHealth();
-            return payload;
-        } catch (error) {
-            if (llmResult) llmResult.innerHTML = `<div class="error-box">${error.message}</div>`;
-            return null;
-        }
-    };
-
-    window.testLlm = async function testLlmRuntime() {
-        try {
-            const payload = await window.api("/llm/test", "POST", formPayload());
-            if (llmResult) llmResult.innerHTML = payload.ok
-                ? `<div class="success-box">${payload.message || "Connection successful."}</div>`
-                : `<div class="error-box">${payload.message || "Connection failed."}</div>`;
-            return payload;
-        } catch (error) {
-            if (llmResult) llmResult.innerHTML = `<div class="error-box">${error.message}</div>`;
-            return null;
-        }
-    };
-
-    async function loadModels() {
-        const button = document.getElementById("load-models-btn");
-        if (button) {
-            button.disabled = true;
-            button.textContent = "Loading…";
-        }
-        try {
-            const payload = await window.api("/llm/models", "POST", formPayload());
-            const list = document.getElementById("llm-model-list");
-            if (list) {
-                list.innerHTML = "";
-                for (const model of payload.models || []) {
-                    const option = document.createElement("option");
-                    option.value = model;
-                    list.appendChild(option);
-                }
-            }
-            if (llmResult) llmResult.innerHTML = payload.ok
-                ? `<div class="success-box">${payload.models?.length || 0} model(s) available. Select or enter one, then Save Settings.</div>`
-                : `<div class="error-box">${payload.message || "Model discovery failed."}</div>`;
-        } catch (error) {
-            if (llmResult) llmResult.innerHTML = `<div class="error-box">${error.message}</div>`;
-        } finally {
-            if (button) {
-                button.disabled = false;
-                button.textContent = "Load Models";
-            }
-        }
-    }
-
-    function humanSessionLabel(session) {
-        return session?.request?.natural_language_goal || session?.label || "Environment Bootstrap";
-    }
-
-    function replaceSessionIdsWithLabels(sessions) {
-        const root = document.getElementById("sessions-list");
-        if (!root) return;
-        const labels = new Map((sessions || []).map((item) => [item.session_id, humanSessionLabel(item)]));
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-        const nodes = [];
-        while (walker.nextNode()) nodes.push(walker.currentNode);
-        for (const node of nodes) {
-            let value = node.nodeValue || "";
-            for (const [sessionId, label] of labels) {
-                if (value.includes(sessionId)) value = value.split(sessionId).join(label);
-            }
-            node.nodeValue = value;
-        }
-    }
-
-    const originalCreateSession = window.createSession;
-    if (typeof originalCreateSession === "function") {
-        window.createSession = async function createSessionRuntime() {
-            const goal = document.getElementById("goal")?.value.trim() || "";
-            const projectPath = document.getElementById("project-path")?.value.trim() || null;
-            const forceInstall = Boolean(document.getElementById("force-install")?.checked);
-            if (!goal) {
-                if (typeof window.showError === "function") window.showError("Enter an environment goal first.");
-                return null;
-            }
-            const button = document.getElementById("create-btn");
-            if (button) { button.disabled = true; button.textContent = "Creating…"; }
-            try {
-                const payload = {
-                    natural_language_goal: goal,
-                    project_path: projectPath,
-                    required_tools: typeof window.selectedTools === "function" ? window.selectedTools() : [],
-                    optional_tools: [],
-                    project_dependencies: [],
-                    constraints: forceInstall ? { force_install: true } : {}
-                };
-                const created = await window.api("/sessions", "POST", payload);
-                window.state.sessionId = created.session_id;
-                if (typeof window.openTab === "function") window.openTab("sessions");
-                if (typeof window.loadSessions === "function") await window.loadSessions();
-                if (typeof window.viewSession === "function") await window.viewSession(created.session_id);
-                return created;
-            } catch (error) {
-                if (typeof window.showError === "function") window.showError(error.message);
-                return null;
-            } finally {
-                if (button) { button.disabled = false; button.textContent = "Create Session"; }
-            }
-        };
-    }
-
-    const originalLoadSessions = window.loadSessions;
-    if (typeof originalLoadSessions === "function") {
-        window.loadSessions = async function loadSessionsWithLabels() {
-            const result = await originalLoadSessions();
-            try {
-                const payload = await window.api("/sessions");
-                replaceSessionIdsWithLabels(payload.sessions || []);
-            } catch {
-                // Preserve the original session view if relabeling fails.
-            }
-            return result;
-        };
-    }
-
-    function renderExecutionHistory(session) {
-        const detail = document.getElementById("session-detail");
-        if (!detail) return;
-        let card = detail.querySelector("[data-execution-evidence]");
-        if (!card) {
-            card = document.createElement("div");
-            card.dataset.executionEvidence = "1";
-            card.className = "card";
-            detail.appendChild(card);
-        }
-        const history = session?.execution_history || [];
-        const rows = history.map((item) => {
-            const failed = item.success === false;
-            const details = item.details ? `<pre>${JSON.stringify(item.details, null, 2)}</pre>` : "";
-            return `<div class="event ${failed ? "bad" : "ok"}"><strong>${item.action_id}</strong><br><span>${item.output || item.error || "No execution message."}</span>${details}<br><small>${item.timestamp || ""}</small></div>`;
-        }).join("");
-        card.innerHTML = `<h3>Execution Evidence</h3>${rows || '<div class="muted">No execution evidence recorded yet.</div>'}`;
-    }
-
-    window.renderSession = function renderSessionRuntime(session, stateData, plan, events, decisions) {
-        const scrollY = window.scrollY;
-        originalRenderSession(session, stateData, plan, events, decisions);
-        const title = document.querySelector("#session-detail h3");
-        if (title) title.textContent = humanSessionLabel(session);
-        renderExecutionHistory(session);
-        window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
-    };
-
-    function ensureControls() {
-        setProviderFields();
-        ensureModelTools();
-        ensureInstallControl();
-        ensureConsoleTools();
-    }
-
-    providerInput?.addEventListener("change", () => {
-        setProviderFields();
-        if (llmResult) llmResult.innerHTML = '<div class="muted">Provider changed. Nothing is saved until you click Save Settings.</div>';
-    });
-
-    ensureControls();
-    setTimeout(() => {
-        if (typeof window.refreshAll === "function") {
-            window.refreshAll().catch(() => {});
-        }
-    }, 0);
+  providerInput?.addEventListener("change",enableProviderFields);
+  addLanguageSwitch();ensureConsole();ensureForceInstall();ensureModels();addSafeModeHint();setLanguage(localStorage.getItem("gui-language")||"en");
 })();
