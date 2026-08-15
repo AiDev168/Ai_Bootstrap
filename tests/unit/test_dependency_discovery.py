@@ -9,7 +9,9 @@ from ai_engineering_bootstrap.audit.dependencies import (
 from ai_engineering_bootstrap.audit.models import AuditStatus
 
 
-def test_dependency_discovery_reads_project_and_dev_dependencies(tmp_path: Path) -> None:
+def test_dependency_discovery_reads_project_and_dev_dependencies(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "pyproject.toml").write_text(
         """
 [project]

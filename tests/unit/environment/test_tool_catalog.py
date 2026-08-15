@@ -34,7 +34,7 @@ class TestToolCatalog:
         catalog = get_tool_catalog()
         tools = catalog.list_tools()
         assert len(tools) > 0
-        
+
         # Check expected tools exist
         tool_ids = [t.tool_id for t in tools]
         assert "python" in tool_ids
@@ -48,7 +48,7 @@ class TestToolCatalog:
         """Test retrieving a tool by ID."""
         catalog = ToolCatalog()
         cursor = catalog.get("cursor")
-        
+
         assert cursor is not None
         assert cursor.tool_id == "cursor"
         assert cursor.display_name == "Cursor"
@@ -60,14 +60,14 @@ class TestToolCatalog:
         catalog = ToolCatalog()
         tools = catalog.list_tools()
         tool_ids = [t.tool_id for t in tools]
-        
+
         assert tool_ids == sorted(tool_ids)
 
     def test_register_duplicate_tool_raises_error(self) -> None:
         """Test that registering a duplicate tool raises error."""
         catalog = ToolCatalog()
         tool = catalog.get("python")
-        
+
         with pytest.raises(DuplicateToolError):
             catalog.register(tool)
 
@@ -75,7 +75,7 @@ class TestToolCatalog:
         """Test finding tools by platform."""
         catalog = ToolCatalog()
         linux_tools = catalog.find_by_platform(Platform.LINUX)
-        
+
         assert len(linux_tools) > 0
         # All tools should support Linux in our catalog
         for tool in linux_tools:
@@ -84,14 +84,18 @@ class TestToolCatalog:
     def test_get_installation_strategy(self) -> None:
         """Test getting installation strategy for a tool."""
         catalog = ToolCatalog()
-        
+
         # Ruff uses pip on Linux
-        strategy = catalog.get_installation_strategy("ruff", Platform.LINUX, Architecture.X86_64)
+        strategy = catalog.get_installation_strategy(
+            "ruff", Platform.LINUX, Architecture.X86_64
+        )
         assert strategy is not None
         assert strategy.artifact_format == ArtifactFormat.PIP
-        
+
         # Cursor uses DEB on Linux x86_64
-        strategy = catalog.get_installation_strategy("cursor", Platform.LINUX, Architecture.X86_64)
+        strategy = catalog.get_installation_strategy(
+            "cursor", Platform.LINUX, Architecture.X86_64
+        )
         assert strategy is not None
         assert strategy.artifact_format == ArtifactFormat.DEB
 
@@ -103,7 +107,7 @@ class TestToolDefinition:
         """Test Cursor tool definition."""
         catalog = get_tool_catalog()
         cursor = catalog.get("cursor")
-        
+
         assert cursor.tool_id == "cursor"
         assert cursor.description != ""
         assert Platform.LINUX in cursor.platforms
@@ -117,7 +121,7 @@ class TestToolDefinition:
         """Test Ruff tool definition."""
         catalog = get_tool_catalog()
         ruff = catalog.get("ruff")
-        
+
         assert ruff.tool_id == "ruff"
         assert ruff.privilege_level == PrivilegeLevel.USER
         assert ruff.risk_level == RiskLevel.LOW
@@ -131,13 +135,15 @@ class TestInstallationStrategies:
         """Test DEB strategy artifact discovery."""
         catalog = get_tool_catalog()
         cursor = catalog.get("cursor")
-        strategy_def = catalog.get_installation_strategy("cursor", Platform.LINUX, Architecture.X86_64)
-        
+        strategy_def = catalog.get_installation_strategy(
+            "cursor", Platform.LINUX, Architecture.X86_64
+        )
+
         assert strategy_def is not None
         installer = DebInstallStrategy(strategy_def, cursor)
-        
+
         metadata = installer.discover_artifact()
-        
+
         # Source domain should be from the URL (www.cursor.com or downloads.cursor.com)
         assert metadata.source_domain in ["www.cursor.com", "downloads.cursor.com"]
         assert metadata.format == ArtifactFormat.DEB
@@ -147,13 +153,15 @@ class TestInstallationStrategies:
         """Test PIP strategy artifact discovery."""
         catalog = get_tool_catalog()
         ruff = catalog.get("ruff")
-        strategy_def = catalog.get_installation_strategy("ruff", Platform.LINUX, Architecture.X86_64)
-        
+        strategy_def = catalog.get_installation_strategy(
+            "ruff", Platform.LINUX, Architecture.X86_64
+        )
+
         assert strategy_def is not None
         installer = PipInstallStrategy(strategy_def, ruff)
-        
+
         metadata = installer.discover_artifact()
-        
+
         assert metadata.source_domain == "pypi.org"
         assert metadata.format == ArtifactFormat.PIP
         assert metadata.trust_level == "official"
@@ -162,11 +170,13 @@ class TestInstallationStrategies:
         """Test DEB strategy artifact validation."""
         catalog = get_tool_catalog()
         cursor = catalog.get("cursor")
-        strategy_def = catalog.get_installation_strategy("cursor", Platform.LINUX, Architecture.X86_64)
-        
+        strategy_def = catalog.get_installation_strategy(
+            "cursor", Platform.LINUX, Architecture.X86_64
+        )
+
         installer = DebInstallStrategy(strategy_def, cursor)
         metadata = installer.discover_artifact()
-        
+
         # Valid metadata should pass
         assert installer.validate_artifact(metadata) is True
 
@@ -174,10 +184,12 @@ class TestInstallationStrategies:
         """Test that DEB strategy rejects unofficial sources."""
         catalog = get_tool_catalog()
         cursor = catalog.get("cursor")
-        strategy_def = catalog.get_installation_strategy("cursor", Platform.LINUX, Architecture.X86_64)
-        
+        strategy_def = catalog.get_installation_strategy(
+            "cursor", Platform.LINUX, Architecture.X86_64
+        )
+
         installer = DebInstallStrategy(strategy_def, cursor)
-        
+
         # Create metadata with unofficial source
         bad_metadata = ArtifactMetadata(
             source_url="https://evil.com/cursor.deb",
@@ -187,7 +199,7 @@ class TestInstallationStrategies:
             format=ArtifactFormat.DEB,
             trust_level="unknown",
         )
-        
+
         with pytest.raises(ArtifactValidationError):
             installer.validate_artifact(bad_metadata)
 
@@ -195,10 +207,12 @@ class TestInstallationStrategies:
         """Test that PIP strategy validates PyPI source."""
         catalog = get_tool_catalog()
         ruff = catalog.get("ruff")
-        strategy_def = catalog.get_installation_strategy("ruff", Platform.LINUX, Architecture.X86_64)
-        
+        strategy_def = catalog.get_installation_strategy(
+            "ruff", Platform.LINUX, Architecture.X86_64
+        )
+
         installer = PipInstallStrategy(strategy_def, ruff)
-        
+
         # Create metadata with non-PyPI source
         bad_metadata = ArtifactMetadata(
             source_url="https://evil.com/ruff.whl",
@@ -208,7 +222,7 @@ class TestInstallationStrategies:
             format=ArtifactFormat.PIP,
             trust_level="unknown",
         )
-        
+
         with pytest.raises(ArtifactValidationError):
             installer.validate_artifact(bad_metadata)
 
@@ -216,13 +230,15 @@ class TestInstallationStrategies:
         """Test that dry run skips actual installation."""
         catalog = get_tool_catalog()
         ruff = catalog.get("ruff")
-        strategy_def = catalog.get_installation_strategy("ruff", Platform.LINUX, Architecture.X86_64)
-        
+        strategy_def = catalog.get_installation_strategy(
+            "ruff", Platform.LINUX, Architecture.X86_64
+        )
+
         installer = PipInstallStrategy(strategy_def, ruff)
         metadata = installer.discover_artifact()
-        
+
         result = installer.install(metadata, dry_run=True)
-        
+
         assert result.status == StrategyStatus.SKIPPED
         assert "Dry run" in result.message
 
@@ -234,20 +250,24 @@ class TestStrategyFactory:
         """Test factory creates DEB strategy."""
         catalog = get_tool_catalog()
         cursor = catalog.get("cursor")
-        strategy_def = catalog.get_installation_strategy("cursor", Platform.LINUX, Architecture.X86_64)
-        
+        strategy_def = catalog.get_installation_strategy(
+            "cursor", Platform.LINUX, Architecture.X86_64
+        )
+
         installer = StrategyFactory.create_strategy(strategy_def, cursor)
-        
+
         assert isinstance(installer, DebInstallStrategy)
 
     def test_creates_pip_strategy(self) -> None:
         """Test factory creates PIP strategy."""
         catalog = get_tool_catalog()
         ruff = catalog.get("ruff")
-        strategy_def = catalog.get_installation_strategy("ruff", Platform.LINUX, Architecture.X86_64)
-        
+        strategy_def = catalog.get_installation_strategy(
+            "ruff", Platform.LINUX, Architecture.X86_64
+        )
+
         installer = StrategyFactory.create_strategy(strategy_def, ruff)
-        
+
         assert isinstance(installer, PipInstallStrategy)
 
 
@@ -257,22 +277,22 @@ class TestPlatformDetection:
     def test_get_current_platform_returns_tuple(self) -> None:
         """Test platform detection returns correct types."""
         plat, arch = get_current_platform()
-        
+
         assert isinstance(plat, Platform)
         assert isinstance(arch, Architecture)
 
     def test_get_current_platform_matches_system(self) -> None:
         """Test platform detection matches system."""
         plat, arch = get_current_platform()
-        
+
         system = platform_module.system().lower()
         machine = platform_module.machine().lower()
-        
+
         if system == "linux":
             assert plat == Platform.LINUX
         elif system == "darwin":
             assert plat == Platform.MACOS
-            
+
         if machine in ("x86_64", "amd64"):
             assert arch == Architecture.X86_64
         elif machine in ("arm64", "aarch64"):
@@ -286,11 +306,13 @@ class TestArtifactMetadata:
         """Test official trust level assignment."""
         catalog = get_tool_catalog()
         cursor = catalog.get("cursor")
-        strategy_def = catalog.get_installation_strategy("cursor", Platform.LINUX, Architecture.X86_64)
-        
+        strategy_def = catalog.get_installation_strategy(
+            "cursor", Platform.LINUX, Architecture.X86_64
+        )
+
         installer = DebInstallStrategy(strategy_def, cursor)
         metadata = installer.discover_artifact()
-        
+
         assert metadata.trust_level == "official"
 
 
@@ -305,7 +327,7 @@ class TestInstallationResult:
             status=StrategyStatus.SUCCESS,
             message="Test successful",
         )
-        
+
         assert result.strategy_id == "test_strategy"
         assert result.tool_id == "test_tool"
         assert result.status == StrategyStatus.SUCCESS
@@ -325,38 +347,42 @@ class TestIntegrationWithReconciler:
             ToolRequirementLevel,
             ToolStatus,
         )
-        
+
         catalog = get_tool_catalog()
         reconciler = EnvironmentReconciler()
-        
+
         # Create desired state with missing tools
         desired = DesiredEnvironmentState(
             tools={
-                "ruff": ToolRequirement(tool_id="ruff", level=ToolRequirementLevel.REQUIRED),
-                "pytest": ToolRequirement(tool_id="pytest", level=ToolRequirementLevel.REQUIRED),
+                "ruff": ToolRequirement(
+                    tool_id="ruff", level=ToolRequirementLevel.REQUIRED
+                ),
+                "pytest": ToolRequirement(
+                    tool_id="pytest", level=ToolRequirementLevel.REQUIRED
+                ),
             }
         )
-        
+
         # Create actual state without those tools
         actual = ActualEnvironmentState(
             tools={
-                "python": ToolStatus(tool_id="python", status="installed", version="3.12.0"),
+                "python": ToolStatus(
+                    tool_id="python", status="installed", version="3.12.0"
+                ),
             }
         )
-        
+
         delta = reconciler.reconcile(actual, desired)
-        
+
         # Should have install actions for missing tools
         assert delta.has_changes
         assert delta.required_actions_count >= 2
-        
+
         # Verify we can get strategies for the deltas
         for tool_delta in delta.tool_deltas:
             if tool_delta.action.value == "install":
                 strategy = catalog.get_installation_strategy(
-                    tool_delta.tool_id, 
-                    Platform.LINUX, 
-                    Architecture.X86_64
+                    tool_delta.tool_id, Platform.LINUX, Architecture.X86_64
                 )
                 # Strategy should exist for known tools
                 if tool_delta.tool_id in ["ruff", "pytest"]:

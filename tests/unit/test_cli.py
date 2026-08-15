@@ -112,14 +112,20 @@ def test_bootstrap_cli_rejects_interactive_approval_in_safe_mode() -> None:
     assert "requires --real-execution" in result.output
 
 
-def test_run_pipeline_interactive_approval_uses_bootstrap_service(monkeypatch: object) -> None:
+def test_run_pipeline_interactive_approval_uses_bootstrap_service(
+    monkeypatch: object,
+) -> None:
     result_object = type(
         "PipelineResult",
         (),
         {
             "audit_report": StubAuditService().run(),
-            "original_plan": type("Plan", (), {"is_actionable": False, "actions": []})(),
-            "validation_result": type("Validation", (), {"is_valid": True, "errors": []})(),
+            "original_plan": type(
+                "Plan", (), {"is_actionable": False, "actions": []}
+            )(),
+            "validation_result": type(
+                "Validation", (), {"is_valid": True, "errors": []}
+            )(),
             "execution_result": None,
             "verification_result": None,
             "is_success": True,

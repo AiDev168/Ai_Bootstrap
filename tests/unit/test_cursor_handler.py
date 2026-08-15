@@ -51,7 +51,13 @@ def test_cursor_handler_resolves_official_deb_url_from_metadata() -> None:
     result = handler.execute(_action(download_url=API_URL), _context())
 
     assert result.status == ExecutionStatus.SUCCESS
-    assert runner.call_args.args[0] == ("sudo", "apt-get", "install", "-y", runner.call_args.args[0][-1])
+    assert runner.call_args.args[0] == (
+        "sudo",
+        "apt-get",
+        "install",
+        "-y",
+        runner.call_args.args[0][-1],
+    )
     downloaded_path = downloader.call_args.args[1]
     assert downloader.call_args.args[0] == DEB_URL
     assert Path(downloaded_path).name == "cursor.deb"

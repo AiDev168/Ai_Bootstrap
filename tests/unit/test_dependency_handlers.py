@@ -19,7 +19,9 @@ def _real_context() -> ExecutionContext:
 
 
 def test_create_virtualenv_real_creates_marker(tmp_path: Path) -> None:
-    action = ExecutionPlanAction("create_virtualenv", "Create venv", 1, {"venv_path": str(tmp_path / ".venv")})
+    action = ExecutionPlanAction(
+        "create_virtualenv", "Create venv", 1, {"venv_path": str(tmp_path / ".venv")}
+    )
     result = CreateVirtualEnvHandler().execute(action, _real_context())
     assert result.status == ExecutionStatus.SUCCESS
     assert (tmp_path / ".venv" / "pyvenv.cfg").is_file()
@@ -33,7 +35,11 @@ def test_package_handler_uses_no_shell() -> None:
         "install_python_package",
         "Install package",
         1,
-        {"package": "demo_pkg", "requirement": "demo_pkg>=1", "python_executable": "/venv/bin/python"},
+        {
+            "package": "demo_pkg",
+            "requirement": "demo_pkg>=1",
+            "python_executable": "/venv/bin/python",
+        },
     )
     result = InstallPythonPackageHandler(runner).execute(action, _real_context())
     assert result.status == ExecutionStatus.SUCCESS

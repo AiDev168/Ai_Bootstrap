@@ -95,7 +95,9 @@ class VerificationError(InstallationStrategyError):
 class InstallationStrategyBase(ABC):
     """Abstract base class for installation strategies."""
 
-    def __init__(self, strategy: InstallationStrategy, tool_definition: ToolDefinition) -> None:
+    def __init__(
+        self, strategy: InstallationStrategy, tool_definition: ToolDefinition
+    ) -> None:
         self._strategy = strategy
         self._tool_definition = tool_definition
 
@@ -108,7 +110,9 @@ class InstallationStrategyBase(ABC):
         """Validate the artifact before installation."""
 
     @abstractmethod
-    def install(self, metadata: ArtifactMetadata, dry_run: bool = False) -> InstallationResult:
+    def install(
+        self, metadata: ArtifactMetadata, dry_run: bool = False
+    ) -> InstallationResult:
         """Install the artifact."""
 
     @abstractmethod
@@ -123,10 +127,13 @@ class DebInstallStrategy(InstallationStrategyBase):
         """Discover DEB artifact from official source."""
         source_url = self._strategy.source_url
         if not source_url:
-            raise ArtifactDiscoveryError(f"No source URL provided for {self._tool_definition.tool_id}")
+            raise ArtifactDiscoveryError(
+                f"No source URL provided for {self._tool_definition.tool_id}"
+            )
 
         # Parse domain from URL
         from urllib.parse import urlparse
+
         parsed = urlparse(source_url)
         source_domain = parsed.netloc
 
@@ -140,22 +147,30 @@ class DebInstallStrategy(InstallationStrategyBase):
             source_url=source_url,
             source_domain=source_domain,
             platform=self._strategy.platform,
-            architecture=self._strategy.architecture[0] if self._strategy.architecture else Architecture.X86_64,
+            architecture=self._strategy.architecture[0]
+            if self._strategy.architecture
+            else Architecture.X86_64,
             format=ArtifactFormat.DEB,
-            trust_level="official" if source_domain in self._tool_definition.allowed_domains else "unknown",
+            trust_level="official"
+            if source_domain in self._tool_definition.allowed_domains
+            else "unknown",
         )
 
     def validate_artifact(self, metadata: ArtifactMetadata) -> bool:
         """Validate DEB artifact metadata."""
         if metadata.format != ArtifactFormat.DEB:
             raise ArtifactValidationError(f"Expected DEB format, got {metadata.format}")
-        
+
         if metadata.trust_level not in ("official", "verified"):
-            raise ArtifactValidationError(f"Artifact trust level too low: {metadata.trust_level}")
+            raise ArtifactValidationError(
+                f"Artifact trust level too low: {metadata.trust_level}"
+            )
 
         return True
 
-    def install(self, metadata: ArtifactMetadata, dry_run: bool = False) -> InstallationResult:
+    def install(
+        self, metadata: ArtifactMetadata, dry_run: bool = False
+    ) -> InstallationResult:
         """Install DEB package."""
         if dry_run:
             return InstallationResult(
@@ -170,7 +185,7 @@ class DebInstallStrategy(InstallationStrategyBase):
             # Download artifact to temp location
             with tempfile.TemporaryDirectory(prefix="bootstrap-deb-") as temp_dir:
                 deb_path = Path(temp_dir) / f"{self._tool_definition.tool_id}.deb"
-                
+
                 # Download with validation
                 request = urllib.request.Request(
                     metadata.source_url,
@@ -179,11 +194,14 @@ class DebInstallStrategy(InstallationStrategyBase):
                         "Accept": "application/octet-stream,*/*",
                     },
                 )
-                
-                with urllib.request.urlopen(request, timeout=300) as response, open(deb_path, "wb") as f:
-                        while chunk := response.read(1024 * 1024):
-                            f.write(chunk)
-                
+
+                with (
+                    urllib.request.urlopen(request, timeout=300) as response,
+                    open(deb_path, "wb") as f,
+                ):
+                    while chunk := response.read(1024 * 1024):
+                        f.write(chunk)
+
                 if not deb_path.exists() or deb_path.stat().st_size == 0:
                     raise InstallationError("Downloaded artifact is empty or missing")
 
@@ -227,7 +245,7 @@ class DebInstallStrategy(InstallationStrategyBase):
         """Verify DEB installation."""
         if not self._tool_definition.version_probe:
             return True  # No verification probe defined
-        
+
         try:
             result = subprocess.run(
                 self._tool_definition.version_probe.command,
@@ -244,7 +262,7 @@ class DebInstallStrategy(InstallationStrategyBase):
         """Get installed version."""
         if not self._tool_definition.version_probe:
             return None
-        
+
         try:
             result = subprocess.run(
                 self._tool_definition.version_probe.command,
@@ -266,12 +284,14 @@ class PipInstallStrategy(InstallationStrategyBase):
     def discover_artifact(self) -> ArtifactMetadata:
         """Discover pip package artifact."""
         package_name = self._strategy.package_name or self._tool_definition.tool_id
-        
+
         return ArtifactMetadata(
             source_url=f"https://pypi.org/project/{package_name}/",
             source_domain="pypi.org",
             platform=self._strategy.platform,
-            architecture=self._strategy.architecture[0] if self._strategy.architecture else Architecture.X86_64,
+            architecture=self._strategy.architecture[0]
+            if self._strategy.architecture
+            else Architecture.X86_64,
             format=ArtifactFormat.PIP,
             trust_level="official",
         )
@@ -280,13 +300,17 @@ class PipInstallStrategy(InstallationStrategyBase):
         """Validate pip package metadata."""
         if metadata.format != ArtifactFormat.PIP:
             raise ArtifactValidationError(f"Expected PIP format, got {metadata.format}")
-        
+
         if metadata.source_domain != "pypi.org":
-            raise ArtifactValidationError(f"Expected pypi.org, got {metadata.source_domain}")
+            raise ArtifactValidationError(
+                f"Expected pypi.org, got {metadata.source_domain}"
+            )
 
         return True
 
-    def install(self, metadata: ArtifactMetadata, dry_run: bool = False) -> InstallationResult:
+    def install(
+        self, metadata: ArtifactMetadata, dry_run: bool = False
+    ) -> InstallationResult:
         """Install Python package via pip."""
         if dry_run:
             return InstallationResult(
@@ -298,7 +322,7 @@ class PipInstallStrategy(InstallationStrategyBase):
             )
 
         package_name = self._strategy.package_name or self._tool_definition.tool_id
-        
+
         try:
             result = subprocess.run(
                 [shutil.which("pip") or "pip", "install", package_name],
@@ -350,7 +374,7 @@ class PipInstallStrategy(InstallationStrategyBase):
                 return result.returncode == 0
             except (OSError, subprocess.SubprocessError):
                 return False
-        
+
         try:
             result = subprocess.run(
                 self._tool_definition.version_probe.command,
@@ -366,7 +390,7 @@ class PipInstallStrategy(InstallationStrategyBase):
     def _get_version(self) -> str | None:
         """Get installed version."""
         package_name = self._strategy.package_name or self._tool_definition.tool_id
-        
+
         try:
             result = subprocess.run(
                 [shutil.which("pip") or "pip", "show", package_name],
@@ -391,9 +415,12 @@ class BinaryInstallStrategy(InstallationStrategyBase):
         """Discover binary artifact."""
         source_url = self._strategy.source_url
         if not source_url:
-            raise ArtifactDiscoveryError(f"No source URL provided for {self._tool_definition.tool_id}")
+            raise ArtifactDiscoveryError(
+                f"No source URL provided for {self._tool_definition.tool_id}"
+            )
 
         from urllib.parse import urlparse
+
         parsed = urlparse(source_url)
         source_domain = parsed.netloc
 
@@ -401,22 +428,32 @@ class BinaryInstallStrategy(InstallationStrategyBase):
             source_url=source_url,
             source_domain=source_domain,
             platform=self._strategy.platform,
-            architecture=self._strategy.architecture[0] if self._strategy.architecture else Architecture.X86_64,
+            architecture=self._strategy.architecture[0]
+            if self._strategy.architecture
+            else Architecture.X86_64,
             format=ArtifactFormat.BINARY,
-            trust_level="official" if source_domain in self._tool_definition.allowed_domains else "unknown",
+            trust_level="official"
+            if source_domain in self._tool_definition.allowed_domains
+            else "unknown",
         )
 
     def validate_artifact(self, metadata: ArtifactMetadata) -> bool:
         """Validate binary artifact metadata."""
         if metadata.format != ArtifactFormat.BINARY:
-            raise ArtifactValidationError(f"Expected BINARY format, got {metadata.format}")
-        
+            raise ArtifactValidationError(
+                f"Expected BINARY format, got {metadata.format}"
+            )
+
         if metadata.trust_level not in ("official", "verified"):
-            raise ArtifactValidationError(f"Artifact trust level too low: {metadata.trust_level}")
+            raise ArtifactValidationError(
+                f"Artifact trust level too low: {metadata.trust_level}"
+            )
 
         return True
 
-    def install(self, metadata: ArtifactMetadata, dry_run: bool = False) -> InstallationResult:
+    def install(
+        self, metadata: ArtifactMetadata, dry_run: bool = False
+    ) -> InstallationResult:
         """Install binary artifact."""
         if dry_run:
             return InstallationResult(
@@ -441,7 +478,7 @@ class BinaryInstallStrategy(InstallationStrategyBase):
         """Verify binary installation."""
         if not self._tool_definition.version_probe:
             return False
-        
+
         try:
             result = subprocess.run(
                 self._tool_definition.version_probe.command,
@@ -468,7 +505,10 @@ class StrategyFactory:
             return DebInstallStrategy(strategy, tool_definition)
         elif strategy.artifact_format == ArtifactFormat.PIP:
             return PipInstallStrategy(strategy, tool_definition)
-        elif strategy.artifact_format in (ArtifactFormat.BINARY, ArtifactFormat.TARBALL):
+        elif strategy.artifact_format in (
+            ArtifactFormat.BINARY,
+            ArtifactFormat.TARBALL,
+        ):
             return BinaryInstallStrategy(strategy, tool_definition)
         else:
             raise InstallationStrategyError(

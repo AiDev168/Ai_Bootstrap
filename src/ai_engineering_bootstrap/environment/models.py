@@ -38,11 +38,7 @@ class PythonPackageRequirement:
 
 @dataclass
 class EnvironmentRequest:
-    """
-    User request to prepare an engineering environment.
-
-    This is the primary input model that captures what the user wants.
-    """
+    """User request to prepare an engineering environment."""
 
     request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     project_id: str | None = None
@@ -50,9 +46,11 @@ class EnvironmentRequest:
     natural_language_goal: str = ""
     required_tools: list[str] = field(default_factory=list)
     optional_tools: list[str] = field(default_factory=list)
+    excluded_tools: list[str] = field(default_factory=list)
     languages: list[str] = field(default_factory=list)
     frameworks: list[str] = field(default_factory=list)
     project_dependencies: list[PythonPackageRequirement] = field(default_factory=list)
+    excluded_packages: list[str] = field(default_factory=list)
     configurations: dict[str, Any] = field(default_factory=dict)
     constraints: dict[str, Any] = field(default_factory=dict)
     platform_preferences: dict[str, Any] = field(default_factory=dict)
@@ -60,30 +58,51 @@ class EnvironmentRequest:
 
     def to_desired_state(self) -> DesiredEnvironmentState:
         """Convert this request into a structured desired state."""
+        force_install = bool(self.constraints.get("force_install", False))
+        excluded_tools = {tool.lower() for tool in self.excluded_tools}
+        excluded_packages = {package.lower() for package in self.excluded_packages}
         tools = {
-            tool_id: ToolRequirement(tool_id=tool_id, level=ToolRequirementLevel.REQUIRED)
+            tool_id: ToolRequirement(
+                tool_id=tool_id,
+                level=ToolRequirementLevel.REQUIRED,
+                configuration={"force_install": force_install} if force_install else {},
+            )
             for tool_id in self.required_tools
+            if tool_id.lower() not in excluded_tools
         }
         for tool_id in self.optional_tools:
-            if tool_id not in tools:
-                tools[tool_id] = ToolRequirement(tool_id=tool_id, level=ToolRequirementLevel.OPTIONAL)
+            if tool_id not in tools and tool_id.lower() not in excluded_tools:
+                tools[tool_id] = ToolRequirement(
+                    tool_id=tool_id,
+                    level=ToolRequirementLevel.OPTIONAL,
+                    configuration={"force_install": force_install}
+                    if force_install
+                    else {},
+                )
+
+        packages = [
+            package
+            for package in self.project_dependencies
+            if package.name.lower() not in excluded_packages
+        ]
+        constraints = dict(self.constraints)
+        if self.excluded_tools:
+            constraints["excluded_tools"] = list(self.excluded_tools)
+        if self.excluded_packages:
+            constraints["excluded_packages"] = list(self.excluded_packages)
 
         return DesiredEnvironmentState(
             tools=tools,
-            python_packages=self.project_dependencies,
+            python_packages=packages,
             configurations=self.configurations,
-            project_requirements=self.project_dependencies,
-            constraints=self.constraints,
+            project_requirements=packages,
+            constraints=constraints,
         )
 
 
 @dataclass(frozen=True)
 class DesiredEnvironmentState:
-    """
-    Structured target state for an engineering environment.
-
-    This represents what we want the environment to look like after completion.
-    """
+    """Structured target state for an engineering environment."""
 
     tools: dict[str, ToolRequirement] = field(default_factory=dict)
     python_packages: list[PythonPackageRequirement] = field(default_factory=list)
@@ -97,23 +116,19 @@ class ToolStatus:
     """Observed status of a single tool in the actual environment."""
 
     tool_id: str
-    status: str  # "installed", "missing", "error"
+    status: str
     version: str | None = None
     location: str | None = None
-    health: str = "unknown"  # "healthy", "degraded", "broken", "unknown"
+    health: str = "unknown"
     probe_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class ActualEnvironmentState:
-    """
-    Observed current state of the engineering environment.
-
-    This comes from real audit/probe systems, not from LLM inference.
-    """
+    """Observed current state of the engineering environment."""
 
     tools: dict[str, ToolStatus] = field(default_factory=dict)
-    python_packages: dict[str, str] = field(default_factory=dict)  # name -> version
+    python_packages: dict[str, str] = field(default_factory=dict)
     system_info: dict[str, Any] = field(default_factory=dict)
     probe_timestamp: str = ""
     probe_evidence: dict[str, Any] = field(default_factory=dict)
@@ -154,11 +169,7 @@ class PackageDelta:
 
 @dataclass(frozen=True)
 class EnvironmentDelta:
-    """
-    Computed difference between actual and desired environment states.
-
-    This is calculated deterministically, not by LLM.
-    """
+    """Computed difference between actual and desired environment states."""
 
     tool_deltas: list[ToolDelta] = field(default_factory=list)
     package_deltas: list[PackageDelta] = field(default_factory=list)
@@ -175,9 +186,10 @@ class EnvironmentDelta:
 
     @property
     def required_actions_count(self) -> int:
-        """Count of required (non-optional) actions."""
+        """Count of required non-optional actions."""
         count = sum(
-            1 for d in self.tool_deltas
+            1
+            for d in self.tool_deltas
             if d.action != DeltaAction.NONE
             and d.desired_requirement
             and d.desired_requirement.level == ToolRequirementLevel.REQUIRED
@@ -190,7 +202,8 @@ class EnvironmentDelta:
     def optional_actions_count(self) -> int:
         """Count of optional actions."""
         return sum(
-            1 for d in self.tool_deltas
+            1
+            for d in self.tool_deltas
             if d.action != DeltaAction.NONE
             and d.desired_requirement
             and d.desired_requirement.level == ToolRequirementLevel.OPTIONAL
@@ -202,7 +215,6 @@ __all__ = [
     "DeltaAction",
     "DesiredEnvironmentState",
     "EnvironmentDelta",
-    "EnvironmentRequest",
     "PackageDelta",
     "PythonPackageRequirement",
     "ToolDelta",

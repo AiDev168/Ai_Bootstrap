@@ -1,0 +1,182 @@
+name: One-time runtime finalize v3
+
+on:
+  push:
+    branches:
+      - feature/step32-final-validation
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install project tooling
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      - name: Apply fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"Anchor not found in {path}: {old[:100]!r}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          def replace_region(path: str, start: str, end: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              a = text.index(start)
+              b = text.index(end, a)
+              p.write_text(text[:a] + new + text[b:], encoding="utf-8")
+
+          replace_once(
+              "src/ai_engineering_bootstrap/pipeline/engine.py",
+              "        return True\n\n\nclass PipelineEngine:",
+              '''        return True\n\n    @property\n    def action_successful(self) -> bool:\n        if self.execution_result is None or not self.validation_result.is_valid:\n            return False\n        if self.is_pending_approval or self.is_rejected_approval:\n            return False\n        if not self.execution_result.is_success:\n            return False\n        return not any(\n            getattr(item, "status", None).value == "failed"\n            for item in (self.verification_result or [])\n        )\n\n\nclass PipelineEngine:''',
+          )
+          replace_once(
+              "src/ai_engineering_bootstrap/bootstrap/service.py",
+              "    @property\n    def is_success(self) -> bool:\n",
+              '''    @property\n    def requested_actions_successful(self) -> bool:\n        return all(result.is_success for result in self.action_results)\n\n    @property\n    def is_success(self) -> bool:\n''',
+          )
+          replace_once(
+              "src/ai_engineering_bootstrap/bootstrap/service.py",
+              "            if not result.is_success:\n                break\n",
+              "            if not result.action_successful:\n                break\n",
+          )
+
+          replace_once(
+              "src/ai_engineering_bootstrap/backend/session_service.py",
+              "                        error=None\n                        if action_result.status.value == \"success\"\n                        else action_result.message,\n                    )",
+              "                        error=None\n                        if action_result.status.value == \"success\"\n                        else action_result.message,\n                        artifacts=dict(action_result.details),\n                    )",
+          )
+          replace_once(
+              "src/ai_engineering_bootstrap/backend/session_service.py",
+              "        session.status = (\n            SessionStatus.COMPLETED if result.is_success else SessionStatus.FAILED\n        )",
+              '''        requested_actions_successful = result.requested_actions_successful\n        session.status = (\n            SessionStatus.COMPLETED\n            if requested_actions_successful\n            else SessionStatus.FAILED\n        )''',
+          )
+          replace_once(
+              "src/ai_engineering_bootstrap/backend/session_service.py",
+              '            "session_completed" if result.is_success else "session_failed",',
+              '            "session_completed" if requested_actions_successful else "session_failed",',
+          )
+          replace_once(
+              "src/ai_engineering_bootstrap/backend/session_service.py",
+              '            "Session execution completed."\n            if result.is_success\n            else "Session execution failed.",',
+              '            "Requested installation actions completed successfully."\n            if requested_actions_successful\n            else "One or more requested actions failed during execution.",',
+          )
+          replace_once(
+              "src/ai_engineering_bootstrap/backend/session_service.py",
+              '                "environment_ready": result.environment_ready,\n                "excluded_actions": excluded_actions,',
+              '                "environment_ready": result.environment_ready,\n                "requested_actions_successful": requested_actions_successful,\n                "excluded_actions": excluded_actions,',
+          )
+          replace_once(
+              "src/ai_engineering_bootstrap/backend/session_service.py",
+              '            "session_id": session.session_id,\n            "status": session.status.value,',
+              '''            "session_id": session.session_id,\n            "label": session.request.natural_language_goal.strip()\n            if session.request and session.request.natural_language_goal.strip()\n            else "Environment Bootstrap",\n            "status": session.status.value,''',
+          )
+
+          llm = Path("src/ai_engineering_bootstrap/backend/llm_settings.py")
+          text = llm.read_text(encoding="utf-8")
+          if "connection_ok: bool | None" not in text:
+              text = text.replace(
+                  "    enabled: bool = False\n",
+                  "    enabled: bool = False\n    connection_ok: bool | None = None\n    connection_message: str = \"Not tested yet.\"\n",
+                  1,
+              )
+          if "self._last_probe" not in text:
+              text = text.replace(
+                  "        self.store = store or LLMSettingsStore()\n",
+                  "        self.store = store or LLMSettingsStore()\n        self._last_probe: dict[str, Any] | None = None\n",
+                  1,
+              )
+          start = "    def get(self) -> LLMSettings:\n"
+          end = "    def provider_config(self) -> ProviderConfig:\n"
+          new_get = '''    def get(self) -> LLMSettings:\n        values = self.store.load()\n        provider = values.get("provider", DEFAULT_PROVIDER)\n        model = values.get("model", "")\n        base_url = values.get("base_url", "")\n        api_key = values.get("api_key", "")\n        enabled = values.get("enabled", "false").lower() == "true"\n        probe = self._last_probe\n        connection_ok = None\n        connection_message = "Not tested yet."\n        if probe and probe.get("fingerprint") == self._fingerprint(values):\n            connection_ok = bool(probe.get("ok"))\n            connection_message = str(probe.get("message", ""))\n        return LLMSettings(\n            provider=provider,\n            model=model,\n            base_url=base_url,\n            api_key_configured=bool(api_key),\n            enabled=enabled,\n            connection_ok=connection_ok,\n            connection_message=connection_message,\n        )\n\n'''
+          replace_region("src/ai_engineering_bootstrap/backend/llm_settings.py", start, end, new_get)
+          start = "    def update(self, payload: dict[str, Any]) -> LLMSettings:\n"
+          end = "    def provider_config(self) -> ProviderConfig:\n"
+          new_update = '''    @staticmethod\n    def _fingerprint(values: dict[str, str]) -> tuple[str, str, str, bool]:\n        return (\n            values.get("provider", DEFAULT_PROVIDER),\n            values.get("model", ""),\n            values.get("base_url", ""),\n            bool(values.get("api_key", "")),\n        )\n\n    def _record_probe(self, values: dict[str, str], result: dict[str, Any]) -> dict[str, Any]:\n        self._last_probe = {\n            "fingerprint": self._fingerprint(values),\n            "ok": bool(result.get("ok")),\n            "message": str(result.get("message", "")),\n        }\n        return result\n\n    def update(self, payload: dict[str, Any]) -> LLMSettings:\n        current = self.store.load()\n        values = self._normalize_values(payload, current)\n        self.store.save(values)\n        self._last_probe = None\n        return self.get()\n\n'''
+          replace_region("src/ai_engineering_bootstrap/backend/llm_settings.py", start, end, new_update)
+          start = "    def test_connection(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:\n"
+          end = "    def models(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:\n"
+          new_test = '''    def test_connection(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:\n        values = self._normalize_values(payload or {}, self.store.load())\n        provider = values["provider"]\n        if provider == "mock":\n            return self._record_probe(\n                values,\n                {"ok": True, "provider": provider, "message": "Mock provider is available offline."},\n            )\n        config = ProviderConfig(\n            provider_type=provider,\n            model=values.get("model") or None,\n            base_url=values.get("base_url") or None,\n            api_key=values.get("api_key") or None,\n            options={},\n        )\n        if provider in {"local_server", "remote_api"}:\n            if not config.base_url:\n                raise ValueError(f"Base URL is required for {provider}")\n            base_url = config.base_url.rstrip("/")\n            endpoint = f"{base_url}/models" if base_url.endswith("/v1") else f"{base_url}/v1/models"\n            headers = {"Authorization": f"Bearer {config.api_key}"} if config.api_key else {}\n            request = urllib.request.Request(endpoint, headers=headers)\n            try:\n                with urllib.request.urlopen(request, timeout=10) as response:\n                    ok = 200 <= response.status < 300\n                return self._record_probe(\n                    values,\n                    {"ok": ok, "provider": provider, "url": endpoint, "message": "LLM server is reachable." if ok else "LLM server returned a non-success status."},\n                )\n            except (urllib.error.URLError, urllib.error.HTTPError) as error:\n                return self._record_probe(\n                    values,\n                    {"ok": False, "provider": provider, "url": endpoint, "message": f"Connection failed: {error}"},\n                )\n        return self._record_probe(\n            values,\n            {"ok": bool(config.model), "provider": provider, "message": "Provider configuration accepted." if config.model else "Model is not configured."},\n        )\n\n'''
+          replace_region("src/ai_engineering_bootstrap/backend/llm_settings.py", start, end, new_test)
+          llm.write_text(text, encoding="utf-8")
+
+          backend = Path("src/ai_engineering_bootstrap/backend/service.py")
+          text = backend.read_text(encoding="utf-8")
+          text = text.replace('"llm_available": settings.enabled,', '"llm_available": settings.connection_ok is True,', 1)
+          if '"connection_ok": settings.connection_ok' not in text:
+              text = text.replace(
+                  '                    "enabled": settings.enabled,\n',
+                  '                    "enabled": settings.enabled,\n                    "connection_ok": settings.connection_ok,\n                    "connection_message": settings.connection_message,\n',
+                  1,
+              )
+          backend.write_text(text, encoding="utf-8")
+
+          test = Path("tests/unit/test_gui_backend_contract.py")
+          text = test.read_text(encoding="utf-8")
+          if "from types import SimpleNamespace" not in text:
+              text = text.replace(
+                  "\"\"\"Backend contracts exercised by the GUI.\"\"\"\n\n",
+                  "\"\"\"Backend contracts exercised by the GUI.\"\"\"\n\nfrom types import SimpleNamespace\n\n",
+                  1,
+              )
+          if "EnvironmentSessionService" not in text:
+              text = text.replace(
+                  "from ai_engineering_bootstrap.backend.service import ApplicationBackend\n",
+                  "from ai_engineering_bootstrap.backend.service import ApplicationBackend\nfrom ai_engineering_bootstrap.backend.session_service import EnvironmentSessionService\nfrom ai_engineering_bootstrap.environment.session_repository import InMemorySessionRepository\n",
+                  1,
+              )
+          text = text.replace(
+              "from ai_engineering_bootstrap.environment.models import EnvironmentRequest\n",
+              "from ai_engineering_bootstrap.environment.models import EnvironmentRequest\n",
+              1,
+          )
+          text = re.sub(
+              r"def test_session_endpoints_return_serializable_data\(\) -> None:\n    backend = ApplicationBackend\(\)",
+              "def test_session_endpoints_return_serializable_data() -> None:\n    service = EnvironmentSessionService(repository=InMemorySessionRepository(), audit_factory=lambda: SimpleNamespace(checks=[]))\n    backend = ApplicationBackend(session_service=service)",
+              text,
+              count=1,
+          )
+          test.write_text(text, encoding="utf-8")
+
+          runtime = Path("src/ai_engineering_bootstrap/gui/static/app-runtime.js")
+          marker = "data-step32-console-controls"
+          runtime_text = runtime.read_text(encoding="utf-8")
+          if marker not in runtime_text:
+              runtime_text += '''\n\n(() => {\n    const consoleLog = document.getElementById("request-log");\n    const latest = document.getElementById("latest");\n    const toolbar = document.querySelector("#console .toolbar");\n    let paused = false;\n    let snapshot = null;\n    let filter = "ALL";\n    function refresh() {\n        if (consoleLog) {\n            for (const item of consoleLog.querySelectorAll(".request")) {\n                const method = item.querySelector("strong")?.textContent?.trim() || "";\n                const error = item.classList.contains("bad");\n                item.style.display = filter === "ALL" || method === filter || (filter === "ERROR" && error) ? "block" : "none";\n            }\n        }\n        if (latest) {\n            const last = consoleLog?.querySelector(".request");\n            latest.classList.toggle("error-box", Boolean(last?.classList.contains("bad")));\n            if (paused && snapshot !== null && latest.textContent !== snapshot) latest.textContent = snapshot;\n        }\n    }\n    if (toolbar && !toolbar.querySelector("#request-filter")) {\n        const controls = document.createElement("span");\n        controls.dataset.step32ConsoleControls = "1";\n        controls.innerHTML = '<select id="request-filter"><option value="ALL">All</option><option value="GET">GET</option><option value="POST">POST</option><option value="ERROR">Errors</option></select><button id="pause-latest" class="secondary" type="button">Pause</button>';\n        toolbar.appendChild(controls);\n        document.getElementById("request-filter")?.addEventListener("change", event => { filter = event.target.value; refresh(); });\n        document.getElementById("pause-latest")?.addEventListener("click", event => { paused = !paused; snapshot = paused ? (latest?.textContent || "") : null; event.target.textContent = paused ? "Resume" : "Pause"; refresh(); });\n    }\n    const observer = new MutationObserver(refresh);\n    if (consoleLog) observer.observe(consoleLog, {childList: true, subtree: true});\n    if (latest) observer.observe(latest, {childList: true, characterData: true, subtree: true});\n    refresh();\n})();\n'''
+              runtime.write_text(runtime_text, encoding="utf-8")
+          PY
+      - name: Format
+        run: python -m ruff check . --fix && python -m ruff format .
+      - name: Lint
+        run: python -m ruff check .
+      - name: Format check
+        run: python -m ruff format --check .
+      - name: Compile
+        run: python -m compileall -q src tests
+      - name: Targeted tests
+        run: pytest -q tests/unit/test_gui_backend_contract.py tests/unit/test_runtime_session_service.py tests/unit/test_step32_installation_intent.py
+      - name: Full regression
+        run: pytest -q
+      - name: Diff check
+        run: git diff --check
+      - name: Commit and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src tests .github/workflows/one-time-runtime-finalize-v3.yml
+          git rm .github/workflows/one-time-runtime-finalize-v3.yml
+          git commit -m "chore: finalize step32 runtime fixes v3 [skip ci]"
+          git push

@@ -41,10 +41,13 @@ class ExecutorEngine:
         self._safety_gate = SafetyGate()
         self._verifier_registry = VerifierRegistry()
 
+    @staticmethod
+    def _executor_action_id(action: object) -> str:
+        context = getattr(action, "context", {})
+        return str(context.get("executor_action_id", getattr(action, "action_id", "")))
+
     def verify(
-        self,
-        plan: ExecutionPlan,
-        execution_result: ExecutionResult,
+        self, plan: ExecutionPlan, execution_result: ExecutionResult
     ) -> list[VerificationResult]:
         """Verify successful action results using independent read-only verifiers."""
         results: list[VerificationResult] = []
@@ -54,7 +57,8 @@ class ExecutorEngine:
                 if action_index < len(execution_result.results)
                 else None
             )
-            verifier = self._verifier_registry.get_verifier(action.action_id)
+            executor_action_id = self._executor_action_id(action)
+            verifier = self._verifier_registry.get_verifier(executor_action_id)
             if verifier is None:
                 results.append(
                     VerificationResult(
@@ -81,11 +85,7 @@ class ExecutorEngine:
             results.append(verifier.verify(action, result, context))
         return results
 
-    def execute(
-        self,
-        plan: ExecutionPlan,
-        max_attempts: int = 1,
-    ) -> ExecutionResult:
+    def execute(self, plan: ExecutionPlan, max_attempts: int = 1) -> ExecutionResult:
         """Process all actions deterministically with optional retry."""
         if not plan.is_intact():
             return ExecutionResult(
@@ -97,7 +97,7 @@ class ExecutorEngine:
         results: list[ActionResult] = []
         context = ExecutionContext(
             mode=self._mode,
-            dry_run=(self._mode == ExecutionMode.SAFE),
+            dry_run=self._mode == ExecutionMode.SAFE,
             is_approved=self._is_approved,
         )
         policy = RetryPolicy(max_attempts=max_attempts)
@@ -117,66 +117,72 @@ class ExecutorEngine:
                 )
                 continue
 
+            executor_action_id = self._executor_action_id(action)
             attempt = 0
             final_result: ActionResult | None = None
-
             while attempt < max_attempts:
                 attempt += 1
-
-                # 1. Safety Gate Check
                 allowed, reason = self._safety_gate.evaluate(
-                    action.action_id,
-                    self._mode,
-                    is_approved=self._is_approved,
+                    executor_action_id, self._mode, is_approved=self._is_approved
                 )
-
                 if not allowed:
                     final_result = ActionResult(
                         action_id=action.action_id,
                         status=ExecutionStatus.FAILED,
                         message=f"Safety Gate Denied: {reason}",
-                        details={"reason": "policy_violation"},
+                        details={
+                            "reason": "policy_violation",
+                            "executor_action_id": executor_action_id,
+                        },
                     )
                     break
-
-                # 2. Handler Lookup & Execution
                 try:
-                    handler = self._registry.get_handler(
-                        action.action_id,
-                        self._mode,
-                    )
+                    handler = self._registry.get_handler(executor_action_id, self._mode)
                     result = handler.execute(action, context)
-
                     if result.status != ExecutionStatus.FAILED:
-                        final_result = result
+                        final_result = ActionResult(
+                            action_id=action.action_id,
+                            status=result.status,
+                            message=result.message,
+                            details={
+                                **result.details,
+                                "executor_action_id": executor_action_id,
+                            },
+                        )
                         break
-
-                    failure_record = policy.classify_failure(result)
+                    final_result = ActionResult(
+                        action_id=action.action_id,
+                        status=result.status,
+                        message=result.message,
+                        details={
+                            **result.details,
+                            "executor_action_id": executor_action_id,
+                        },
+                    )
+                    failure_record = policy.classify_failure(final_result)
                     if not failure_record.is_retryable:
-                        final_result = result
                         break
-
-                    final_result = result
-
                 except KeyError as err:
                     final_result = ActionResult(
                         action_id=action.action_id,
                         status=ExecutionStatus.FAILED,
                         message=str(err),
-                        details={"error": "Unsupported or Unauthorized"},
+                        details={
+                            "error": "Unsupported or Unauthorized",
+                            "executor_action_id": executor_action_id,
+                        },
                     )
                     break
-                except Exception as err:  # noqa: BLE001
+                except Exception as err:  # noqa: BLE001 - handler boundary converts unexpected failures to structured results
                     final_result = ActionResult(
                         action_id=action.action_id,
                         status=ExecutionStatus.FAILED,
                         message=f"Handler execution error: {err!s}",
-                        details={},
+                        details={"executor_action_id": executor_action_id},
                     )
                     rec = policy.classify_failure(final_result)
                     if not rec.is_retryable:
                         break
-
             if final_result:
                 results.append(final_result)
 

@@ -96,7 +96,9 @@ class PipelineEngine:
                 action_id_value = getattr(action, "id", "")
             action_id = str(action_id_value)
             policy = getattr(action, "policy", None)
-            requirement = getattr(getattr(policy, "approval_requirement", None), "name", None)
+            requirement = getattr(
+                getattr(policy, "approval_requirement", None), "name", None
+            )
             requires_approval = safety_gate.requires_human_approval(action_id)
             explicit_approval = getattr(action, "requires_approval", None)
             if requirement == "REQUIRED":
@@ -121,7 +123,9 @@ class PipelineEngine:
                         approval_id = configured
                         approval_offsets[action_id] = 1
 
-            request = approval_provider.get_request(approval_id) if approval_id else None
+            request = (
+                approval_provider.get_request(approval_id) if approval_id else None
+            )
             status = approval_provider.get_status(approval_id) if approval_id else None
 
             if request and (
@@ -174,12 +178,15 @@ class PipelineEngine:
         return pending, rejected, rejected_action_indexes
 
     @staticmethod
-    def _classify_failures(execution_result: ExecutionResult, policy: RetryPolicy) -> list[FailureRecord]:
+    def _classify_failures(
+        execution_result: ExecutionResult, policy: RetryPolicy
+    ) -> list[FailureRecord]:
         """Classify failures in deterministic result order."""
         return [
             record
             for result in execution_result.results
-            if (record := policy.classify_failure(result)).failure_type != FailureType.NONE
+            if (record := policy.classify_failure(result)).failure_type
+            != FailureType.NONE
         ]
 
     @staticmethod
@@ -255,7 +262,9 @@ class PipelineEngine:
         evidence = ExecutionAuditService(run_id)
         evidence.record("audit", "started")
         report = default_audit_service().run()
-        evidence.record("audit", "completed", health_score=report.readiness.health_score)
+        evidence.record(
+            "audit", "completed", health_score=report.readiness.health_score
+        )
 
         planner = PlannerEngine()
         agent_decision = None
@@ -263,7 +272,9 @@ class PipelineEngine:
         if plan_override is not None:
             original_plan = plan_override
         elif agent_planning_service is not None and agent_context is not None:
-            runtime_result = AgentRuntime(agent_planning_service).run(agent_context, run_id)
+            runtime_result = AgentRuntime(agent_planning_service).run(
+                agent_context, run_id
+            )
             agent_decision = runtime_result.planning.decision
             original_plan = runtime_result.planning.plan
             agent_metadata = AgentRuntime.metadata(runtime_result)
@@ -274,7 +285,9 @@ class PipelineEngine:
         evidence.record("planning", "completed", plan_id=original_plan.plan_id)
         validator = ExecutionPlanValidator()
         validation_result = validator.validate(original_plan)
-        evidence.record("validation", "passed" if validation_result.is_valid else "failed")
+        evidence.record(
+            "validation", "passed" if validation_result.is_valid else "failed"
+        )
         if not validation_result.is_valid:
             evidence.complete("failed", reason="invalid_plan")
             return PipelineResult(
@@ -333,7 +346,12 @@ class PipelineEngine:
         final_verification: Any | None = None
 
         while True:
-            evidence.record("execution", "started", plan_id=current_plan.plan_id, replan_count=replan_count)
+            evidence.record(
+                "execution",
+                "started",
+                plan_id=current_plan.plan_id,
+                replan_count=replan_count,
+            )
             execution = executor.execute(current_plan, max_attempts=max_retry_attempts)
             execution_history.append(execution)
             evidence.record("execution", "completed", success=execution.is_success)
@@ -341,12 +359,19 @@ class PipelineEngine:
             verification = executor.verify(current_plan, execution)
             final_execution = execution
             final_verification = verification
-            verification_failed = any(item.status.value == "failed" for item in verification)
-            evidence.record("verification", "failed" if verification_failed else "completed")
+            verification_failed = any(
+                item.status.value == "failed" for item in verification
+            )
+            evidence.record(
+                "verification", "failed" if verification_failed else "completed"
+            )
 
             failures = self._classify_failures(execution, policy)
             failure_records.extend(failures)
-            needs_replan = any(record.requires_replan for record in failures) or verification_failed
+            needs_replan = (
+                any(record.requires_replan for record in failures)
+                or verification_failed
+            )
             if not needs_replan:
                 evidence.complete("completed")
                 break
@@ -360,7 +385,11 @@ class PipelineEngine:
             replan_count += 1
             evidence.record("recovery", "replan_requested", replan_count=replan_count)
             current_report = default_audit_service().run()
-            evidence.record("audit", "completed_after_failure", health_score=current_report.readiness.health_score)
+            evidence.record(
+                "audit",
+                "completed_after_failure",
+                health_score=current_report.readiness.health_score,
+            )
             recovery_decision = None
             candidate, recovery_decision = self._generate_recovery_plan(
                 current_report,
@@ -372,7 +401,10 @@ class PipelineEngine:
             if recovery_decision is not None:
                 agent_decision = recovery_decision
             candidate_validation = validator.validate(candidate)
-            evidence.record("replan_validation", "passed" if candidate_validation.is_valid else "failed")
+            evidence.record(
+                "replan_validation",
+                "passed" if candidate_validation.is_valid else "failed",
+            )
             if not candidate_validation.is_valid:
                 evidence.complete("failed", reason="invalid_replanned_plan")
                 break

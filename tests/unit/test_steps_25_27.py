@@ -54,10 +54,16 @@ def test_pipeline_replans_once_after_replanable_failure() -> None:
     )
 
     with (
-        patch("ai_engineering_bootstrap.pipeline.engine.default_audit_service") as audit_factory,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.default_audit_service"
+        ) as audit_factory,
         patch("ai_engineering_bootstrap.pipeline.engine.PlannerEngine") as planner_cls,
-        patch("ai_engineering_bootstrap.pipeline.engine.ExecutorEngine") as executor_cls,
-        patch("ai_engineering_bootstrap.pipeline.engine.ExecutionPlanValidator") as validator_cls,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.ExecutorEngine"
+        ) as executor_cls,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.ExecutionPlanValidator"
+        ) as validator_cls,
     ):
         audit = MagicMock()
         audit.run.side_effect = [_report(False), _report(True)]
@@ -91,10 +97,16 @@ def test_pipeline_replan_limit_prevents_unbounded_recovery() -> None:
     )
 
     with (
-        patch("ai_engineering_bootstrap.pipeline.engine.default_audit_service") as audit_factory,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.default_audit_service"
+        ) as audit_factory,
         patch("ai_engineering_bootstrap.pipeline.engine.PlannerEngine") as planner_cls,
-        patch("ai_engineering_bootstrap.pipeline.engine.ExecutorEngine") as executor_cls,
-        patch("ai_engineering_bootstrap.pipeline.engine.ExecutionPlanValidator") as validator_cls,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.ExecutorEngine"
+        ) as executor_cls,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.ExecutionPlanValidator"
+        ) as validator_cls,
     ):
         audit = MagicMock()
         audit.run.return_value = _report(False)
@@ -125,9 +137,13 @@ def test_pipeline_records_ordered_run_evidence() -> None:
     )
 
     with (
-        patch("ai_engineering_bootstrap.pipeline.engine.default_audit_service") as audit_factory,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.default_audit_service"
+        ) as audit_factory,
         patch("ai_engineering_bootstrap.pipeline.engine.PlannerEngine") as planner_cls,
-        patch("ai_engineering_bootstrap.pipeline.engine.ExecutorEngine") as executor_cls,
+        patch(
+            "ai_engineering_bootstrap.pipeline.engine.ExecutorEngine"
+        ) as executor_cls,
     ):
         audit = MagicMock()
         audit.run.return_value = _report(True)
@@ -143,7 +159,9 @@ def test_pipeline_records_ordered_run_evidence() -> None:
     evidence = result.run_evidence
     assert evidence.run_id == "run-evidence-1"
     assert evidence.completed_at is not None
-    assert [event.sequence for event in evidence.events] == list(range(1, len(evidence.events) + 1))
+    assert [event.sequence for event in evidence.events] == list(
+        range(1, len(evidence.events) + 1)
+    )
     stages = [event.stage for event in evidence.events]
     assert stages[:4] == ["audit", "audit", "planning", "validation"]
     assert stages[-1] == "pipeline"

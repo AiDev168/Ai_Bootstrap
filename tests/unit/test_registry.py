@@ -13,21 +13,25 @@ def test_registry_loads_defaults() -> None:
     # در مود REAL پشتیبانی نمی‌شود (چون هندلر واقعی ندارد)
     assert reg.is_supported("install_git", ExecutionMode.REAL) is False
 
+
 def test_get_handler_safe_mode() -> None:
     reg = ActionRegistry()
     handler = reg.get_handler("install_git", ExecutionMode.SAFE)
     assert handler is not None
+
 
 def test_get_handler_unknown() -> None:
     reg = ActionRegistry()
     with pytest.raises(KeyError):
         reg.get_handler("unknown_action_xyz", ExecutionMode.SAFE)
 
+
 def test_get_handler_real_mode_rejection() -> None:
     reg = ActionRegistry()
     # اکشن‌هایی که فقط سیف هستند در مود واقعی رد می‌شوند
     with pytest.raises(KeyError):
         reg.get_handler("install_git", ExecutionMode.REAL)
+
 
 def test_real_handler_approval() -> None:
     reg = ActionRegistry()

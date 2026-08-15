@@ -36,8 +36,12 @@ def test_bootstrap_service_runs_safe_plan_and_final_audit() -> None:
     )
 
     with (
-        patch("ai_engineering_bootstrap.bootstrap.service.default_audit_service") as audit_factory,
-        patch("ai_engineering_bootstrap.bootstrap.service.PipelineEngine") as pipeline_cls,
+        patch(
+            "ai_engineering_bootstrap.bootstrap.service.default_audit_service"
+        ) as audit_factory,
+        patch(
+            "ai_engineering_bootstrap.bootstrap.service.PipelineEngine"
+        ) as pipeline_cls,
     ):
         audit_factory.return_value.run.return_value = _report(True)
         pipeline = MagicMock()
@@ -91,7 +95,11 @@ def test_bootstrap_service_prompts_each_real_approval_independently() -> None:
             if provider.get_status(approval_id) is not None:
                 execution = ExecutionResult(
                     True,
-                    [ActionResult(action.action_id, ExecutionStatus.SUCCESS, "installed")],
+                    [
+                        ActionResult(
+                            action.action_id, ExecutionStatus.SUCCESS, "installed"
+                        )
+                    ],
                     "ok",
                 )
                 return MagicMock(
@@ -116,7 +124,9 @@ def test_bootstrap_service_prompts_each_real_approval_independently() -> None:
 
     pipeline.run.side_effect = run_side_effect
 
-    with patch("ai_engineering_bootstrap.bootstrap.service.default_audit_service") as audit_factory:
+    with patch(
+        "ai_engineering_bootstrap.bootstrap.service.default_audit_service"
+    ) as audit_factory:
         audit_factory.return_value.run.return_value = _report(True)
         service = EnvironmentBootstrapService(pipeline)
         result = service.run(

@@ -118,12 +118,14 @@ def test_capability_contains_no_callables() -> None:
 
     for field_name in cap.__dataclass_fields__:
         value = getattr(cap, field_name)
-        if callable(value) and not isinstance(
-            value, (str, Enum, list, dict, bool)
-        ) and (
-            inspect.isfunction(value)
-            or inspect.ismethod(value)
-            or inspect.isbuiltin(value)
+        if (
+            callable(value)
+            and not isinstance(value, (str, Enum, list, dict, bool))
+            and (
+                inspect.isfunction(value)
+                or inspect.ismethod(value)
+                or inspect.isbuiltin(value)
+            )
         ):
             pytest.fail(f"Field {field_name} contains a callable function/method!")
 

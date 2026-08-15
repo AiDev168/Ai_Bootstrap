@@ -23,47 +23,65 @@ class _SafeHandlerBase:
 
 
 class CheckPythonVersionSafeHandler(_SafeHandlerBase, ActionHandler):
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         return self._simulate_success(action)
 
 
 class InstallGitHandler(_SafeHandlerBase, ActionHandler):
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         return self._simulate_success(action)
 
 
 class InstallDockerHandler(_SafeHandlerBase, ActionHandler):
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         return self._simulate_success(action)
 
 
 class InstallCursorHandler(_SafeHandlerBase, ActionHandler):
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         return self._simulate_success(action)
 
 
 class FixVenvHandler(_SafeHandlerBase, ActionHandler):
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         return self._simulate_success(action)
 
 
 class FixEditableHandler(_SafeHandlerBase, ActionHandler):
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         return self._simulate_success(action)
 
 
 class UpgradePythonHandler(_SafeHandlerBase, ActionHandler):
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         return self._simulate_success(action)
 
 
 class CreateVirtualEnvSafeHandler(_SafeHandlerBase, ActionHandler):
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         return self._simulate_success(action)
 
 
 class InstallPythonPackageSafeHandler(_SafeHandlerBase, ActionHandler):
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         package = str(action.context.get("package", "")).strip()
         requirement = str(action.context.get("requirement", package)).strip()
         result = self._simulate_success(action)
@@ -84,7 +102,9 @@ class InstallPythonPackageSafeHandler(_SafeHandlerBase, ActionHandler):
 
 
 class InstallProjectDependenciesSafeHandler(_SafeHandlerBase, ActionHandler):
-    def execute(self, action: ExecutionPlanAction, context: ExecutionContext) -> ActionResult:
+    def execute(
+        self, action: ExecutionPlanAction, context: ExecutionContext
+    ) -> ActionResult:
         return self._simulate_success(action)
 
 

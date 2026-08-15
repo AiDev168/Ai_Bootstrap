@@ -39,9 +39,7 @@ class DependencyDiscovery:
 
         requirements: list[DependencyRequirement] = []
         project = data.get("project", {})
-        requirements.extend(
-            self._normalize(project.get("dependencies", []), "project")
-        )
+        requirements.extend(self._normalize(project.get("dependencies", []), "project"))
 
         if include_dev:
             optional = project.get("optional-dependencies", {})
@@ -56,9 +54,7 @@ class DependencyDiscovery:
         return sorted(unique.values(), key=lambda item: item.name.lower())
 
     @staticmethod
-    def _normalize(
-        requirements: list[str], source: str
-    ) -> list[DependencyRequirement]:
+    def _normalize(requirements: list[str], source: str) -> list[DependencyRequirement]:
         normalized: list[DependencyRequirement] = []
         for requirement in requirements:
             match = _DEPENDENCY_NAME.match(requirement.strip())

@@ -7,6 +7,7 @@ from typing import Any
 
 class AuditStatus(str, Enum):
     """Outcome reported by an individual audit probe (Source of Truth)."""
+
     AVAILABLE = "available"
     NOT_FOUND = "not_found"
     UNSUPPORTED = "unsupported"
@@ -15,6 +16,7 @@ class AuditStatus(str, Enum):
 
 class CheckStatus(str, Enum):
     """Status of an audit check mapped from AuditStatus for reporting."""
+
     PASSED = "passed"
     FAILED = "failed"
     WARNING = "warning"
@@ -22,6 +24,7 @@ class CheckStatus(str, Enum):
 
 class CheckCategory(str, Enum):
     """Categories for grouping audit checks in reports."""
+
     PYTHON = "Python"
     ENVIRONMENT = "Environment"
     DEPENDENCIES = "Dependencies"
@@ -34,6 +37,7 @@ class CheckCategory(str, Enum):
 @dataclass(frozen=True)
 class AuditCheck:
     """Represents a single audit check result normalized for reporting."""
+
     name: str
     status: CheckStatus
     category: CheckCategory = CheckCategory.SYSTEM
@@ -45,6 +49,7 @@ class AuditCheck:
 @dataclass(frozen=True)
 class EnvironmentReadiness:
     """Determines readiness for Development and Production environments."""
+
     development_ready: bool
     production_ready: bool
     passed_count: int
@@ -60,18 +65,21 @@ class EnvironmentReadiness:
         warnings = sum(1 for c in checks if c.status == CheckStatus.WARNING)
 
         dev_critical_names = {
-            "Python Version", "Virtual Environment", "Editable Install",
-            "Typer", "Rich", "Pytest", "Ruff", "Git",
+            "Python Version",
+            "Virtual Environment",
+            "Editable Install",
+            "Typer",
+            "Rich",
+            "Pytest",
+            "Ruff",
+            "Git",
         }
 
         dev_ready = True
         for check in checks:
-            if (
-                check.status == CheckStatus.FAILED
-                and (
-                    check.name in dev_critical_names
-                    or check.category == CheckCategory.DEPENDENCIES
-                )
+            if check.status == CheckStatus.FAILED and (
+                check.name in dev_critical_names
+                or check.category == CheckCategory.DEPENDENCIES
             ):
                 dev_ready = False
                 break
@@ -103,5 +111,6 @@ class EnvironmentReadiness:
 @dataclass(frozen=True)
 class AuditReport:
     """Complete audit report including readiness status."""
+
     checks: list[AuditCheck]
     readiness: EnvironmentReadiness

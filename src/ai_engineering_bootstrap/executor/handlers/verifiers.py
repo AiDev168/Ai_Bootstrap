@@ -44,7 +44,11 @@ class PythonVersionVerifier(ActionVerifier):
         current = sys.version_info[:2]
         required = (3, 8)
         observed = f"{current[0]}.{current[1]}"
-        status = VerificationStatus.VERIFIED if current >= required else VerificationStatus.FAILED
+        status = (
+            VerificationStatus.VERIFIED
+            if current >= required
+            else VerificationStatus.FAILED
+        )
         return VerificationResult(
             action.action_id,
             status,
@@ -115,7 +119,9 @@ class PythonPackageVerifier(ActionVerifier):
                     check=False,
                     shell=False,
                 )
-                version = completed.stdout.strip() if completed.returncode == 0 else None
+                version = (
+                    completed.stdout.strip() if completed.returncode == 0 else None
+                )
             except (OSError, subprocess.SubprocessError):
                 version = None
 
@@ -201,7 +207,9 @@ class ProjectDependenciesVerifier(ActionVerifier):
                 "Execution failed; nothing to verify.",
             )
 
-        project_name = str(action.context.get("project_name", "ai-engineering-bootstrap"))
+        project_name = str(
+            action.context.get("project_name", "ai-engineering-bootstrap")
+        )
         python_executable = str(action.context.get("python_executable", sys.executable))
         target = Path(python_executable)
         if not target.exists():
@@ -231,7 +239,9 @@ class ProjectDependenciesVerifier(ActionVerifier):
                     check=False,
                     shell=False,
                 )
-                version = completed.stdout.strip() if completed.returncode == 0 else None
+                version = (
+                    completed.stdout.strip() if completed.returncode == 0 else None
+                )
             except (OSError, subprocess.SubprocessError):
                 version = None
         if version is None:

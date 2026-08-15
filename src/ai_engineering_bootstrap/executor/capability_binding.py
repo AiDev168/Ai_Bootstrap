@@ -63,7 +63,9 @@ class CapabilityActionBinder:
         self, registry: CapabilityRegistry
     ) -> list[CapabilityBindingResult]:
         """Validate every capability in deterministic order."""
-        return [self.validate(capability) for capability in registry.list_capabilities()]
+        return [
+            self.validate(capability) for capability in registry.list_capabilities()
+        ]
 
 
 __all__ = ["CapabilityActionBinder", "CapabilityBindingResult"]

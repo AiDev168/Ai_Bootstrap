@@ -97,7 +97,9 @@ class InstallGitRealHandler(_UbuntuAptHandler):
         if error:
             return error
         try:
-            result = self._run(("sudo", "apt-get", "install", "-y", "git"), 600, interactive=True)
+            result = self._run(
+                ("sudo", "apt-get", "install", "-y", "git"), 600, interactive=True
+            )
         except (OSError, subprocess.SubprocessError) as exc:
             return self._result(
                 action, ExecutionStatus.FAILED, f"Git installation failed: {exc}"
@@ -146,7 +148,9 @@ class InstallDockerRealHandler(_UbuntuAptHandler):
                     output=output[-3000:],
                 )
             service = self._run(
-                ("sudo", "systemctl", "enable", "--now", "docker"), 120, interactive=True
+                ("sudo", "systemctl", "enable", "--now", "docker"),
+                120,
+                interactive=True,
             )
         except (OSError, subprocess.SubprocessError) as exc:
             return self._result(
@@ -222,7 +226,6 @@ class InstallCursorRealHandler(_UbuntuAptHandler):
             return None
         return value
 
-
     def _resolve_download_url(self, metadata_url: str) -> str:
         metadata = self._fetch_metadata(metadata_url)
         for key in ("debUrl", "downloadUrl"):
@@ -277,7 +280,9 @@ class InstallCursorRealHandler(_UbuntuAptHandler):
                         "Cursor installer download produced an empty package.",
                     )
                 result = self._run(
-                    ("sudo", "apt-get", "install", "-y", str(deb)), 900, interactive=True
+                    ("sudo", "apt-get", "install", "-y", str(deb)),
+                    900,
+                    interactive=True,
                 )
         except RuntimeError as exc:
             return self._result(

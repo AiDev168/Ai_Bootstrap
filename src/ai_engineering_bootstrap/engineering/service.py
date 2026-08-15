@@ -71,9 +71,13 @@ class EngineeringEnvironmentService:
     @staticmethod
     def _tool_path(name: str) -> str | None:
         if name == "pytest":
-            return shutil.which("pytest") or EngineeringEnvironmentService._python_module_path("pytest")
+            return shutil.which(
+                "pytest"
+            ) or EngineeringEnvironmentService._python_module_path("pytest")
         if name == "ruff":
-            return shutil.which("ruff") or EngineeringEnvironmentService._python_module_path("ruff")
+            return shutil.which(
+                "ruff"
+            ) or EngineeringEnvironmentService._python_module_path("ruff")
         if name == "git":
             return shutil.which("git")
         if name == "docker":

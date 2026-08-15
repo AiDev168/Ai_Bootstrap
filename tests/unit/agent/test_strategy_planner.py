@@ -1,6 +1,5 @@
 """Tests for strategy planner."""
 
-
 from ai_engineering_bootstrap.agent.provider import MockProvider
 from ai_engineering_bootstrap.agent.strategy_planner import (
     StrategyDecision,
@@ -121,7 +120,9 @@ class TestStrategyPlannerDeterministic:
                 ToolDelta(
                     tool_id="python",
                     action=DeltaAction.NONE,
-                    actual_status=ToolStatus(tool_id="python", status="ready", version="3.12.0"),
+                    actual_status=ToolStatus(
+                        tool_id="python", status="ready", version="3.12.0"
+                    ),
                 )
             ],
             package_deltas=[],
@@ -138,7 +139,6 @@ class TestStrategyPlannerDeterministic:
                 ToolDelta(
                     tool_id="cursor",
                     action=DeltaAction.INSTALL,
-                    
                     actual_status=ToolStatus(tool_id="cursor", status="missing"),
                 )
             ],
@@ -158,7 +158,6 @@ class TestStrategyPlannerDeterministic:
                 ToolDelta(
                     tool_id="ruff",
                     action=DeltaAction.INSTALL,
-                    
                     actual_status=ToolStatus(tool_id="cursor", status="missing"),
                 )
             ],
@@ -178,19 +177,16 @@ class TestStrategyPlannerDeterministic:
                 ToolDelta(
                     tool_id="cursor",
                     action=DeltaAction.INSTALL,
-                    
                     actual_status=ToolStatus(tool_id="cursor", status="missing"),
                 ),
                 ToolDelta(
                     tool_id="ruff",
                     action=DeltaAction.INSTALL,
-                    
                     actual_status=ToolStatus(tool_id="cursor", status="missing"),
                 ),
                 ToolDelta(
                     tool_id="pytest",
                     action=DeltaAction.INSTALL,
-                    
                     actual_status=ToolStatus(tool_id="cursor", status="missing"),
                 ),
             ],
@@ -219,7 +215,6 @@ class TestStrategyPlannerWithLLM:
                 ToolDelta(
                     tool_id="cursor",
                     action=DeltaAction.INSTALL,
-                    
                     actual_status=ToolStatus(tool_id="cursor", status="missing"),
                 )
             ],
@@ -237,7 +232,6 @@ class TestStrategyPlannerWithLLM:
                 ToolDelta(
                     tool_id="ruff",
                     action=DeltaAction.INSTALL,
-                    
                     actual_status=ToolStatus(tool_id="cursor", status="missing"),
                 )
             ],
@@ -264,7 +258,6 @@ class TestStrategyPlannerEdgeCases:
                 ToolDelta(
                     tool_id="unknown_tool_xyz",
                     action=DeltaAction.INSTALL,
-                    
                     actual_status=ToolStatus(tool_id="cursor", status="missing"),
                 )
             ],
@@ -282,7 +275,6 @@ class TestStrategyPlannerEdgeCases:
                 ToolDelta(
                     tool_id="cursor",
                     action=DeltaAction.INSTALL,
-                    
                     actual_status=ToolStatus(tool_id="cursor", status="missing"),
                 )
             ],
@@ -301,7 +293,6 @@ class TestStrategyPlannerEdgeCases:
                 ToolDelta(
                     tool_id="python",
                     action=DeltaAction.UPGRADE,
-                    
                     actual_status=ToolStatus(tool_id="python", status="installed"),
                 )
             ],

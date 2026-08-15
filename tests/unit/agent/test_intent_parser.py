@@ -1,6 +1,5 @@
 """Tests for LLM-powered intent parsing."""
 
-
 from ai_engineering_bootstrap.agent.intent_parser import IntentParser, ParsedIntent
 from ai_engineering_bootstrap.agent.provider import MockProvider
 
@@ -13,7 +12,6 @@ class TestParsedIntent:
         intent = ParsedIntent()
         assert intent.natural_language_goal == ""
         assert intent.required_tools == []
-        assert intent.optional_tools == []
         assert intent.confidence == 0.0
 
     def test_create_intent_with_data(self) -> None:
@@ -59,7 +57,7 @@ class TestIntentParserDeterministic:
         self.parser = IntentParser(provider=None)
 
     def test_parse_simple_python_request(self) -> None:
-        """Test parsing simple Python environment request."""
+        """Explicitly named Python environment requires Python."""
         text = "I need a Python environment for development"
         intent = self.parser.parse(text)
 
@@ -68,23 +66,23 @@ class TestIntentParserDeterministic:
         assert intent.confidence == 0.7
 
     def test_parse_ai_ml_request(self) -> None:
-        """Test parsing AI/ML environment request."""
+        """Framework mentions are captured without inventing extra installers."""
         text = "Set up machine learning environment with PyTorch"
         intent = self.parser.parse(text)
 
-        assert "python" in intent.required_tools
+        assert "python" not in intent.required_tools
         assert "pytorch" in intent.frameworks
-        assert "transformers" in intent.frameworks
+        assert "transformers" not in intent.frameworks
 
     def test_parse_fastapi_request(self) -> None:
-        """Test parsing FastAPI environment request."""
+        """Framework mention alone does not invent a package/tool install."""
         text = "Prepare FastAPI project environment"
         intent = self.parser.parse(text)
 
-        assert "python" in intent.required_tools
+        assert "python" not in intent.required_tools
         assert "fastapi" in intent.frameworks
-        assert "pytest" in intent.required_tools
-        assert "uvicorn" in intent.project_dependencies
+        assert "pytest" not in intent.required_tools
+        assert "uvicorn" not in intent.project_dependencies
 
     def test_parse_constraints(self) -> None:
         """Test parsing constraint specifications."""
@@ -95,7 +93,7 @@ class TestIntentParserDeterministic:
         assert "use_virtualenv" in intent.constraints
 
     def test_parse_multiple_tools(self) -> None:
-        """Test parsing multiple tool mentions."""
+        """Test parsing multiple explicitly requested installers."""
         text = "Install python, git, docker, ruff, and black"
         intent = self.parser.parse(text)
 
@@ -127,17 +125,14 @@ class TestIntentParserWithLLM:
         text = "Python environment for AI development"
         intent = self.parser.parse(text)
 
-        # Should return some result (may fallback to deterministic)
         assert isinstance(intent, ParsedIntent)
         assert intent.natural_language_goal == text
 
     def test_fallback_on_llm_failure(self) -> None:
         """Test fallback to deterministic on LLM failure."""
-        # MockProvider will fail for non-fix contexts
         text = "Setup environment"
         intent = self.parser.parse(text)
 
-        # Should still return valid intent via fallback
         assert isinstance(intent, ParsedIntent)
 
 
@@ -159,12 +154,11 @@ class TestIntentParserEdgeCases:
         text = "Install weirdtool123 and unknownpkg"
         intent = self.parser.parse(text)
 
-        # Should not match unknown tools
         assert "weirdtool123" not in intent.required_tools
         assert "unknownpkg" not in intent.required_tools
 
     def test_case_insensitive(self) -> None:
-        """Test case-insensitive parsing."""
+        """Test case-insensitive explicit environment tool detection."""
         text = "PYTHON and FASTAPI environment"
         intent = self.parser.parse(text)
 
@@ -172,11 +166,10 @@ class TestIntentParserEdgeCases:
         assert "fastapi" in intent.frameworks
 
     def test_very_long_input(self) -> None:
-        """Test parsing very long input."""
+        """Test parsing very long input without truncating explicit install targets."""
         text = "I need a comprehensive development environment with " * 100
         text += "python, git, and docker for sure"
         intent = self.parser.parse(text)
 
-        assert "python" in intent.required_tools
-        assert "git" in intent.required_tools
-        assert "docker" in intent.required_tools
+        assert {"python", "git", "docker"}.issubset(set(intent.required_tools))
+        assert "python" in intent.languages

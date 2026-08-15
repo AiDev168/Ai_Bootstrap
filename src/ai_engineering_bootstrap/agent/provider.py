@@ -102,9 +102,7 @@ class LocalServerProvider(LLMProvider):
         except TimeoutError as error:
             raise ProviderTimeoutError("Request timed out.") from error
         except json.JSONDecodeError as error:
-            raise ProviderResponseError(
-                f"Invalid response JSON: {error}"
-            ) from error
+            raise ProviderResponseError(f"Invalid response JSON: {error}") from error
 
     def _build_payload(self, prompt: str) -> dict[str, Any]:
         system_prompt = (
@@ -152,11 +150,14 @@ class LocalServerProvider(LLMProvider):
     def _request(self, payload: dict[str, Any]) -> dict[str, Any]:
         data = json.dumps(payload).encode("utf-8")
         base_url = self.config.base_url.rstrip("/")
-        request = urllib.request.Request(
-            f"{base_url}/v1/chat/completions",
-            data=data,
-            headers={"Content-Type": "application/json"},
-        )
+        if base_url.endswith("/v1"):
+            endpoint = f"{base_url}/chat/completions"
+        else:
+            endpoint = f"{base_url}/v1/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+        request = urllib.request.Request(endpoint, data=data, headers=headers)
 
         with urllib.request.urlopen(request, timeout=self.config.timeout) as response:
             return json.loads(response.read().decode("utf-8"))
@@ -174,8 +175,7 @@ class LocalServerProvider(LLMProvider):
         capabilities: list[Capability],
     ) -> str:
         cap_list = "\n".join(
-            f"- ID: {capability.capability_id}, "
-            f"Description: {capability.description}"
+            f"- ID: {capability.capability_id}, Description: {capability.description}"
             for capability in capabilities
         )
         thinking_instruction = (
@@ -197,13 +197,13 @@ class LocalServerProvider(LLMProvider):
     def _parse_response(self, data: dict[str, Any]) -> AgentDecision:
         choices = data.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise ProviderResponseError(
-                "Provider response contains no choices."
-            )
+            raise ProviderResponseError("Provider response contains no choices.")
 
         choice = choices[0]
         if not isinstance(choice, dict):
-            raise ProviderResponseError("Provider response contains invalid choice data.")
+            raise ProviderResponseError(
+                "Provider response contains invalid choice data."
+            )
 
         finish_reason = choice.get("finish_reason")
         if finish_reason == "length":
@@ -219,18 +219,17 @@ class LocalServerProvider(LLMProvider):
 
         message = choice.get("message") or {}
         if not isinstance(message, dict):
-            raise ProviderResponseError("Provider response contains invalid message data.")
+            raise ProviderResponseError(
+                "Provider response contains invalid message data."
+            )
 
         content = message.get("content")
-
         if not isinstance(content, str) or not content.strip():
             content = message.get("reasoning_content")
-
         if not isinstance(content, str) or not content.strip():
             reasoning = message.get("reasoning")
             if isinstance(reasoning, str):
                 content = reasoning
-
         if not isinstance(content, str) or not content.strip():
             raise ProviderResponseError(
                 "Provider returned empty decision content. "
@@ -242,12 +241,10 @@ class LocalServerProvider(LLMProvider):
     @staticmethod
     def _decision_from_content(content: str) -> AgentDecision:
         normalized = content.strip()
-
         if normalized.startswith("```json"):
-            normalized = normalized[len("```json"):].strip()
+            normalized = normalized[len("```json") :].strip()
         elif normalized.startswith("```"):
             normalized = normalized[3:].strip()
-
         if normalized.endswith("```"):
             normalized = normalized[:-3].strip()
 
@@ -257,10 +254,8 @@ class LocalServerProvider(LLMProvider):
             raise ProviderResponseError(
                 f"Could not parse JSON. Received: {normalized[:300]}..."
             ) from error
-
         if not isinstance(decision_data, dict):
             raise ProviderResponseError("Provider decision must be a JSON object.")
-
         selected = decision_data.get("selected_capability_ids", [])
         if not isinstance(selected, list) or not all(
             isinstance(item, str) for item in selected
@@ -268,18 +263,15 @@ class LocalServerProvider(LLMProvider):
             raise ProviderResponseError(
                 "selected_capability_ids must be a JSON array of strings."
             )
-
         try:
             confidence = float(decision_data.get("confidence", 0.5))
         except (TypeError, ValueError) as error:
             raise ProviderResponseError("confidence must be numeric.") from error
-
         return AgentDecision(
             reasoning_summary=str(decision_data.get("reasoning_summary", "")),
             selected_capability_ids=selected,
             confidence=confidence,
         )
-
 
 
 class RemoteAPIProvider(LLMProvider):
@@ -328,62 +320,45 @@ class RemoteAPIProvider(LLMProvider):
         except TimeoutError as error:
             raise ProviderTimeoutError("Request timed out.") from error
         except json.JSONDecodeError as error:
-            raise ProviderResponseError(
-                f"Invalid response: {error}"
-            ) from error
+            raise ProviderResponseError(f"Invalid response: {error}") from error
 
     def _build_prompt(
         self,
         context: str,
         capabilities: list[Capability],
     ) -> str:
-        cap_list = ", ".join(
-            capability.capability_id for capability in capabilities
-        )
-        return (
-            f"Select IDs for: {context}. "
-            f"Available: [{cap_list}]. Output JSON."
-        )
+        cap_list = ", ".join(capability.capability_id for capability in capabilities)
+        return f"Select IDs for: {context}. Available: [{cap_list}]. Output JSON."
 
     def _parse_response(self, data: dict[str, Any]) -> AgentDecision:
         choices = data.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise ProviderResponseError(
-                "Provider response contains no choices."
-            )
-
+            raise ProviderResponseError("Provider response contains no choices.")
         message = choices[0].get("message") or {}
         content = message.get("content")
-
         if not isinstance(content, str) or not content.strip():
             raise ProviderResponseError("No content in API response.")
-
         try:
             decision_data = json.loads(content)
         except json.JSONDecodeError as error:
             raise ProviderResponseError(
                 f"Could not parse JSON: {content[:300]}..."
             ) from error
-
         if not isinstance(decision_data, dict):
             raise ProviderResponseError("Provider decision must be a JSON object.")
-
         selected = decision_data.get("selected_capability_ids", [])
         if not selected and "capability_id" in decision_data:
             selected = [decision_data["capability_id"]]
-
         if not isinstance(selected, list) or not all(
             isinstance(item, str) for item in selected
         ):
             raise ProviderResponseError(
                 "selected_capability_ids must be a JSON array of strings."
             )
-
         try:
             confidence = float(decision_data.get("confidence", 0.5))
         except (TypeError, ValueError) as error:
             raise ProviderResponseError("confidence must be numeric.") from error
-
         return AgentDecision(
             reasoning_summary=str(decision_data.get("reasoning_summary", "")),
             selected_capability_ids=selected,
@@ -395,13 +370,8 @@ class RemoteAPIProvider(LLMProvider):
         context: str,
         capabilities: list[Capability],
     ) -> str:
-        cap_list = ", ".join(
-            capability.capability_id for capability in capabilities
-        )
-        return (
-            f"Select IDs for: {context}. "
-            f"Available: [{cap_list}]. Output JSON."
-        )
+        cap_list = ", ".join(capability.capability_id for capability in capabilities)
+        return f"Select IDs for: {context}. Available: [{cap_list}]. Output JSON."
 
 
 class InProcessProvider(LLMProvider):
@@ -418,60 +388,38 @@ class InProcessProvider(LLMProvider):
     ) -> AgentDecision:
         if self.model is None:
             raise ProviderConnectionError("No model instance provided.")
-
         try:
             prompt = self._build_prompt(context, available_capabilities)
-
             if not hasattr(self.model, "generate"):
-                raise ProviderResponseError(
-                    "Model has no 'generate' method."
-                )
-
+                raise ProviderResponseError("Model has no 'generate' method.")
             output = self.model.generate(prompt)
             decision_data = json.loads(output)
-
             if not isinstance(decision_data, dict):
-                raise ProviderResponseError(
-                    "Provider decision must be a JSON object."
-                )
-
+                raise ProviderResponseError("Provider decision must be a JSON object.")
             selected = decision_data.get("selected_capability_ids", [])
             if not selected and "capability_id" in decision_data:
                 selected = [decision_data["capability_id"]]
-
             if not isinstance(selected, list) or not all(
                 isinstance(item, str) for item in selected
             ):
                 raise ProviderResponseError(
                     "selected_capability_ids must be a JSON array of strings."
                 )
-
             try:
-                confidence = float(
-                    decision_data.get("confidence", 0.5)
-                )
+                confidence = float(decision_data.get("confidence", 0.5))
             except (TypeError, ValueError) as error:
-                raise ProviderResponseError(
-                    "confidence must be numeric."
-                ) from error
-
+                raise ProviderResponseError("confidence must be numeric.") from error
             return AgentDecision(
-                reasoning_summary=str(
-                    decision_data.get("reasoning_summary", "")
-                ),
+                reasoning_summary=str(decision_data.get("reasoning_summary", "")),
                 selected_capability_ids=selected,
                 confidence=confidence,
             )
         except (ProviderConnectionError, ProviderResponseError):
             raise
         except json.JSONDecodeError as error:
-            raise ProviderResponseError(
-                f"Could not parse JSON: {error}"
-            ) from error
+            raise ProviderResponseError(f"Could not parse JSON: {error}") from error
         except Exception as error:
-            raise ProviderResponseError(
-                f"Model execution failed: {error}"
-            ) from error
+            raise ProviderResponseError(f"Model execution failed: {error}") from error
 
     def _build_prompt(
         self,
@@ -487,23 +435,16 @@ class InProcessProvider(LLMProvider):
 
 def build_provider(config: ProviderConfig) -> LLMProvider:
     """Create a provider from a validated provider configuration."""
-
     if config.provider_type == "local_server":
         return LocalServerProvider(config)
-
     if config.provider_type == "remote_api":
         api_key = config.api_key
-
         if not api_key:
             env_name = config.options.get("api_key_env")
             if env_name:
                 api_key = os.environ.get(str(env_name))
-
         if not api_key:
-            raise ProviderConnectionError(
-                "Remote API provider requires an API key."
-            )
-
+            raise ProviderConnectionError("Remote API provider requires an API key.")
         return RemoteAPIProvider(
             ProviderConfig(
                 provider_type=config.provider_type,
@@ -514,16 +455,11 @@ def build_provider(config: ProviderConfig) -> LLMProvider:
                 options=config.options,
             )
         )
-
     if config.provider_type == "in_process":
         return InProcessProvider(config)
-
     if config.provider_type == "mock":
         return MockProvider()
-
-    raise ValueError(
-        f"Unsupported provider type: {config.provider_type}"
-    )
+    raise ValueError(f"Unsupported provider type: {config.provider_type}")
 
 
 __all__ = [

@@ -14,7 +14,9 @@ class FailureDiagnosis:
     """Diagnosis of a failed action."""
 
     action_id: str
-    failure_type: str  # e.g., "download_failed", "installation_error", "verification_failed"
+    failure_type: (
+        str  # e.g., "download_failed", "installation_error", "verification_failed"
+    )
     root_cause: str
     suggested_recovery: str
     confidence: float = 0.0
@@ -140,8 +142,14 @@ class FailureDiagnoser:
         error_lower = error_message.lower()
 
         # Match against known patterns
-        for pattern_key, (pattern_desc, recovery_desc) in self._failure_patterns.items():
-            if pattern_key.replace("_", " ") in error_lower or pattern_key in error_lower:
+        for pattern_key, (
+            pattern_desc,
+            recovery_desc,
+        ) in self._failure_patterns.items():
+            if (
+                pattern_key.replace("_", " ") in error_lower
+                or pattern_key in error_lower
+            ):
                 return FailureDiagnosis(
                     action_id=execution.action_id,
                     failure_type=pattern_key,
@@ -186,8 +194,8 @@ Analyze the following failed action and diagnose the root cause:
 
 Action ID: {execution.action_id}
 Action Type: {execution.action_type}
-Tool: {getattr(execution, 'tool_id', 'unknown')}
-Strategy: {getattr(execution, 'strategy', 'unknown')}
+Tool: {getattr(execution, "tool_id", "unknown")}
+Strategy: {getattr(execution, "strategy", "unknown")}
 Retry Count: {retry_count}
 
 Error Message:

@@ -38,7 +38,10 @@ def default_audit_service(project_root: Path | None = None) -> AuditService:
         PythonVersionProbe(),
         VirtualEnvProbe(),
         EditableInstallProbe(),
-        *[ProjectDependencyProbe(req) for req in DependencyDiscovery(root).discover(include_dev=True)],
+        *[
+            ProjectDependencyProbe(req)
+            for req in DependencyDiscovery(root).discover(include_dev=True)
+        ],
         GitExecutableProbe(),
         DockerExecutableProbe(),
         CursorExecutableProbe(),
@@ -49,4 +52,14 @@ def default_audit_service(project_root: Path | None = None) -> AuditService:
     ]
     return AuditService(probes=probes)
 
-__all__ = ["AuditCheck", "AuditReport", "AuditService", "EnvironmentReadiness", "EvidenceEvent", "ExecutionAuditService", "RunEvidence", "default_audit_service"]
+
+__all__ = [
+    "AuditCheck",
+    "AuditReport",
+    "AuditService",
+    "EnvironmentReadiness",
+    "EvidenceEvent",
+    "ExecutionAuditService",
+    "RunEvidence",
+    "default_audit_service",
+]

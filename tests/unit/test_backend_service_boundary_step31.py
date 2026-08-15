@@ -27,13 +27,17 @@ def _delta() -> EnvironmentDelta:
             ToolDelta(
                 tool_id="cursor",
                 action=DeltaAction.INSTALL,
-                desired_requirement=ToolRequirement("cursor", ToolRequirementLevel.REQUIRED),
+                desired_requirement=ToolRequirement(
+                    "cursor", ToolRequirementLevel.REQUIRED
+                ),
                 actual_status=ToolStatus("cursor", "missing"),
             ),
             ToolDelta(
                 tool_id="ruff",
                 action=DeltaAction.INSTALL,
-                desired_requirement=ToolRequirement("ruff", ToolRequirementLevel.REQUIRED),
+                desired_requirement=ToolRequirement(
+                    "ruff", ToolRequirementLevel.REQUIRED
+                ),
                 actual_status=ToolStatus("ruff", "missing"),
             ),
         ],
@@ -76,10 +80,11 @@ def test_execution_plan_builder_maps_known_actions() -> None:
 
     assert plan.is_actionable
     assert [action.action_id for action in plan.actions] == [
-        "install_cursor",
-        "install_python_package",
-        "install_python_package",
+        "install_cursor:cursor",
+        "install_python_package:ruff",
+        "install_python_package:pytest",
     ]
+    assert len({action.action_id for action in plan.actions}) == len(plan.actions)
 
 
 def test_execution_plan_builder_fails_closed_for_unknown_strategy() -> None:
