@@ -3,7 +3,10 @@
 import re
 from pathlib import Path
 
-HTML_PATH = Path(__file__).resolve().parents[2] / "src/ai_engineering_bootstrap/gui/static/index.html"
+HTML_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "src/ai_engineering_bootstrap/gui/static/index.html"
+)
 RUNTIME_PATH = HTML_PATH.with_name("app-runtime.js")
 
 
@@ -41,7 +44,7 @@ def test_dashboard_has_professional_console_i18n_and_timeline_controls() -> None
         "stage-verification",
         "stage-recovery",
         "stage-error",
-        "data-start=\"safe\"",
+        'data-start="safe"',
         "/llm/settings",
         "/llm/test",
         "/llm/models",
