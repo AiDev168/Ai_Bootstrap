@@ -80,11 +80,15 @@ class EnvironmentRequest:
                     else {},
                 )
 
-        packages = [
-            package
-            for package in self.project_dependencies
-            if package.name.lower() not in excluded_packages
-        ]
+        packages: list[PythonPackageRequirement] = []
+        seen_packages: set[str] = set()
+        for package in self.project_dependencies:
+            key = package.name.strip().lower()
+            if not key or key in excluded_packages or key in seen_packages:
+                continue
+            seen_packages.add(key)
+            packages.append(package)
+
         constraints = dict(self.constraints)
         if self.excluded_tools:
             constraints["excluded_tools"] = list(self.excluded_tools)
